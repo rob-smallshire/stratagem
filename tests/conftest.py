@@ -71,6 +71,14 @@ def boot_until_ready(bbc: Beebium, game_build: BuildResult, program: str) -> dic
     Returns that program's labels."""
     labels = game_build.labels[program]
     status_address = labels["zp_boot_status"]
+    # Shift-Break before the OS has finished starting garbles the boot
+    # (beebium #125), so wait for the language's prompt first.
+    prompt = bbc.run_until_or_timeout(
+        lambda: bbc.video.screen_text().text.rstrip().endswith(">"),
+        BOOT_TIMEOUT_EMULATED_SECONDS,
+    )
+    assert prompt, "no prompt after power-on"
+    bbc.disc.set_spin_up_delay(False)
     bbc.boot_disc(str(game_build.disc_filepath))
     ready = bbc.run_until_or_timeout(
         lambda: bbc.memory.address.peek[status_address] == BOOT_READY,
