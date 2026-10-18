@@ -34,3 +34,8 @@ CRTC R1 to `&40`, giving 64 character columns (128 MODE 2 pixels) by 32 rows
 (`set_crtc_start_address`, L6108; `consider_setting_crtc_start_address`,
 L6098). The palette is `palette_registers_table` (L3969), and water is
 drawn by changing colour 0 mid-frame in the IRQ handler (L4087-4103).
+
+Tile shapes: `obstruction_patterns` (L551 in the enhanced disassembly) gives
+each tile shape eight heights, one per eighth of the tile's width (`&00`
+empty, `&ff` fully obstructed), with tile flips reusing them for other
+orientations. Slopes and curves are just height maps.

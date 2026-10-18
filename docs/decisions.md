@@ -34,3 +34,8 @@ A running log of design decisions. Add to it whenever one is made.
   displayed so new rows are drawn hidden; new columns drawn after vsync
   ahead of the beam; both axes per frame; a camera window with an eased
   lead; a 32 x 32 tile cache in low RAM. See `architecture.md`.
+- **Progression:** follow a Terraria-like progression. Flight is earned in
+  stages, starting with a double jump (then, for example, thrust boots, a
+  fuelled Exile-style jetpack, longer endurance).
+- **Graphics detail** is set aside for now; tile *shapes* (slopes, partly
+  dug tiles) are in scope, as they change play.
