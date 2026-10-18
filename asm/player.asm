@@ -274,8 +274,13 @@
     STA zp_stop + 1
 .stop_set
     \ Climb a ledge: if on the ground, the ledge is at most a tile high (and
-    \ no higher than the top of the world), and there is room above it.
+    \ no higher than the top of the world), and there is room above it; but
+    \ not while digging downwards, when a ledge is something to dig into.
     LDA zp_player_on_ground
+    BEQ stop
+    LDA zp_input
+    AND #INPUT_ACTION OR INPUT_DOWN
+    CMP #INPUT_ACTION OR INPUT_DOWN
     BEQ stop
     SEC                         \ lift = py + PLAYER_HEIGHT - top
     LDA zp_box_y

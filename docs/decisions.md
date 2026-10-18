@@ -61,3 +61,7 @@ A running log of design decisions. Add to it whenever one is made.
   first, but first shape the step into a ramp (the floor under the leading
   edge going down, the tile ahead at the feet going up). While L is held, K
   aims rather than jumps.
+- **No climbing while digging down:** with L and M held, slopes and ledges
+  ahead aren't climbed, so a diagonal dig cuts down into a rising slope
+  instead of walking up it. Digging straight ahead into a slope still walks
+  up it: digging down a little first, to make a pit, is part of the game.

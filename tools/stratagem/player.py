@@ -15,7 +15,9 @@ Then the player moves horizontally and vertically, each separately. A tile
 is solid in some of its quarter-cells (2 pixels by 4 lines), by its shape,
 so a move that would overlap solid quarter-cells stops flush against the
 nearest of them. Walking into a ledge at most a tile high climbs it, if
-there is room above, so a slope is climbed a quarter-cell step at a time;
+there is room above, so a slope is climbed a quarter-cell step at a time
+(but not while digging downwards, with ACTION and DOWN held: then a slope
+or ledge ahead is something to dig into, not to climb);
 and a player who was standing doesn't fall off a step down shallower than
 SNAP_DOWN lines (a quarter-cell step), but follows the ground down it. Every move is less than a
 tile, so the player can never pass through one; and as the player was clear
@@ -28,7 +30,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.tiles import QUARTER_LINES, QUARTER_PIXELS, solid_quarter_cells
 
 PLAYER_WIDTH = 6        # pixels
@@ -125,7 +127,9 @@ def step(player: Player, inputs: int, tile_at: TileAt, abilities: int = STARTING
             x = new_x
         else:
             lift = py + PLAYER_HEIGHT - min(rect[2] for rect in found)
-            if player.on_ground and lift <= TILE_HEIGHT and lift <= py and box_free(tile_at, new_px, py - lift):
+            digging_down = inputs & INPUT_ACTION and inputs & INPUT_DOWN
+            if (player.on_ground and not digging_down and lift <= TILE_HEIGHT and lift <= py
+                    and box_free(tile_at, new_px, py - lift)):
                 x, y = new_x, (py - lift) << 4      # Climb the ledge
             else:
                 if vx > 0:
