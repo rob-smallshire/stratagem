@@ -1,5 +1,5 @@
-"""A model of the camera in asm/main.asm: a focus point moved by the keys,
-and a camera that follows it, exactly as the 6502 does it.
+"""A model of the camera in asm/main.asm, which follows a focus point (the
+player), exactly as the 6502 does it.
 
 The focus is in pixels (x, 0-2047) and lines (y, 0-4095). The camera is the
 world cell at the top left of the view: x in columns (two pixels), y in
@@ -7,15 +7,12 @@ character rows (eight lines).
 
 The camera keeps the focus inside a window around the centre of the view
 (a dead zone), so small movements don't scroll. Horizontally the window
-shifts against the direction of travel by a lead that eases towards
-LEAD_MAX, to show more of what lies ahead, as Exile's scrolling velocity
-does. The camera moves up to MAX_STEP_X columns a frame, more the further
+shifts against the focus's direction of travel by a lead that eases
+towards LEAD_MAX, to show more of what lies ahead, as Exile's scrolling
+velocity does. The camera moves up to MAX_STEP_X columns a frame, more the further
 the focus is outside the window, and one row a frame vertically (the hidden
 row can take only one new row a frame). If the focus leaves the view
 altogether, as when teleporting, the view is redrawn centred on it.
-
-The focus marker is MARKER_COLUMNS wide and MARKER_LINES high, with its top
-left at the focus.
 """
 
 from __future__ import annotations
@@ -28,13 +25,6 @@ WORLD_COLUMNS = 1024
 WORLD_ROWS = 512
 CAMERA_X_MAX = WORLD_COLUMNS - VIEW_COLUMNS          # 960
 CAMERA_Y_MAX = WORLD_ROWS - VIEW_ROWS                # 481
-
-MARKER_COLUMNS = 2
-MARKER_LINES = 16
-FOCUS_X_MAX = WORLD_COLUMNS * 2 - MARKER_COLUMNS * 2  # 2044
-FOCUS_Y_MAX = WORLD_ROWS * 8 - MARKER_LINES           # 4080
-FOCUS_SPEED_X = 2    # pixels a frame
-FOCUS_SPEED_Y = 4    # lines a frame
 
 WINDOW_LEFT = 24     # columns: the window is WINDOW_LEFT <= x < WINDOW_RIGHT
 WINDOW_RIGHT = 40
@@ -64,25 +54,15 @@ def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
 
-def _direction(inputs: int, negative: int, positive: int) -> int:
-    return (1 if inputs & positive else 0) - (1 if inputs & negative else 0)
-
-
-def update_focus(state: Camera, inputs: int) -> Camera:
-    vx = _direction(inputs, INPUT_LEFT, INPUT_RIGHT)
-    vy = _direction(inputs, INPUT_UP, INPUT_DOWN)
-    focus_x = _clamp(state.focus_x + FOCUS_SPEED_X * vx, 0, FOCUS_X_MAX)
-    focus_y = _clamp(state.focus_y + FOCUS_SPEED_Y * vy, 0, FOCUS_Y_MAX)
+def plan_camera(state: Camera, direction: int) -> Camera:
+    """Ease the lead towards the focus's direction of travel (-1, 0 or 1),
+    then decide where the camera goes."""
     lead = state.lead
-    target = vx * LEAD_MAX
-    if lead < target:
+    if lead < direction * LEAD_MAX:
         lead += 1
-    elif lead > target:
+    elif lead > direction * LEAD_MAX:
         lead -= 1
-    return replace(state, focus_x=focus_x, focus_y=focus_y, lead=lead)
-
-
-def plan_camera(state: Camera) -> Camera:
+    state = replace(state, lead=lead)
     column = state.focus_x >> 1
     row = state.focus_y >> 3
     x = column - state.camera_x
@@ -112,13 +92,3 @@ def plan_camera(state: Camera) -> Camera:
     camera_y = _clamp(state.camera_y + dy, 0, CAMERA_Y_MAX)
     return replace(state, camera_x=camera_x, camera_y=camera_y,
                    dx=camera_x - state.camera_x, dy=camera_y - state.camera_y, redraw=False)
-
-
-def step(state: Camera, inputs: int) -> Camera:
-    """One frame: move the focus by the inputs, then plan the camera."""
-    return plan_camera(update_focus(state, inputs))
-
-
-def marker_screen_position(state: Camera) -> tuple[int, int]:
-    """The marker's view column and line."""
-    return (state.focus_x >> 1) - state.camera_x, state.focus_y - state.camera_y * 8

@@ -1,6 +1,7 @@
 """The 6502 focus and camera planning match the Python model, frame by frame."""
 
 import random
+from dataclasses import replace
 
 import pytest
 
@@ -31,8 +32,8 @@ def _get16(memory, address: int) -> int:
     return memory[address] | memory[address + 1] << 8
 
 
-def write_state(memory, labels, state: Camera, inputs: int) -> None:
-    memory[labels["zp_input"]] = inputs
+def write_state(memory, labels, state: Camera, direction: int) -> None:
+    memory[labels["zp_direction"]] = direction & 0xFF
     _put16(memory, labels["zp_focus_x"], state.focus_x)
     _put16(memory, labels["zp_focus_y"], state.focus_y)
     memory[labels["zp_lead"]] = state.lead & 0xFF
@@ -53,9 +54,13 @@ def read_state(memory, labels) -> Camera:
     )
 
 
+FOCUS_X_MAX = camera.WORLD_COLUMNS * 2 - 1
+FOCUS_Y_MAX = camera.WORLD_ROWS * 8 - 1
+
+
 def _random_state(rng: random.Random) -> Camera:
-    focus_x = rng.choice([0, 1, 2, camera.FOCUS_X_MAX, rng.randrange(camera.FOCUS_X_MAX + 1)])
-    focus_y = rng.choice([0, 3, camera.FOCUS_Y_MAX, rng.randrange(camera.FOCUS_Y_MAX + 1)])
+    focus_x = rng.choice([0, 1, 2, FOCUS_X_MAX, rng.randrange(FOCUS_X_MAX + 1)])
+    focus_y = rng.choice([0, 3, FOCUS_Y_MAX, rng.randrange(FOCUS_Y_MAX + 1)])
     if rng.random() < 0.8:
         # Near the focus, as in play; otherwise anywhere, forcing a redraw.
         camera_x = (focus_x >> 1) - rng.randrange(camera.VIEW_COLUMNS)
@@ -79,16 +84,19 @@ def test_camera_matches_model(main_machine, game_build):
     frames = 0
     for _ in range(300):
         state = _random_state(rng)
-        inputs = 0
+        direction = 0
         for _ in range(60):
             if rng.random() < 0.15:
-                inputs = rng.randrange(16)     # held for several frames, as keys are
-            write_state(memory, labels, state, inputs)
-            main_machine.call(labels["update_focus"])
+                direction = rng.choice([-1, 0, 1])     # held for several frames
+            # The focus wanders as a player does: up to 2 pixels and 6 lines a frame.
+            focus_x = max(0, min(FOCUS_X_MAX, state.focus_x + direction * rng.randint(0, 2)))
+            focus_y = max(0, min(FOCUS_Y_MAX, state.focus_y + rng.randint(-6, 6)))
+            state = replace(state, focus_x=focus_x, focus_y=focus_y)
+            write_state(memory, labels, state, direction)
             main_machine.call(labels["plan_camera"])
             actual = read_state(memory, labels)
-            expected = camera.step(state, inputs)
-            assert actual == expected, f"from {state} with inputs {inputs}"
+            expected = camera.plan_camera(state, direction)
+            assert actual == expected, f"from {state} with direction {direction}"
             state = expected
             frames += 1
     assert frames == 18_000

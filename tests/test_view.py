@@ -1,26 +1,30 @@
 """The game draws and scrolls the world exactly as the models do, every frame."""
 
+from dataclasses import replace
+
 import pytest
 from beebium.client import Beebium
 
 from conftest import boot_until_ready
-from stratagem import camera
-from stratagem.camera import MARKER_COLUMNS, MARKER_LINES, Camera
+from stratagem import camera, player, sprites
+from stratagem.camera import Camera
+from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
 from stratagem.tiles import tile_graphics
 from stratagem.world import tile_at
 
-MARKER_COLOUR = 0x3F       # asm/render.asm
 SCREENSHOT_DIRPATH_NAME = "screenshots"
 GRAPHICS = tile_graphics()
+FRAMES = sprites.sprite_frames()
 
 
 def _signed(byte: int) -> int:
     return byte - 256 if byte & 0x80 else byte
 
 
-def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, int, int]:
-    """The camera state, the input it was last stepped with, and the screen start."""
+def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, Player, int, int]:
+    """The camera and player, the input they were last stepped with, and the
+    screen start."""
     peek = bbc.memory.address.peek
 
     def word(name: str) -> int:
@@ -36,16 +40,25 @@ def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, int, int]:
         dy=_signed(peek[labels["zp_plan_dy"]]),
         redraw=peek[labels["zp_redraw"]] != 0,
     )
-    return state, peek[labels["zp_input"]], word("zp_screen_start")
+    hero = Player(
+        x=word("zp_player_x"), y=word("zp_player_y"),
+        vx=_signed(peek[labels["zp_player_vx"]]), vy=_signed(peek[labels["zp_player_vy"]]),
+        on_ground=peek[labels["zp_player_on_ground"]] != 0,
+        facing=_signed(peek[labels["zp_player_facing"]]),
+    )
+    return state, hero, peek[labels["zp_input"]], word("zp_screen_start")
 
 
-def expected_screen(state: Camera, screen_start: int) -> dict[int, int]:
+def expected_screen(state: Camera, hero: Player, screen_start: int) -> dict[int, int]:
     image = render_view(screen_start, state.camera_x, state.camera_y, tile_at, GRAPHICS)
-    column, line = camera.marker_screen_position(state)
-    for l in range(line, line + MARKER_LINES):
-        for c in range(column, column + MARKER_COLUMNS):
-            address = wrap(screen_start + (l >> 3) * 512 + c * CELL_BYTES) + (l & 7)
-            image[address] ^= MARKER_COLOUR
+    frame = FRAMES[sprites.frame_for(hero)]
+    column = (hero.px >> 1) - state.camera_x
+    line = hero.py - state.camera_y * 8
+    for l in range(player.PLAYER_HEIGHT):
+        for c in range(sprites.SPRITE_COLUMNS):
+            address = wrap(screen_start + ((line + l) >> 3) * 512 + (column + c) * CELL_BYTES) + ((line + l) & 7)
+            i = l * sprites.SPRITE_COLUMNS + c
+            image[address] = image[address] & frame[i] | frame[sprites.SPRITE_BYTES + i]
     return image
 
 
@@ -62,14 +75,14 @@ def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Ca
     assert wrong[:8] == [], f"{len(wrong)} cached tiles are wrong"
 
 
-def assert_screen_matches_model(bbc: Beebium, machine, labels: dict[str, int]) -> Camera:
-    state, _, screen_start = read_state(bbc, labels)
+def assert_screen_matches_model(bbc: Beebium, machine, labels: dict[str, int]) -> tuple[Camera, Player]:
+    state, hero, _, screen_start = read_state(bbc, labels)
     assert_tile_cache_holds_view(bbc, labels, state)
-    expected = expected_screen(state, screen_start)
+    expected = expected_screen(state, hero, screen_start)
     actual = bbc.memory.region(machine.screen_region).peek[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
-    assert differences[:8] == [], f"{len(differences)} displayed screen bytes differ at {state}"
-    return state
+    assert differences[:8] == [], f"{len(differences)} displayed screen bytes differ at {state}, {hero}"
+    return state, hero
 
 
 def next_frame(bbc: Beebium, labels: dict[str, int]) -> None:
@@ -94,23 +107,28 @@ def test_initial_view_matches_model(game, machine, game_build):
     bbc.video.capture_frame().save_png(str(screenshot_dirpath / f"view-{machine.name}.png"))
 
 
-@pytest.mark.parametrize("keys", [["X"], ["Z"], ["M"], ["K"], ["X", "M"], ["Z", "K"]],
+@pytest.mark.parametrize("keys", [["X"], ["Z"], ["K"], ["X", "K"], ["Z", "K"]],
                          ids=lambda keys: "+".join(keys))
-def test_every_frame_matches_model_while_scrolling(game, machine, keys):
+def test_every_frame_matches_model_while_playing(game, machine, keys):
     bbc, labels = game
-    previous, _, _ = read_state(bbc, labels)
+    previous, previous_hero, _, _ = read_state(bbc, labels)
     moved = 0
-    for frame in range(90):
+    for frame in range(120):
         if frame == 0:
             for key in keys:
                 bbc.keyboard.key_down(key)
-        if frame == 60:
+        if frame == 90:
             for key in keys:
                 bbc.keyboard.key_up(key)
         next_frame(bbc, labels)
-        state = assert_screen_matches_model(bbc, machine, labels)
-        _, inputs, _ = read_state(bbc, labels)
-        assert state == camera.step(previous, inputs)
+        state, hero = assert_screen_matches_model(bbc, machine, labels)
+        _, _, inputs, _ = read_state(bbc, labels)
+        expected_hero = player.step(previous_hero, inputs, tile_at)
+        assert hero == expected_hero
+        direction = (1 if inputs & camera.INPUT_RIGHT else 0) - (1 if inputs & camera.INPUT_LEFT else 0)
+        focus_x, focus_y = player.focus(expected_hero)
+        assert state == camera.plan_camera(replace(previous, focus_x=focus_x, focus_y=focus_y), direction)
         moved += abs(state.dx) + abs(state.dy)
-        previous = state
-    assert moved > 10, "the camera hardly moved"
+        previous, previous_hero = state, hero
+    if keys != ["K"]:
+        assert moved > 10, "the camera hardly moved"

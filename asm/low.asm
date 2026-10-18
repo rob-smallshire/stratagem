@@ -40,12 +40,23 @@ ENDMACRO
     RTS
 }
 
-\ Exclusive-OR the focus marker onto the screen at zp_marker_address.
-.call_render_marker
+\ Draw the player's sprite (see render_sprite).
+.call_render_sprite
 {
     LDA zp_romsel_render
     SELECT_ROMSEL
-    JSR render_marker
+    JSR render_sprite
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    RTS
+}
+
+\ Remove the player's sprite (see render_restore).
+.call_render_restore
+{
+    LDA zp_romsel_render
+    SELECT_ROMSEL
+    JSR render_restore
     LDA zp_romsel_game
     SELECT_ROMSEL
     RTS

@@ -1,18 +1,15 @@
-\ MAIN: the game, in user RAM. For now: a focus marker moved with Z, X, K
-\ and M, and a camera that follows it, scrolling the world smoothly.
+\ MAIN: the game, in user RAM. For now: the player walks (Z, X) and jumps
+\ (K) about the world, and the camera follows, scrolling smoothly.
 \
 \ Each frame, just after vertical sync, the screen is flipped: the CRTC is
 \ given the new start address, and any newly exposed columns are drawn,
 \ top-down, ahead of the beam. A newly exposed row is always the hidden
 \ 32nd row, so it is drawn before the flip, while it cannot be seen. The rest
-\ of the frame moves the focus and plans the next flip.
+\ of the frame moves the player and plans the next flip.
 
 CLEAR USER_START, USER_END
 ORG USER_START
 GUARD USER_END
-
-INITIAL_FOCUS_X = 128 * 8       \ Pixels
-INITIAL_FOCUS_Y = 52 * 16       \ Lines
 
 \ Negative INKEY numbers, as OSBYTE &81 takes them in X
 INKEY_Z = &100 - 98
@@ -33,15 +30,22 @@ INKEY_M = &100 - 102
     STA zp_camera_y
     STA zp_camera_y + 1
     STA zp_columns_width
-    STA zp_marker_drawn
-    LDA #LO(INITIAL_FOCUS_X)
-    STA zp_focus_x
-    LDA #HI(INITIAL_FOCUS_X)
-    STA zp_focus_x + 1
-    LDA #LO(INITIAL_FOCUS_Y)
-    STA zp_focus_y
-    LDA #HI(INITIAL_FOCUS_Y)
-    STA zp_focus_y + 1
+    STA zp_sprite_drawn
+    STA zp_direction
+    STA zp_player_vx
+    STA zp_player_vy
+    STA zp_player_on_ground
+    LDA #1
+    STA zp_player_facing
+    LDA #LO(PLAYER_START_X)
+    STA zp_player_x
+    LDA #HI(PLAYER_START_X)
+    STA zp_player_x + 1
+    LDA #LO(PLAYER_START_Y)
+    STA zp_player_y
+    LDA #HI(PLAYER_START_Y)
+    STA zp_player_y + 1
+    JSR player_focus_and_frame
     LDA #LO(SCREEN_START)
     STA zp_screen_start
     LDA #HI(SCREEN_START)
@@ -52,7 +56,7 @@ INKEY_M = &100 - 102
     JSR plan_camera             \ The focus is outside the view, so redraw
     JSR apply_plan
     JSR set_crtc_start
-    JSR draw_marker
+    JSR draw_sprite
     LDA #BOOT_READY
     STA zp_boot_status
     \ Fall through into the main loop
@@ -63,11 +67,11 @@ INKEY_M = &100 - 102
     LDA #19                     \ Wait for vertical sync
     JSR OSBYTE
     JSR flip                    \ The time-critical part, first
-    JSR undraw_marker           \ The camera moves only while the marker is
-    JSR draw_marker             \ well inside the view, clear of new columns
+    JSR restore_sprite          \ The camera moves only while the player is
+    JSR draw_sprite             \ well inside the view, clear of new columns
 .frame_shown                    \ The screen now shows the camera's view
     JSR read_input
-    JSR update_focus
+    JSR update_player
     JSR plan_camera
     JSR apply_plan
     JMP main_loop
@@ -110,112 +114,33 @@ INKEY_M = &100 - 102
 }
 
 \ ---------------------------------------------------------------------------
-\ Focus and camera: modelled exactly by tools/stratagem/camera.py. These
-\ routines are pure, using only zero page, so they can be tested in py65.
+\ Camera: modelled exactly by tools/stratagem/camera.py. Pure, using only
+\ zero page, so it can be tested in py65.
 
-\ Move the focus by zp_input, and ease the lead towards the direction of
-\ travel.
-.update_focus
+\ Ease the lead towards the focus's direction of travel, zp_direction, then
+\ decide where the camera goes next: set zp_camera_x/y, and either
+\ zp_plan_dx/dy, the movement to apply at the next flip, or zp_redraw.
+.plan_camera
 {
-    LDA zp_input
-    AND #INPUT_LEFT OR INPUT_RIGHT
-    CMP #INPUT_RIGHT
-    BEQ right
-    CMP #INPUT_LEFT
-    BEQ left
     LDA #0
-    BEQ ease_lead
-.right
-    CLC
-    LDA zp_focus_x
-    ADC #FOCUS_SPEED_X
-    STA zp_focus_x
-    BCC right_added
-    INC zp_focus_x + 1
-.right_added
-    LDA #LO(FOCUS_X_MAX)        \ Clamp to FOCUS_X_MAX
-    CMP zp_focus_x
-    LDA #HI(FOCUS_X_MAX)
-    SBC zp_focus_x + 1
-    BCS right_done
-    LDA #LO(FOCUS_X_MAX)
-    STA zp_focus_x
-    LDA #HI(FOCUS_X_MAX)
-    STA zp_focus_x + 1
-.right_done
+    LDX zp_direction
+    BEQ target_set
     LDA #LEAD_MAX
-    BNE ease_lead
-.left
-    SEC
-    LDA zp_focus_x
-    SBC #FOCUS_SPEED_X
-    STA zp_focus_x
-    LDA zp_focus_x + 1
-    SBC #0
-    STA zp_focus_x + 1
-    BCS left_done               \ Clamp to 0
-    LDA #0
-    STA zp_focus_x
-    STA zp_focus_x + 1
-.left_done
+    CPX #1
+    BEQ target_set
     LDA #&100 - LEAD_MAX
-.ease_lead                      \ Move zp_lead one step towards A
+.target_set
     STA zp_temp
     LDA zp_lead
     SEC
     SBC zp_temp                 \ lead - target, small enough not to overflow
-    BEQ vertical
+    BEQ lead_done
     BMI increase_lead
     DEC zp_lead
-    JMP vertical
+    JMP lead_done
 .increase_lead
     INC zp_lead
-.vertical
-    LDA zp_input
-    AND #INPUT_UP OR INPUT_DOWN
-    CMP #INPUT_DOWN
-    BEQ down
-    CMP #INPUT_UP
-    BEQ up
-    RTS
-.down
-    CLC
-    LDA zp_focus_y
-    ADC #FOCUS_SPEED_Y
-    STA zp_focus_y
-    BCC down_added
-    INC zp_focus_y + 1
-.down_added
-    LDA #LO(FOCUS_Y_MAX)        \ Clamp to FOCUS_Y_MAX
-    CMP zp_focus_y
-    LDA #HI(FOCUS_Y_MAX)
-    SBC zp_focus_y + 1
-    BCS done
-    LDA #LO(FOCUS_Y_MAX)
-    STA zp_focus_y
-    LDA #HI(FOCUS_Y_MAX)
-    STA zp_focus_y + 1
-    RTS
-.up
-    SEC
-    LDA zp_focus_y
-    SBC #FOCUS_SPEED_Y
-    STA zp_focus_y
-    LDA zp_focus_y + 1
-    SBC #0
-    STA zp_focus_y + 1
-    BCS done                    \ Clamp to 0
-    LDA #0
-    STA zp_focus_y
-    STA zp_focus_y + 1
-.done
-    RTS
-}
-
-\ Decide where the camera goes next: set zp_camera_x/y, and either
-\ zp_plan_dx/dy, the movement to apply at the next flip, or zp_redraw.
-.plan_camera
-{
+.lead_done
     LDA #0
     STA zp_redraw
     STA zp_plan_dx
@@ -772,7 +697,7 @@ INKEY_M = &100 - 102
 .redraw_view
 {
     LDA #0
-    STA zp_marker_drawn         \ The marker is drawn over
+    STA zp_sprite_drawn         \ The sprite is drawn over
     STA zp_columns_width
     JSR view_tiles
     LDA zp_view_right
@@ -879,13 +804,14 @@ INKEY_M = &100 - 102
     RTS
 }
 
-\ Draw the marker at the focus.
-.draw_marker
+\ Draw the player's sprite, saving the screen under it.
+.draw_sprite
 {
-    \ View column = (focus_x >> 1) - camera_x, line = focus_y - camera_y * 8
-    LDA zp_focus_x + 1
+    \ View column = (px >> 1) - camera_x, line = py - camera_y * 8
+    JSR player_pixels
+    LDA zp_box_x + 1
     LSR A
-    LDA zp_focus_x
+    LDA zp_box_x
     ROR A
     SEC
     SBC zp_camera_x
@@ -901,7 +827,7 @@ INKEY_M = &100 - 102
     ROL zp_ptr + 1
     STA zp_ptr
     SEC
-    LDA zp_focus_y
+    LDA zp_box_y
     SBC zp_ptr
     STA zp_temp + 1             \ Line
     \ Address = screen_start + (line >> 3) * ROW_BYTES + column * 8 + (line AND 7)
@@ -926,31 +852,35 @@ INKEY_M = &100 - 102
     ORA zp_ptr                  \ Column * 8 has its low three bits clear
     CLC
     ADC zp_screen_start
-    STA zp_marker_address
+    STA zp_sprite_address
     LDA zp_ptr + 1
     ADC zp_screen_start + 1
     JSR wrap_both_ways
-    STA zp_marker_address + 1
-    JSR call_render_marker
+    STA zp_sprite_address + 1
+    LDA zp_player_frame
+    STA zp_sprite_frame
+    JSR call_render_sprite
     LDA #&FF
-    STA zp_marker_drawn
+    STA zp_sprite_drawn
     RTS
 }
 
-\ Remove the marker, if it is drawn.
-.undraw_marker
+\ Remove the player's sprite, if it is drawn.
+.restore_sprite
 {
-    LDA zp_marker_drawn
+    LDA zp_sprite_drawn
     BEQ done
-    JSR call_render_marker
+    JSR call_render_restore
     LDA #0
-    STA zp_marker_drawn
+    STA zp_sprite_drawn
 .done
     RTS
 }
 
 \ ---------------------------------------------------------------------------
 \ Data
+
+INCLUDE "asm/player.asm"
 
 .main_end
 

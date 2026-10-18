@@ -25,11 +25,33 @@ ALIGN TILE_BYTES                \ So a cell's offset in a tile never carries
         EQUB HI(tile_graphics + tile * TILE_BYTES)
     NEXT
 
+\ Sprite frames: SPRITE_BYTES mask bytes then SPRITE_BYTES data bytes each.
+.sprite_frames
+    SPRITE_FRAMES
+.sprite_mask_low
+    FOR frame, 0, SPRITE_FRAME_COUNT - 1
+        EQUB LO(sprite_frames + frame * 2 * SPRITE_BYTES)
+    NEXT
+.sprite_mask_high
+    FOR frame, 0, SPRITE_FRAME_COUNT - 1
+        EQUB HI(sprite_frames + frame * 2 * SPRITE_BYTES)
+    NEXT
+.sprite_data_low
+    FOR frame, 0, SPRITE_FRAME_COUNT - 1
+        EQUB LO(sprite_frames + frame * 2 * SPRITE_BYTES + SPRITE_BYTES)
+    NEXT
+.sprite_data_high
+    FOR frame, 0, SPRITE_FRAME_COUNT - 1
+        EQUB HI(sprite_frames + frame * 2 * SPRITE_BYTES + SPRITE_BYTES)
+    NEXT
+
+\ The screen bytes under the sprite, saved when it is drawn.
+.sprite_save
+    SKIP SPRITE_BYTES
+
 CLEAR RENDER_CODE, RENDER_END
 ORG RENDER_CODE
 GUARD RENDER_END
-
-MARKER_COLOUR = &3F             \ Both pixels colour 7
 
 \ Copy the eight bytes of the cell at zp_tile to the screen at pointer.
 MACRO COPY_CELL pointer
@@ -139,33 +161,57 @@ ENDMACRO
     RTS
 }
 
-\ Draw zp_render_width columns of zp_render_count cells, from world cell
-\ (zp_render_u, zp_render_v), at zp_render_base onwards. They are drawn a row
-\ at a time, so that the top of every column is drawn first, ahead of the
-\ beam.
+\ Draw zp_render_width (1 or 2) columns of zp_render_count cells, from world
+\ cell (zp_render_u, zp_render_v), at zp_render_base onwards. They are drawn
+\ a row at a time, so that the top of every column is drawn first, ahead of
+\ the beam.
 .render_columns
 {
+    \ Each column's tile column in the cache and cell offset in its tiles.
+    LDX #0
+    LDA zp_render_u
+.setup_loop
+    TAY
+    LSR A
+    LSR A
+    AND #TILE_CACHE_SIZE - 1
+    STA column_tile,X
+    TYA
+    AND #3
+    ASL A
+    ASL A
+    ASL A
+    STA column_offset,X
+    INY
+    TYA
+    INX
+    CPX zp_render_width
+    BNE setup_loop
     LDA zp_render_base
     STA zp_screen
     LDA zp_render_base + 1
     STA zp_screen + 1
 .row_loop
     JSR set_row_pointer
+    LDX #0
     LDA zp_screen
     STA zp_screen_lower
     LDA zp_screen + 1
     STA zp_screen_lower + 1
-    LDA zp_render_u
-    STA zp_render_column
-    LDA zp_render_width
-    STA zp_render_across
 .column_loop
-    LDA zp_render_column
-    SET_CELL_GRAPHICS
+    LDY column_tile,X
+    LDA (zp_row_pointer),Y      \ The tile
+    TAY
+    LDA tile_address_low,Y
+    ORA zp_render_half
+    ORA column_offset,X
+    STA zp_tile
+    LDA tile_address_high,Y
+    STA zp_tile + 1
     COPY_CELL zp_screen_lower
-    DEC zp_render_across
+    INX
+    CPX zp_render_width
     BEQ row_done
-    INC zp_render_column
     CLC                         \ The next column: a cell on, wrapping
     LDA zp_screen_lower
     ADC #CELL_BYTES
@@ -182,32 +228,30 @@ ENDMACRO
     CLC                         \ The next row
     LDA zp_screen + 1
     ADC #HI(ROW_BYTES)
-    JSR wrap_screen_high
+    CMP #HI(SCREEN_END)
+    BCC no_wrap
+    SBC #HI(SCREEN_END - SCREEN_START)
+.no_wrap
     STA zp_screen + 1
     INC zp_render_v
     DEC zp_render_count
-    BEQ done
-    JMP row_loop
-.done
+    BNE row_loop
     RTS
 }
 
-\ Exclusive-OR the marker, two columns by MARKER_LINES lines, onto the
-\ screen with its top line at zp_marker_address. Drawing it twice removes
-\ it.
-.render_marker
+.column_tile        SKIP 2
+.column_offset      SKIP 2
+
+\ The sprite is SPRITE_COLUMNS bytes wide. Point zp_screen, zp_screen_lower
+\ and zp_tile at the cells of its three columns on the character row of its
+\ top line, zp_sprite_address, and set Y to the line within the row.
+.sprite_pointers
 {
-    LDA zp_marker_address
+    LDA zp_sprite_address
     AND #&F8
     STA zp_screen
-    LDA zp_marker_address + 1
+    LDA zp_sprite_address + 1
     STA zp_screen + 1
-    LDA zp_marker_address
-    AND #7
-    TAY
-    LDX #MARKER_LINES
-.line_loop
-    \ The second column is the next cell, which may be past the screen's end.
     CLC
     LDA zp_screen
     ADC #CELL_BYTES
@@ -216,23 +260,126 @@ ENDMACRO
     ADC #0
     JSR wrap_screen_high
     STA zp_screen_lower + 1
-    LDA (zp_screen),Y
-    EOR #MARKER_COLOUR
-    STA (zp_screen),Y
-    LDA (zp_screen_lower),Y
-    EOR #MARKER_COLOUR
-    STA (zp_screen_lower),Y
-    INY
-    CPY #8
-    BNE next_line
-    LDY #0                      \ Down to the next character row
+    CLC
+    LDA zp_screen_lower
+    ADC #CELL_BYTES
+    STA zp_tile
+    LDA zp_screen_lower + 1
+    ADC #0
+    JSR wrap_screen_high
+    STA zp_tile + 1
+    LDA zp_sprite_address
+    AND #7
+    TAY
+    RTS
+}
+
+\ Move the sprite's column pointers down a character row.
+.sprite_next_row
+{
     CLC
     LDA zp_screen + 1
     ADC #HI(ROW_BYTES)
     JSR wrap_screen_high
     STA zp_screen + 1
+    CLC
+    LDA zp_screen_lower + 1
+    ADC #HI(ROW_BYTES)
+    JSR wrap_screen_high
+    STA zp_screen_lower + 1
+    CLC
+    LDA zp_tile + 1
+    ADC #HI(ROW_BYTES)
+    JSR wrap_screen_high
+    STA zp_tile + 1
+    LDY #0
+    RTS
+}
+
+\ Draw sprite frame zp_sprite_frame with its top line at zp_sprite_address,
+\ saving the screen under it, each byte as (screen AND mask) OR data.
+.render_sprite
+{
+    LDX zp_sprite_frame         \ Point the AND and ORA operands at the frame
+    LDA sprite_mask_low,X
+    STA mask0 + 1
+    STA mask1 + 1
+    STA mask2 + 1
+    LDA sprite_mask_high,X
+    STA mask0 + 2
+    STA mask1 + 2
+    STA mask2 + 2
+    LDA sprite_data_low,X
+    STA data0 + 1
+    STA data1 + 1
+    STA data2 + 1
+    LDA sprite_data_high,X
+    STA data0 + 2
+    STA data1 + 2
+    STA data2 + 2
+    JSR sprite_pointers
+    LDA #PLAYER_HEIGHT
+    STA zp_render_count
+    LDX #0
+.line_loop
+    LDA (zp_screen),Y
+    STA sprite_save,X
+.mask0
+    AND &FFFF,X
+.data0
+    ORA &FFFF,X
+    STA (zp_screen),Y
+    INX
+    LDA (zp_screen_lower),Y
+    STA sprite_save,X
+.mask1
+    AND &FFFF,X
+.data1
+    ORA &FFFF,X
+    STA (zp_screen_lower),Y
+    INX
+    LDA (zp_tile),Y
+    STA sprite_save,X
+.mask2
+    AND &FFFF,X
+.data2
+    ORA &FFFF,X
+    STA (zp_tile),Y
+    INX
+    INY
+    CPY #8
+    BNE next_line
+    JSR sprite_next_row
 .next_line
-    DEX
+    DEC zp_render_count
+    BNE line_loop
+    RTS
+}
+
+\ Remove the sprite drawn at zp_sprite_address, restoring the screen under
+\ it.
+.render_restore
+{
+    JSR sprite_pointers
+    LDA #PLAYER_HEIGHT
+    STA zp_render_count
+    LDX #0
+.line_loop
+    LDA sprite_save,X
+    STA (zp_screen),Y
+    INX
+    LDA sprite_save,X
+    STA (zp_screen_lower),Y
+    INX
+    LDA sprite_save,X
+    STA (zp_tile),Y
+    INX
+    INY
+    CPY #8
+    BNE next_line
+    JSR sprite_next_row
+.next_line
+    DEC zp_render_count
     BNE line_loop
     RTS
 }

@@ -65,6 +65,24 @@ GUARD &90
 .zp_relative_x      SKIP 1      \ Focus column and row within the view
 .zp_relative_y      SKIP 1
 
+\ Player (modelled by tools/stratagem/player.py)
+.zp_player_x        SKIP 2      \ Sixteenths of a pixel
+.zp_player_y        SKIP 2      \ Sixteenths of a line
+.zp_player_vx       SKIP 1      \ Signed sixteenths a frame
+.zp_player_vy       SKIP 1
+.zp_player_on_ground SKIP 1     \ Non-zero when standing on something
+.zp_player_facing   SKIP 1      \ 1 right, &FF left
+.zp_player_frame    SKIP 1      \ Sprite frame to draw
+.zp_direction       SKIP 1      \ Signed direction held: -1, 0 or 1
+.zp_new_x           SKIP 2      \ Position being tried
+.zp_new_y           SKIP 2
+.zp_box_x           SKIP 2      \ Player box tested by box_free, in pixels
+.zp_box_y           SKIP 2      \ ... and lines
+.zp_box_right       SKIP 1      \ ... its tile columns and rows
+.zp_box_bottom      SKIP 1
+.zp_box_column      SKIP 1
+.zp_box_row         SKIP 1
+
 \ Tile cache: the tile rectangle it holds, inclusive
 .zp_cached_left     SKIP 1
 .zp_cached_right    SKIP 1
@@ -78,8 +96,9 @@ GUARD &90
 \ Game
 .zp_screen_start    SKIP 2      \ Screen address of the view's top-left cell
 .zp_frame           SKIP 1      \ Incremented once per pass of the main loop
-.zp_marker_address  SKIP 2      \ Screen address of the marker's top line
-.zp_marker_drawn    SKIP 1      \ Non-zero while the marker is on the screen
+.zp_sprite_address  SKIP 2      \ Screen address of the sprite's top line
+.zp_sprite_frame    SKIP 1      \ The frame drawn there
+.zp_sprite_drawn    SKIP 1      \ Non-zero while the sprite is on the screen
 .zp_columns_width   SKIP 1      \ New columns to draw at the next flip...
 .zp_columns_u       SKIP 1      \ ... from this world column
 .zp_columns_base    SKIP 2      \ ... at this screen address
