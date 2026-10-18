@@ -15,13 +15,12 @@ RENDER_REGION_END = &B000
 BANK_START   = &8000
 BANK_END     = &C000
 
-\ Screen geometry: 64 columns of 8-byte characters by 32 rows
+\ Screen geometry: 64 columns of 8-byte cells by 32 rows, of which
+\ VIEW_ROWS are displayed (see build/generated/camera.asm)
 ROW_BYTES        = 512
-VIEW_TILES       = 16
+CELL_BYTES       = 8
 TILE_BYTES       = 64
-TILE_COLUMN_STEP = 32           \ Screen bytes between horizontally adjacent tiles
-TILE_ROW_STEP    = 1024         \ ... and vertically adjacent tiles
-WORLD_LAST_VIEW  = 256 - VIEW_TILES
+MAX_CELLS        = 64           \ Cells in the renderer's cell list
 
 \ CRTC
 CRTC_ADDRESS = &FE00

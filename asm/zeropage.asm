@@ -18,11 +18,9 @@ GUARD &90
 .zp_bank_world      SKIP 1      \ ROMSEL for the world bank
 
 \ Renderer workspace (used only by render code)
-.zp_screen          SKIP 2      \ Screen address of the current tile's top half
-.zp_screen_lower    SKIP 2      \ ... and of its bottom half
-.zp_tile            SKIP 2      \ Graphics of the current tile's top half
-.zp_tile_lower      SKIP 2      \ ... and of its bottom half
-.zp_render_index    SKIP 1      \ Index into the strip
+.zp_screen          SKIP 2      \ Screen address of the current cell
+.zp_screen_lower    SKIP 2      \ A second screen address
+.zp_tile            SKIP 2      \ Graphics of the current cell
 
 \ World generator workspace (used only by world code)
 .zp_world_x         SKIP 1
@@ -31,15 +29,37 @@ GUARD &90
 .zp_world_fine      SKIP 1
 .zp_world_temp      SKIP 1
 
+\ Camera (modelled by tools/stratagem/camera.py)
+.zp_input           SKIP 1      \ INPUT_* bits for this frame
+.zp_focus_x         SKIP 2      \ Focus position, in pixels
+.zp_focus_y         SKIP 2      \ ... and lines
+.zp_lead            SKIP 1      \ Signed horizontal look-ahead, in columns
+.zp_camera_x        SKIP 2      \ World cell at the top left of the view
+.zp_camera_y        SKIP 2
+.zp_plan_dx         SKIP 1      \ Signed camera movement for the next flip
+.zp_plan_dy         SKIP 1
+.zp_redraw          SKIP 1      \ Non-zero if the view must be redrawn
+.zp_column          SKIP 2      \ Focus column (focus_x >> 1)
+.zp_row             SKIP 2      \ Focus row (focus_y >> 3)
+.zp_relative_x      SKIP 1      \ Focus column and row within the view
+.zp_relative_y      SKIP 1
+
 \ Game
-.zp_view_x          SKIP 1      \ World tile at the top left of the view
-.zp_view_y          SKIP 1
-.zp_screen_start    SKIP 2      \ Screen address of the view's top-left tile
+.zp_screen_start    SKIP 2      \ Screen address of the view's top-left cell
 .zp_frame           SKIP 1      \ Incremented once per pass of the main loop
-.zp_scroll_timer    SKIP 1      \ Frames until the view may scroll again
-.zp_strip_x         SKIP 1      \ World position of the strip being filled
-.zp_strip_y         SKIP 1
-.zp_strip_index     SKIP 1
+.zp_marker_address  SKIP 2      \ Screen address of the marker's top line
+.zp_marker_drawn    SKIP 1      \ Non-zero while the marker is on the screen
+.zp_columns_planned SKIP 1      \ New columns to draw at the next flip
+.zp_cell_u          SKIP 2      \ World cell being prepared
+.zp_cell_v          SKIP 2
+.zp_cell_count      SKIP 1      \ Cells still to prepare
+.zp_cell_down       SKIP 1      \ Non-zero to prepare down a column
+.zp_cell_tile       SKIP 1      \ The tile the cell is in
+.zp_cell_index      SKIP 1      \ Index into the cell list
+.zp_rows_left       SKIP 1      \ Rows still to draw in a redraw
+.zp_view_column     SKIP 1      \ View column of a new column being prepared
+.zp_new_column      SKIP 1      \ Which of the new columns
+.zp_temp            SKIP 2
 
 \ Values of zp_machine
 MACHINE_MODEL_B   = 0

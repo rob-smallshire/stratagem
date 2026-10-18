@@ -18,12 +18,23 @@ MACRO SELECT_ROMSEL
     STA ROMSEL
 ENDMACRO
 
-\ Draw the strip described by strip_tiles, strip_base and strip_step.
-.call_render_strip
+\ Draw cells cell_first to cell_end - 1 of the cell list (see render_cells).
+.call_render_cells
 {
     LDA zp_romsel_render
     SELECT_ROMSEL
-    JSR render_strip
+    JSR render_cells
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    RTS
+}
+
+\ Exclusive-OR the focus marker onto the screen at zp_marker_address.
+.call_render_marker
+{
+    LDA zp_romsel_render
+    SELECT_ROMSEL
+    JSR render_marker
     LDA zp_romsel_game
     SELECT_ROMSEL
     RTS
@@ -53,11 +64,15 @@ ENDMACRO
     RTS
 }
 
-\ A strip of tiles for the renderer: VIEW_TILES tile numbers, drawn from
-\ screen address strip_base, each strip_step bytes after the last.
-.strip_tiles        SKIP VIEW_TILES
-.strip_base         SKIP 2
-.strip_step         SKIP 2
+\ The cell list, shared by the game, which fills it, and the renderer: the
+\ graphics address of each cell, and where to draw them: from cell_base,
+\ each cell_step bytes after the last.
+.cell_source_low    SKIP MAX_CELLS
+.cell_source_high   SKIP MAX_CELLS
+.cell_base          SKIP 2
+.cell_step          SKIP 2
+.cell_first         SKIP 1
+.cell_end           SKIP 1
 
 \ ---------------------------------------------------------------------------
 \ Loader

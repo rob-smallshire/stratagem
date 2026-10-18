@@ -1,26 +1,39 @@
 """Screen geometry and MODE 2 pixel encoding.
 
-The view is 128 x 256 MODE 2 pixels: 64 CRTC character columns (one byte,
-two pixels, wide) by 32 character rows of 8 lines, 16K at &4000 with the
-hardware wrap set for a 16K screen. Within a character row, byte
-(column * 8 + line) holds line `line` of column `column`.
+Screen memory is 16K at &4000, with the hardware wrap set for a 16K screen:
+64 CRTC character columns (one byte, two pixels, wide) by 32 character rows
+of 8 lines. Within a character row, byte (column * 8 + line) holds line
+`line` of column `column`. Only VIEW_ROWS = 31 rows are displayed: the 32nd
+is hidden, and is where a new row is drawn before it is scrolled into view.
+
+The world is drawn in cells, one character (8 bytes) each. World cell
+(u, v) is column u (0-1023, two pixels wide) of character row v (0-511,
+eight lines high); it shows quarter u % 4 of half v % 2 of tile
+(u // 4, v // 2).
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 SCREEN_START = 0x4000
 SCREEN_SIZE = 0x4000
 SCREEN_END = SCREEN_START + SCREEN_SIZE
 COLUMNS = 64
+ROWS = 32
 ROW_BYTES = COLUMNS * 8   # 512
+CELL_BYTES = 8
+
+VIEW_COLUMNS = COLUMNS
+VIEW_ROWS = ROWS - 1      # the last row is hidden
+VIEW_LINES = VIEW_ROWS * 8
 
 TILE_WIDTH_PIXELS = 8
 TILE_HEIGHT_LINES = 16
-TILE_WIDTH_BYTES = TILE_WIDTH_PIXELS // 2   # 4 character columns
+TILE_WIDTH_BYTES = TILE_WIDTH_PIXELS // 2   # 4 cells
 TILE_BYTES = TILE_WIDTH_BYTES * TILE_HEIGHT_LINES   # 64
-VIEW_TILES = 16           # the view is 16 x 16 tiles
-TILE_COLUMN_STEP = TILE_WIDTH_BYTES * 8     # 32: screen bytes between horizontally adjacent tiles
-TILE_ROW_STEP = ROW_BYTES * 2               # 1024: screen bytes between vertically adjacent tiles
+CELLS_PER_TILE_X = 4
+CELLS_PER_TILE_Y = 2
 
 
 def wrap(address: int) -> int:
@@ -53,32 +66,41 @@ def mode2_pixels(byte: int) -> tuple[int, int]:
 
 
 def encode_tile(pixels: list[list[int]]) -> bytes:
-    """Encode a tile, given as 16 rows of 8 logical colours, in screen order:
-    the top character row (four columns of eight lines), then the bottom."""
+    """Encode a tile, given as 16 rows of 8 logical colours, as its eight
+    cells: the top half's four columns of eight lines, then the bottom's."""
     assert len(pixels) == TILE_HEIGHT_LINES and all(len(row) == TILE_WIDTH_PIXELS for row in pixels)
     data = bytearray()
-    for char_row in range(2):
+    for half in range(CELLS_PER_TILE_Y):
         for column in range(TILE_WIDTH_BYTES):
             for line in range(8):
-                row = pixels[char_row * 8 + line]
+                row = pixels[half * 8 + line]
                 data.append(mode2_byte(row[2 * column], row[2 * column + 1]))
     return bytes(data)
 
 
-def tile_address(screen_start: int, tile_x: int, tile_y: int) -> int:
-    """The screen address of the top-left byte of view tile (tile_x, tile_y)."""
-    return wrap(screen_start + tile_y * TILE_ROW_STEP + tile_x * TILE_COLUMN_STEP)
+def cell_offset(u: int, v: int) -> int:
+    """The offset of world cell (u, v) within its tile's graphics."""
+    return (v % CELLS_PER_TILE_Y) * 32 + (u % CELLS_PER_TILE_X) * CELL_BYTES
 
 
-def render_view(screen_start: int, tiles: list[list[int]], graphics: list[bytes]) -> bytearray:
-    """Render a 16 x 16 view (tiles[y][x] tile numbers) into a 16K image of
-    &4000-&7FFF, with the view's top-left tile at screen_start."""
-    image = bytearray(SCREEN_SIZE)
-    for tile_y in range(VIEW_TILES):
-        for tile_x in range(VIEW_TILES):
-            data = graphics[tiles[tile_y][tile_x]]
-            address = tile_address(screen_start, tile_x, tile_y)
-            for half in range(2):
-                base = wrap(address + half * ROW_BYTES) - SCREEN_START
-                image[base:base + 32] = data[half * 32:half * 32 + 32]
+def cell_address(screen_start: int, column: int, row: int) -> int:
+    """The screen address of view cell (column, row)."""
+    return wrap(screen_start + row * ROW_BYTES + column * CELL_BYTES)
+
+
+def render_view(screen_start: int, camera_x: int, camera_y: int,
+                tile_at: Callable[[int, int], int], graphics: list[bytes]) -> dict[int, int]:
+    """The expected bytes of the displayed screen, as a mapping from address
+    to byte, with the view's top-left cell, world cell (camera_x, camera_y),
+    at screen_start."""
+    image = {}
+    for row in range(VIEW_ROWS):
+        v = camera_y + row
+        for column in range(VIEW_COLUMNS):
+            u = camera_x + column
+            data = graphics[tile_at(u // CELLS_PER_TILE_X, v // CELLS_PER_TILE_Y)]
+            offset = cell_offset(u, v)
+            address = cell_address(screen_start, column, row)
+            for line in range(CELL_BYTES):
+                image[address + line] = data[offset + line]
     return image

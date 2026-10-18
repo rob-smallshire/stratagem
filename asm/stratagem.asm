@@ -11,6 +11,7 @@ INCLUDE "asm/layout.asm"
 INCLUDE "asm/zeropage.asm"
 INCLUDE "build/generated/tiles.asm"
 INCLUDE "build/generated/world.asm"
+INCLUDE "build/generated/camera.asm"
 
 INCLUDE "asm/low.asm"
 INCLUDE "asm/main.asm"
