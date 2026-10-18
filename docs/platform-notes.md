@@ -1,0 +1,99 @@
+# Platform notes
+
+Facts about the target machines that shape the design. Each is marked
+**V** (verified against ROM disassembly, Beebium source or an emulator test)
+or **U** (unsure). Sources are the beebium-stratagem session's research
+(2026-10-18) and our own tests.
+
+## All targets
+
+- PAGE (OSHWM) is `&1900` with Acorn DFS 2.26 on both the B+128K and the
+  Integra-B. **V**
+- Free sideways RAM slots, as found by `PROBE`: B+128K 0, 1, 12, 13;
+  Integra-B 4-7, all writable by default. **V**
+
+## BBC B+ 128K
+
+- The shadow RAM is the screen. The CPU reaches it at `&3000`-`&7FFF` only
+  from code at `&C000`-`&DFFF`, or at `&A000`-`&AFFF` while ANDY (ROMSEL
+  bit 7) is paged in. **V**
+- With shadow on, OSFILE loads to `&3000`-`&7FFF` land in main RAM: the
+  DFS byte-move NMI code in page `&0D` is not VDU code. **V**
+- MOS 2.00, DFS 2.26 and ANFS 4.18 do not use ANDY, so the plotter can run
+  there and write the screen directly. **V**
+- Keep `&F4` equal to the ROMSEL value, **including bit 7**, while ANDY is
+  paged in. Service calls and the ANFS Econet NMI handler restore ROMSEL
+  from `&F4`; plain IRQs do not touch ROMSEL. **V**
+- A BRK (error) raised in ANDY code pages in the language ROM without bit 7
+  and loses ANDY. Never raise errors from ANDY code. **V**
+- Beebium applies the PC rule using the live PC, which for an operand or
+  data access is already the next instruction's address. Real hardware
+  probably uses the opcode address. **U** So no instruction that touches
+  `&3000`-`&7FFF` may straddle `&9FFF`/`&A000`, `&AFFF`/`&B000` or
+  `&DFFF`/`&E000`; keep the ANDY plotter a few bytes clear of each end. **V**
+- Shadow RAM and ANDY are ordinary 2 MHz accesses in Beebium (no clock
+  stretching); probably the same on real hardware. **U**
+
+## Integra-B (Model B, MOS 1.20, IBOS 1.26)
+
+- The video always reads main RAM. The extra 20K is CPU RAM at
+  `&3000`-`&7FFF` when RAMSEL.SHEN is set, and ROMSEL bit 7 (MEMSEL)
+  switches the CPU back to main RAM (the screen). **V**
+  On the Integra-B `&FE34` is RAMSEL, not ACCCON: never let B+ code write
+  it. **V**
+- Source: IBOS 1.26 source at github.com/kgl2001/IntegraB-OS (`IBOS.asm`,
+  which rebuilds byte-for-byte), and the Integra-B User Guide.
+
+### Detection
+
+- IBOS answers OSBYTE `&49` with X=`&FF` by returning X=`&49`; use this
+  (`PROBE` does). Its ROM title varies between versions. **V**
+- IBOS takes over OSBYTE `&00`: it returns 2 (as a B+) in the default
+  OSMODE 4, and otherwise the OSMODE number. **V**
+
+### Loading and memory
+
+- With SHEN set, DFS 2.26 OSFILE loads to `&3000`-`&7FFF` land in the extra
+  20K, as on the B+ they land in main RAM: either way, in user RAM rather
+  than on the screen. **V** MMFS and ANFS should behave the same. **U**
+- HIMEM (OSBYTE `&84`/`&85`) is `&8000` in shadow modes. PAGE is `&1900`
+  with DFS 2.26; IBOS adds nothing. **V**
+- Shadow needs OSMODE 1 or higher; the default is OSMODE 4. **D/V** If
+  `*SHX` is on (default off), changing between shadow and non-shadow modes
+  swaps the two 20K copies. **D/V**
+
+### Paging protocol
+
+- MOS 1.20 saves and restores the whole of `&F4`, and IBOS's vector stub
+  (`&0880`-`&08BF`) restores the caller's whole `&F4` to ROMSEL on exit, so
+  MEMSEL and PRVEN in `&F4` survive interrupts and OS calls. **V**
+- To reach the screen: `SEI : LDA &F4 : ORA #&80 : STA &F4 : STA &FE30 :
+  CLI`, the reverse to leave it, keeping the bank (bits 0-3) and bit 6.
+  Write `&F4` before `&FE30`, or do both inside SEI/CLI. **V**
+- A BRK (error) pages in the language ROM and clears MEMSEL: as on the B+,
+  raise errors only from code that doesn't depend on it. **V**
+- Alternatively switch SHEN: OSBYTE `&6C` (X=1 screen, X=0 extra RAM), or
+  directly with `&037F` (RAMID, the RAM copy) and `&FE34` together. BREAK
+  sets SHEN again from the last screen mode. **D/V**
+
+### IBOS workspace
+
+- Private RAM `&8000`-`&83FF` holds IBOS's buffers, settings and
+  sideways RAM lists; `&9000`-`&AFFF` is the 8K printer buffer by default
+  (moved with `*BUFFER`). `&8400`-`&8FFF` is not referenced by IBOS, but
+  there is no documented way to claim private RAM. **V/D/U**
+- Main RAM: `&0880`-`&08BF` vector stub, `&037F` RAMID, `&03A5` mode-change
+  state, `&0380`-`&03D8` borrowed temporarily, zero page `&A8`-`&AF`
+  (saved and restored) and `&BC`/`&BD`. **V**
+- IBOS hooks BYTEV, WORDV, WRCHV, RDCHV, INSV, REMV and CNPV (not via
+  extended vectors). **V**
+
+### Sideways RAM
+
+- OSBYTE `&44` returns a bitmask of the W-Z banks (bit 0 = W) that are RAM,
+  writable, and empty or `*SRDATA`; with the default `*SRSET` mapping W-Z
+  are banks 4-7. It returned `&0F` on the default machine. **V**
+- OSWORD `&42`/`&43` are supported with B+/Master semantics; there is no
+  allocate or free call. **V**
+- Write protection is by hardware switches on the V1 board; without the
+  (discontinued) switch assembly the RAM is writable. **D**
