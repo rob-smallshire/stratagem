@@ -17,11 +17,11 @@ ALIGN TILE_BYTES                \ So a cell's offset in a tile never carries
 
 \ The graphics address of each tile.
 .tile_address_low
-    FOR tile, 0, TILE_COUNT - 1
+    FOR tile, 0, KIND_COUNT - 1
         EQUB LO(tile_graphics + tile * TILE_BYTES)
     NEXT
 .tile_address_high
-    FOR tile, 0, TILE_COUNT - 1
+    FOR tile, 0, KIND_COUNT - 1
         EQUB HI(tile_graphics + tile * TILE_BYTES)
     NEXT
 

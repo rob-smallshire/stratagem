@@ -40,6 +40,11 @@ INKEY_SPACE = &100 - 99
     STA zp_player_on_ground
     STA zp_inventory
     STA zp_cooldown
+    STA zp_player_jump_held
+    STA zp_player_air_jumps
+    STA zp_redraw_tile
+    LDA #STARTING_ABILITIES
+    STA zp_abilities
     LDA #1
     STA zp_player_facing
     LDA #LO(PLAYER_START_X)
@@ -73,7 +78,8 @@ INKEY_SPACE = &100 - 99
     JSR OSBYTE
     JSR flip                    \ The time-critical part, first
     JSR restore_sprite          \ The camera moves only while the player is
-    JSR draw_sprite             \ well inside the view, clear of new columns
+    JSR redraw_queued_tile      \ well inside the view, clear of new columns
+    JSR draw_sprite
 .frame_shown                    \ The screen now shows the camera's view
     JSR read_input
     JSR update_player

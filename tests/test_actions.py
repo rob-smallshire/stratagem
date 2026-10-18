@@ -10,6 +10,7 @@ from stratagem import actions, player
 from stratagem.actions import INPUT_ACTION, INPUT_PLACE, Hands
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.tiles import PARTIAL_BASE
 from stratagem.world import CHUNK_SIZE, World
 from test_player import PlayerHarness, _random_start
 
@@ -44,6 +45,7 @@ def test_actions_match_model(machine, game_build):
     world = World()
     hands = Hands()
     done = {actions.DIG: 0, actions.PLACE: 0}
+    partial_seen = set()
     for episode in range(60):
         state = _random_start(rng, world)
         inputs = 0
@@ -69,8 +71,10 @@ def test_actions_match_model(machine, game_build):
             if target is not None:
                 assert (memory[labels["zp_target_x"]], memory[labels["zp_target_y"]]) == target
                 done[action] += 1
+                partial_seen.add(world.tile_at(*target))
             state = expected
     assert done[actions.DIG] > 50 and done[actions.PLACE] > 20, done
+    assert any(kind >= PARTIAL_BASE for kind in partial_seen), "no tile was ever partly dug"
     # The 6502 world agrees with the model everywhere it was changed.
     for index in world.directory:
         x0, y0 = index % 32 * CHUNK_SIZE, index // 32 * CHUNK_SIZE

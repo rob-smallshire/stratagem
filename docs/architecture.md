@@ -134,8 +134,12 @@ first place to optimise.
 
 ## World
 
-A 256 x 256 tile world, one byte per tile (type and flip,
-as in Exile). The world is never stored whole, since 64K is too much:
+A 256 x 256 tile world, one byte per tile. The byte is a *kind*, an index
+into generated tables (`tools/stratagem/tiles.py`): a material whole, or a
+diggable material partly dug from one side by quarters. Each kind has its
+own 64 bytes of graphics in the render region, so the renderer is unchanged,
+and a solid rectangle for collision (`find_hits` in `asm/player.asm`). Slopes
+will be further kinds, with Exile-style height maps. The world is never stored whole, since 64K is too much:
 
 - Immutable terrain (bedrock, water, lava, portals; see `game-design.md`)
   is never modified, so it needs no storage beyond the generator and the

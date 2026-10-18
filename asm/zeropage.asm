@@ -73,6 +73,9 @@ GUARD &90
 .zp_player_on_ground SKIP 1     \ Non-zero when standing on something
 .zp_player_facing   SKIP 1      \ 1 right, &FF left
 .zp_player_frame    SKIP 1      \ Sprite frame to draw
+.zp_player_jump_held SKIP 1     \ Non-zero if UP was held last frame
+.zp_player_air_jumps SKIP 1     \ Jumps left before landing
+.zp_abilities       SKIP 1      \ ABILITY_* bits earned
 .zp_direction       SKIP 1      \ Signed direction held: -1, 0 or 1
 .zp_new_x           SKIP 2      \ Position being tried
 .zp_new_y           SKIP 2
@@ -82,6 +85,14 @@ GUARD &90
 .zp_box_bottom      SKIP 1
 .zp_box_column      SKIP 1
 .zp_box_row         SKIP 1
+.zp_hit_any         SKIP 1      \ find_hits: non-zero if anything was hit
+.zp_hit_left        SKIP 2      \ ... the extremes of what was hit
+.zp_hit_right       SKIP 2
+.zp_hit_top         SKIP 2
+.zp_hit_bottom      SKIP 2
+.zp_hit_relative_y  SKIP 1
+.zp_stop            SKIP 2      \ Where a blocked horizontal move stops
+.zp_lift            SKIP 2      \ Height of a ledge to climb
 
 \ Digging and placing (modelled by tools/stratagem/actions.py)
 .zp_inventory       SKIP 1      \ Blocks carried
@@ -90,7 +101,11 @@ GUARD &90
 .zp_target_x        SKIP 1      \ The tile aimed at
 .zp_target_y        SKIP 1
 .zp_want            SKIP 1      \ Aiming for: 0 diggable, otherwise empty
-.zp_action_frames   SKIP 1      \ Cooldown for a dig
+.zp_action_tile     SKIP 1      \ The kind a dig leaves
+.zp_dig_direction   SKIP 1      \ The side a dig removes from
+.zp_redraw_tile     SKIP 1      \ Non-zero if a changed tile awaits redrawing...
+.zp_redraw_tile_x   SKIP 1      \ ... here
+.zp_redraw_tile_y   SKIP 1
 
 \ Tile cache: the tile rectangle it holds, inclusive
 .zp_cached_left     SKIP 1
@@ -113,6 +128,7 @@ GUARD &90
 .zp_columns_base    SKIP 2      \ ... at this screen address
 .zp_rows_left       SKIP 1      \ Rows still to draw in a redraw
 .zp_temp            SKIP 2
+.zp_temp2           SKIP 2
 
 \ Values of zp_machine
 MACHINE_MODEL_B   = 0

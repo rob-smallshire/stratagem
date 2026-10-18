@@ -39,3 +39,11 @@ A running log of design decisions. Add to it whenever one is made.
   fuelled Exile-style jetpack, longer endurance).
 - **Graphics detail** is set aside for now; tile *shapes* (slopes, partly
   dug tiles) are in scope, as they change play.
+- **Double jump** is the first flight stage: a fresh press of K in the air,
+  restored on landing, gated by an ability bit (on from the start until it
+  can be earned).
+- **Gradual digging:** each dig removes quarters of a tile from the side
+  dug from (grass 4, soil 2, stone/ore/gems 1 per dig), visibly; the tile
+  goes into the inventory when the last quarter goes. Tiles are kinds
+  (material + dug state); collision is by solid rectangles; walking into a
+  ledge up to a tile high climbs exactly its height.

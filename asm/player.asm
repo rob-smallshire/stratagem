@@ -67,13 +67,22 @@
     LDA zp_temp
     STA zp_player_vx
 .vx_done
-    \ Jump, and gravity.
+    \ Jump from the ground, or again in the air with a fresh press of UP.
     LDA zp_input
     AND #INPUT_UP
     BEQ no_jump
     LDA zp_player_on_ground
-    BEQ no_jump
+    BEQ in_the_air
     LDA #&100 - JUMP_SPEED
+    STA zp_player_vy
+    JMP no_jump
+.in_the_air
+    LDA zp_player_jump_held
+    BNE no_jump
+    LDA zp_player_air_jumps
+    BEQ no_jump
+    DEC zp_player_air_jumps
+    LDA #&100 - AIR_JUMP_SPEED
     STA zp_player_vy
 .no_jump
     LDA zp_player_vy
@@ -88,6 +97,22 @@
 
     JSR move_horizontally
     JSR move_vertically
+    \ Landing restores the air jumps the player's abilities allow.
+    LDA zp_player_on_ground
+    BEQ air_jumps_kept
+    LDA zp_abilities
+    AND #ABILITY_DOUBLE_JUMP
+    BEQ air_jumps_set
+    LDA #1
+.air_jumps_set
+    STA zp_player_air_jumps
+.air_jumps_kept
+    LDA zp_input
+    AND #INPUT_UP
+    BEQ held_set
+    LDA #&FF
+.held_set
+    STA zp_player_jump_held
     \ Fall through
 }
 
@@ -209,7 +234,7 @@
     LSR zp_box_x + 1
     ROR A
     STA zp_box_x
-    JSR box_free
+    JSR find_hits
     BCS blocked
     LDA zp_new_x
     STA zp_player_x
@@ -217,24 +242,60 @@
     STA zp_player_x + 1
     RTS
 .blocked
-    \ Climb a step: if on the ground and there is room a tile higher.
+    \ Where to stop, flush against the nearest solid part: x = (left - width)
+    \ * 16 moving right, right * 16 moving left.
+    LDA zp_player_vx
+    BMI stop_left
+    SEC
+    LDA zp_hit_left
+    SBC #PLAYER_WIDTH
+    STA zp_stop
+    LDA zp_hit_left + 1
+    SBC #0
+    STA zp_stop + 1
+    JMP stop_set
+.stop_left
+    LDA zp_hit_right
+    STA zp_stop
+    LDA zp_hit_right + 1
+    STA zp_stop + 1
+.stop_set
+    \ Climb a ledge: if on the ground, the ledge is at most a tile high (and
+    \ no higher than the top of the world), and there is room above it.
     LDA zp_player_on_ground
     BEQ stop
+    SEC                         \ lift = py + PLAYER_HEIGHT - top
+    LDA zp_box_y
+    ADC #PLAYER_HEIGHT - 1
+    STA zp_lift
     LDA zp_box_y + 1
-    BNE room_above
-    LDA zp_box_y
-    CMP #TILE_HEIGHT
-    BCC stop
-.room_above
+    ADC #0
+    STA zp_lift + 1
     SEC
+    LDA zp_lift
+    SBC zp_hit_top
+    STA zp_lift
+    LDA zp_lift + 1
+    SBC zp_hit_top + 1
+    BNE stop                    \ More than 255 lines
+    LDA zp_lift
+    CMP #TILE_HEIGHT + 1
+    BCS stop
+    LDA zp_box_y + 1            \ lift <= py
+    BNE room_at_top
     LDA zp_box_y
-    SBC #TILE_HEIGHT
+    CMP zp_lift
+    BCC stop
+.room_at_top
+    SEC                         \ Try the box at py - lift
+    LDA zp_box_y
+    SBC zp_lift
     STA zp_box_y
     LDA zp_box_y + 1
     SBC #0
     STA zp_box_y + 1
-    JSR box_free
-    BCS stop_from_climb
+    JSR find_hits
+    BCS stop
     LDA zp_new_x
     STA zp_player_x
     LDA zp_new_x + 1
@@ -245,43 +306,11 @@
     STA zp_player_y + 1
     LDX #zp_player_y
     JMP times_sixteen
-.stop_from_climb
-    CLC                         \ Put zp_box_y back (it is not used again,
-    LDA zp_box_y                \ but keep it meaningful)
-    ADC #TILE_HEIGHT
-    STA zp_box_y
-    BCC stop
-    INC zp_box_y + 1
 .stop
-    \ Stop flush against the tile in the way.
-    LDA zp_player_vx
-    BMI stop_left
-    CLC                         \ Right: x = (edge * 8 - PLAYER_WIDTH) * 16,
-    LDA zp_box_x                \ edge = (new_px + PLAYER_WIDTH - 1) >> 3
-    ADC #PLAYER_WIDTH - 1
+    LDA zp_stop
     STA zp_player_x
-    LDA zp_box_x + 1
-    ADC #0
+    LDA zp_stop + 1
     STA zp_player_x + 1
-    LDA zp_player_x
-    AND #&F8
-    SEC
-    SBC #PLAYER_WIDTH
-    STA zp_player_x
-    LDA zp_player_x + 1
-    SBC #0
-    STA zp_player_x + 1
-    JMP stopped
-.stop_left
-    LDA zp_box_x                \ Left: x = ((new_px >> 3) + 1) * 8 * 16
-    AND #&F8
-    CLC
-    ADC #TILE_WIDTH
-    STA zp_player_x
-    LDA zp_box_x + 1
-    ADC #0
-    STA zp_player_x + 1
-.stopped
     LDX #zp_player_x
     JSR times_sixteen
     LDA #0
@@ -326,7 +355,7 @@
     LSR zp_box_y + 1
     ROR A
     STA zp_box_y
-    JSR box_free
+    JSR find_hits
     BCS blocked
     LDA zp_new_y
     STA zp_player_y
@@ -337,34 +366,20 @@
     LDA zp_player_vy
     BEQ up
     BMI up
-    \ Down: land, y = (edge * 16 - PLAYER_HEIGHT) * 16,
-    \ edge = (new_py + PLAYER_HEIGHT - 1) >> 4
-    CLC
-    LDA zp_box_y
-    ADC #PLAYER_HEIGHT - 1
-    STA zp_player_y
-    LDA zp_box_y + 1
-    ADC #0
-    STA zp_player_y + 1
-    LDA zp_player_y
-    AND #&F0
-    SEC
+    SEC                         \ Down: land, y = (top - height) * 16
+    LDA zp_hit_top
     SBC #PLAYER_HEIGHT
     STA zp_player_y
-    LDA zp_player_y + 1
+    LDA zp_hit_top + 1
     SBC #0
     STA zp_player_y + 1
     LDA #&FF
     STA zp_player_on_ground
     BNE stopped
 .up
-    LDA zp_box_y                \ Up: y = ((new_py >> 4) + 1) * 16 * 16
-    AND #&F0
-    CLC
-    ADC #TILE_HEIGHT
+    LDA zp_hit_bottom           \ Up: y = bottom * 16
     STA zp_player_y
-    LDA zp_box_y + 1
-    ADC #0
+    LDA zp_hit_bottom + 1
     STA zp_player_y + 1
 .stopped
     LDX #zp_player_y
@@ -374,11 +389,24 @@
     RTS
 }
 
-\ Return carry clear if a player box at (zp_box_x, zp_box_y), in pixels and
-\ lines, overlaps only passable tiles, as the tile cache has them; carry set
-\ if not.
-.box_free
+\ Find the solid parts of tiles, as the tile cache has them, that a player
+\ box at (zp_box_x, zp_box_y), in pixels and lines, would overlap. Return
+\ carry clear if none; otherwise carry set, with the least left and top and
+\ the greatest right and bottom of them, in world pixels and lines, in
+\ zp_hit_left, zp_hit_top, zp_hit_right and zp_hit_bottom.
+.find_hits
 {
+    LDA #&FF                    \ Nothing hit yet: left and top at most,
+    STA zp_hit_left             \ right and bottom at least
+    STA zp_hit_left + 1
+    STA zp_hit_top
+    STA zp_hit_top + 1
+    LDA #0
+    STA zp_hit_right
+    STA zp_hit_right + 1
+    STA zp_hit_bottom
+    STA zp_hit_bottom + 1
+    STA zp_hit_any
     \ Tile columns zp_box_x >> 3 to (zp_box_x + PLAYER_WIDTH - 1) >> 3.
     CLC
     LDA zp_box_x
@@ -440,6 +468,19 @@
     ASL A
     ASL A
     STA zp_ptr
+    \ The box's top relative to the row, plus HIT_OFFSET: box_y - row * 16.
+    LDA zp_box_row
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA zp_temp
+    LDA zp_box_y
+    SEC
+    SBC zp_temp
+    CLC
+    ADC #HIT_OFFSET
+    STA zp_hit_relative_y
     LDA zp_box_x + 1            \ First column: zp_box_x >> 3
     STA zp_temp
     LDA zp_box_x
@@ -455,9 +496,32 @@
     AND #TILE_CACHE_SIZE - 1
     TAY
     LDA (zp_ptr),Y
-    TAX
-    LDA tile_passable,X
-    BEQ solid
+    TAX                         \ The kind
+    LDA kind_passable,X
+    BNE next_column
+    LDA zp_hit_relative_y       \ Overlapping vertically?
+    CMP kind_bottom_bound,X
+    BCS next_column
+    CMP kind_top_bound,X
+    BEQ next_column
+    BCC next_column
+    LDA zp_box_column           \ ... and horizontally: box_x - column * 8
+    ASL A
+    ASL A
+    ASL A
+    STA zp_temp
+    LDA zp_box_x
+    SEC
+    SBC zp_temp
+    CLC
+    ADC #HIT_OFFSET
+    CMP kind_right_bound,X
+    BCS next_column
+    CMP kind_left_bound,X
+    BEQ next_column
+    BCC next_column
+    JSR record_hit
+.next_column
     LDA zp_box_column
     INC zp_box_column
     CMP zp_box_right
@@ -465,14 +529,111 @@
     LDA zp_box_row
     INC zp_box_row
     CMP zp_box_bottom
-    BNE row_loop
-    CLC
-    RTS
-.solid
-    SEC
+    BEQ rows_done
+    JMP row_loop
+.rows_done
+    LDA zp_hit_any              \ Carry set if anything was hit
+    CMP #1
     RTS
 }
 
-\ Non-zero for each tile a body can pass through.
-.tile_passable
-    TILE_PASSABLE
+\ Record the solid part of kind X, in tile (zp_box_column, zp_box_row), as
+\ hit: widen zp_hit_left/right/top/bottom to include it.
+.record_hit
+{
+    LDA #1
+    STA zp_hit_any
+    \ Column * 8 and row * 16, 16 bits, in zp_temp and zp_temp2.
+    LDA #0
+    STA zp_temp + 1
+    LDA zp_box_column
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    STA zp_temp
+    LDA #0
+    STA zp_temp2 + 1
+    LDA zp_box_row
+    ASL A
+    ROL zp_temp2 + 1
+    ASL A
+    ROL zp_temp2 + 1
+    ASL A
+    ROL zp_temp2 + 1
+    ASL A
+    ROL zp_temp2 + 1
+    STA zp_temp2
+    \ Left: keep the least.
+    CLC
+    LDA zp_temp
+    ADC kind_solid_left,X
+    TAY
+    LDA zp_temp + 1
+    ADC #0
+    CMP zp_hit_left + 1
+    BCC new_left
+    BNE left_done
+    CPY zp_hit_left
+    BCS left_done
+.new_left
+    STY zp_hit_left
+    STA zp_hit_left + 1
+.left_done
+    \ Right: keep the greatest.
+    CLC
+    LDA zp_temp
+    ADC kind_solid_right,X
+    TAY
+    LDA zp_temp + 1
+    ADC #0
+    CMP zp_hit_right + 1
+    BCC right_done
+    BNE new_right
+    CPY zp_hit_right
+    BCC right_done
+    BEQ right_done
+.new_right
+    STY zp_hit_right
+    STA zp_hit_right + 1
+.right_done
+    \ Top: keep the least.
+    CLC
+    LDA zp_temp2
+    ADC kind_solid_top,X
+    TAY
+    LDA zp_temp2 + 1
+    ADC #0
+    CMP zp_hit_top + 1
+    BCC new_top
+    BNE top_done
+    CPY zp_hit_top
+    BCS top_done
+.new_top
+    STY zp_hit_top
+    STA zp_hit_top + 1
+.top_done
+    \ Bottom: keep the greatest.
+    CLC
+    LDA zp_temp2
+    ADC kind_solid_bottom,X
+    TAY
+    LDA zp_temp2 + 1
+    ADC #0
+    CMP zp_hit_bottom + 1
+    BCC bottom_done
+    BNE new_bottom
+    CPY zp_hit_bottom
+    BCC bottom_done
+    BEQ bottom_done
+.new_bottom
+    STY zp_hit_bottom
+    STA zp_hit_bottom + 1
+.bottom_done
+    RTS
+}
+
+\ The properties of each kind of tile.
+INCLUDE "build/generated/kinds.asm"

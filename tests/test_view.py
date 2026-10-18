@@ -46,6 +46,8 @@ def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, Player, in
         vx=_signed(peek[labels["zp_player_vx"]]), vy=_signed(peek[labels["zp_player_vy"]]),
         on_ground=peek[labels["zp_player_on_ground"]] != 0,
         facing=_signed(peek[labels["zp_player_facing"]]),
+        jump_held=peek[labels["zp_player_jump_held"]] != 0,
+        air_jumps=peek[labels["zp_player_air_jumps"]],
     )
     return state, hero, peek[labels["zp_input"]], word("zp_screen_start")
 
@@ -117,6 +119,7 @@ SCRIPTS = {
     "jump": [(90, ["K"]), (30, [])],
     "jump-right": [(90, ["X", "K"]), (30, [])],
     "jump-left": [(90, ["Z", "K"]), (30, [])],
+    "double-jump": [(6, ["K"]), (10, []), (6, ["K"]), (60, [])],
     "dig-down": [(60, ["M", "L"]), (20, [])],
     "tunnel-right": [(90, ["X", "L"]), (10, [])],
     "dig-down-then-build": [(40, ["M", "L"]), (30, ["SPACE"]), (30, ["K", "SPACE"]), (20, ["X"])],

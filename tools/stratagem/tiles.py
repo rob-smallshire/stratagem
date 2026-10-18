@@ -21,6 +21,56 @@ TILE_NAMES = ["air", "grass", "soil", "stone", "ore", "gem", "bedrock", "water",
 # Tiles a body can pass through; the rest are solid.
 PASSABLE = frozenset({AIR, WATER, SKY})
 
+# A tile in the world is a *kind*: one of the materials above, whole (kinds
+# 0 to len(TILE_NAMES) - 1, the same numbers), or a diggable material partly
+# dug away, from one side, by quarters. The dug part is empty (like AIR); the
+# rest is a solid rectangle.
+DIGGABLE = [GRASS, SOIL, STONE, ORE, GEM]
+FROM_LEFT, FROM_RIGHT, FROM_TOP, FROM_BOTTOM = range(4)
+DIRECTIONS = 4
+QUARTERS = 4
+PARTIAL_BASE = len(TILE_NAMES)
+KIND_COUNT = PARTIAL_BASE + len(DIGGABLE) * DIRECTIONS * (QUARTERS - 1)
+
+TILE_PIXEL_WIDTH = 8
+TILE_LINE_HEIGHT = 16
+
+
+def partial_kind(material: int, direction: int, removed: int) -> int:
+    """The kind of `material` with `removed` quarters (1-3) dug away from
+    side `direction`."""
+    assert 1 <= removed < QUARTERS
+    return PARTIAL_BASE + (DIGGABLE.index(material) * DIRECTIONS + direction) * (QUARTERS - 1) + removed - 1
+
+
+def kind_info(kind: int) -> tuple[int, int, int]:
+    """(material, direction, quarters removed) of a kind; whole kinds have
+    direction 0 and nothing removed."""
+    if kind < PARTIAL_BASE:
+        return kind, 0, 0
+    index = kind - PARTIAL_BASE
+    removed = index % (QUARTERS - 1) + 1
+    index //= QUARTERS - 1
+    return DIGGABLE[index // DIRECTIONS], index % DIRECTIONS, removed
+
+
+def kind_rect(kind: int) -> tuple[int, int, int, int] | None:
+    """The solid part of a kind, (left, right, top, bottom) in pixels and
+    lines within the tile, right and bottom exclusive; None if passable."""
+    material, direction, removed = kind_info(kind)
+    if material in PASSABLE:
+        return None
+    left, right, top, bottom = 0, TILE_PIXEL_WIDTH, 0, TILE_LINE_HEIGHT
+    if direction == FROM_LEFT:
+        left = removed * TILE_PIXEL_WIDTH // QUARTERS
+    elif direction == FROM_RIGHT:
+        right = TILE_PIXEL_WIDTH - removed * TILE_PIXEL_WIDTH // QUARTERS
+    elif direction == FROM_TOP:
+        top = removed * TILE_LINE_HEIGHT // QUARTERS
+    else:
+        bottom = TILE_LINE_HEIGHT - removed * TILE_LINE_HEIGHT // QUARTERS
+    return left, right, top, bottom
+
 
 def _speckle(x: int, y: int, salt: int) -> int:
     """A small deterministic hash of a pixel position, 0-255."""
@@ -55,9 +105,22 @@ TILE_PIXELS = {
 }
 
 
-def tile_graphics() -> list[bytes]:
-    """Every tile's 64 bytes, in tile number order."""
+def kind_pixels(kind: int) -> list[list[int]]:
+    """A kind's pixels: its material, with the dug part empty."""
+    material = kind_info(kind)[0]
+    if kind < PARTIAL_BASE:
+        return TILE_PIXELS[material]
+    left, right, top, bottom = kind_rect(kind)
     return [
-        encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in TILE_PIXELS[tile]])
-        for tile in range(len(TILE_NAMES))
+        [TILE_PIXELS[material][y][x] if left <= x < right and top <= y < bottom else TILE_PIXELS[AIR][y][x]
+         for x in range(TILE_WIDTH_PIXELS)]
+        for y in range(TILE_HEIGHT_LINES)
+    ]
+
+
+def tile_graphics() -> list[bytes]:
+    """Every kind's 64 bytes, in kind order."""
+    return [
+        encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in kind_pixels(kind)])
+        for kind in range(KIND_COUNT)
     ]
