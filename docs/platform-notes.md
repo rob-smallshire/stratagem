@@ -47,6 +47,11 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
 - Source: IBOS 1.26 source at github.com/kgl2001/IntegraB-OS (`IBOS.asm`,
   which rebuilds byte-for-byte), and the Integra-B User Guide.
 
+- IBOS has MEMSEL set in the OS idle loop, so in Beebium a CPU-address peek
+  of `&3000`-`&7FFF` on the Integra-B depends on where the machine stopped.
+  Tests read the screen and user RAM through the `main_ram` (screen) and
+  `shadow_ram` (user RAM) regions instead. **V** (beebium-stratagem)
+
 ### Detection
 
 - IBOS answers OSBYTE `&49` with X=`&FF` by returning X=`&49`; use this
