@@ -3,7 +3,7 @@
 Stratagem is an open-world digging and building game in the spirit of
 Terraria, using techniques from Exile: a large tile world, a smart-scrolling
 16-colour view and a physics-driven object system. This document describes
-how it fits the machines; `docs/platform-notes.md` holds the hardware facts
+how it fits the machines; `docs/game-design.md` describes the game; `docs/platform-notes.md` holds the hardware facts
 it relies on, and `docs/decisions.md` records decisions as they are made.
 
 ## Targets and constraints
@@ -107,6 +107,9 @@ remains possible; it costs that 4K and a quarter more plotting per redraw.
 A 256 x 256 tile world, one byte per tile (type and flip,
 as in Exile). The world is never stored whole, since 64K is too much:
 
+- Immutable terrain (bedrock, water, lava, portals; see `game-design.md`)
+  is never modified, so it needs no storage beyond the generator and the
+  map overlay.
 - The base world is procedural, computed from (x, y) by a fast hash-driven
   generator, as in Exile, so unmodified land costs nothing.
 - Modified land is stored as chunks of 8 x 8 tiles (64 bytes). A
