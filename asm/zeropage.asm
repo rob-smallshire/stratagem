@@ -83,6 +83,15 @@ GUARD &90
 .zp_box_column      SKIP 1
 .zp_box_row         SKIP 1
 
+\ Digging and placing (modelled by tools/stratagem/actions.py)
+.zp_inventory       SKIP 1      \ Blocks carried
+.zp_cooldown        SKIP 1      \ Frames until the next dig or place
+.zp_action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
+.zp_target_x        SKIP 1      \ The tile aimed at
+.zp_target_y        SKIP 1
+.zp_want            SKIP 1      \ Aiming for: 0 diggable, otherwise empty
+.zp_action_frames   SKIP 1      \ Cooldown for a dig
+
 \ Tile cache: the tile rectangle it holds, inclusive
 .zp_cached_left     SKIP 1
 .zp_cached_right    SKIP 1

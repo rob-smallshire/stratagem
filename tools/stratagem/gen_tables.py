@@ -4,14 +4,15 @@ Writes into build/generated/:
 - tiles.asm: TILE_* numbers and the tile graphics (64 bytes per tile);
 - world.asm: the world generator's constants, HEIGHTS and PERM tables;
 - camera.asm: the camera's and screen's constants;
-- player.asm: the player's constants, sprite frames and passable tiles.
+- player.asm: the player's constants, sprite frames, and tile properties
+  for movement, digging and placing.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from stratagem import camera, player, screen, sprites, tiles, world
+from stratagem import actions, camera, player, screen, sprites, tiles, world
 
 
 def _bytes_lines(data: bytes | list[int], per_line: int = 16) -> list[str]:
@@ -83,6 +84,18 @@ def player_source() -> str:
     lines.append("")
     lines.append("MACRO TILE_PASSABLE")
     lines += _bytes_lines([0xFF if tile in tiles.PASSABLE else 0 for tile in range(len(tiles.TILE_NAMES))])
+    lines.append("ENDMACRO")
+    lines.append("")
+    for name in ("INPUT_ACTION", "INPUT_PLACE", "PLACE_FRAMES", "INVENTORY_MAX"):
+        lines.append(f"{name} = {getattr(actions, name)}")
+    lines.append(f"PLACED_TILE = {actions.PLACED_TILE}")
+    lines.append("")
+    lines.append("MACRO DIG_FRAMES")
+    lines += _bytes_lines([actions.DIG_FRAMES.get(tile, 0) for tile in range(len(tiles.TILE_NAMES))])
+    lines.append("ENDMACRO")
+    lines.append("")
+    lines.append("MACRO TILE_EMPTY")
+    lines += _bytes_lines([0xFF if tile in actions.EMPTY else 0 for tile in range(len(tiles.TILE_NAMES))])
     lines.append("ENDMACRO")
     return "\n".join(lines) + "\n"
 

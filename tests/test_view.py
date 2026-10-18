@@ -6,12 +6,13 @@ import pytest
 from beebium.client import Beebium
 
 from conftest import boot_until_ready
-from stratagem import camera, player, sprites
+from stratagem import actions, camera, player, sprites
+from stratagem.actions import Hands
 from stratagem.camera import Camera
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
 from stratagem.tiles import tile_graphics
-from stratagem.world import tile_at
+from stratagem.world import World, tile_at
 
 SCREENSHOT_DIRPATH_NAME = "screenshots"
 GRAPHICS = tile_graphics()
@@ -49,8 +50,8 @@ def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, Player, in
     return state, hero, peek[labels["zp_input"]], word("zp_screen_start")
 
 
-def expected_screen(state: Camera, hero: Player, screen_start: int) -> dict[int, int]:
-    image = render_view(screen_start, state.camera_x, state.camera_y, tile_at, GRAPHICS)
+def expected_screen(state: Camera, hero: Player, screen_start: int, world_tile_at=tile_at) -> dict[int, int]:
+    image = render_view(screen_start, state.camera_x, state.camera_y, world_tile_at, GRAPHICS)
     frame = FRAMES[sprites.frame_for(hero)]
     column = (hero.px >> 1) - state.camera_x
     line = hero.py - state.camera_y * 8
@@ -65,20 +66,21 @@ def expected_screen(state: Camera, hero: Player, screen_start: int) -> dict[int,
 TILE_CACHE_SIZE = 32       # asm/layout.asm
 
 
-def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Camera) -> None:
+def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Camera, world_tile_at=tile_at) -> None:
     cache = bbc.memory.address.peek[labels["tile_cache"]:labels["tile_cache"] + TILE_CACHE_SIZE ** 2]
     wrong = []
     for ty in range(state.camera_y >> 1, (state.camera_y + camera.VIEW_ROWS - 1 >> 1) + 1):
         for tx in range(state.camera_x >> 2, (state.camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1):
-            if cache[(ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE] != tile_at(tx, ty):
+            if cache[(ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE] != world_tile_at(tx, ty):
                 wrong.append((tx, ty))
     assert wrong[:8] == [], f"{len(wrong)} cached tiles are wrong"
 
 
-def assert_screen_matches_model(bbc: Beebium, machine, labels: dict[str, int]) -> tuple[Camera, Player]:
+def assert_screen_matches_model(bbc: Beebium, machine, labels: dict[str, int],
+                                world_tile_at=tile_at) -> tuple[Camera, Player]:
     state, hero, _, screen_start = read_state(bbc, labels)
-    assert_tile_cache_holds_view(bbc, labels, state)
-    expected = expected_screen(state, hero, screen_start)
+    assert_tile_cache_holds_view(bbc, labels, state, world_tile_at)
+    expected = expected_screen(state, hero, screen_start, world_tile_at)
     actual = bbc.memory.region(machine.screen_region).peek[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
     assert differences[:8] == [], f"{len(differences)} displayed screen bytes differ at {state}, {hero}"
@@ -107,28 +109,52 @@ def test_initial_view_matches_model(game, machine, game_build):
     bbc.video.capture_frame().save_png(str(screenshot_dirpath / f"view-{machine.name}.png"))
 
 
-@pytest.mark.parametrize("keys", [["X"], ["Z"], ["K"], ["X", "K"], ["Z", "K"]],
-                         ids=lambda keys: "+".join(keys))
-def test_every_frame_matches_model_while_playing(game, machine, keys):
+KEY_INPUTS = {"Z": camera.INPUT_LEFT, "X": camera.INPUT_RIGHT, "K": camera.INPUT_UP, "M": camera.INPUT_DOWN,
+              "L": actions.INPUT_ACTION, "SPACE": actions.INPUT_PLACE}
+SCRIPTS = {
+    "walk-right": [(90, ["X"]), (30, [])],
+    "walk-left": [(90, ["Z"]), (30, [])],
+    "jump": [(90, ["K"]), (30, [])],
+    "jump-right": [(90, ["X", "K"]), (30, [])],
+    "jump-left": [(90, ["Z", "K"]), (30, [])],
+    "dig-down": [(60, ["M", "L"]), (20, [])],
+    "tunnel-right": [(90, ["X", "L"]), (10, [])],
+    "dig-down-then-build": [(40, ["M", "L"]), (30, ["SPACE"]), (30, ["K", "SPACE"]), (20, ["X"])],
+}
+
+
+def press(bbc: Beebium, keys: list[str], down: bool) -> None:
+    for key in keys:
+        if key == "SPACE":
+            (bbc.keyboard.key_down if down else bbc.keyboard.key_up)(" ")
+        else:
+            (bbc.keyboard.key_down if down else bbc.keyboard.key_up)(key)
+
+
+@pytest.mark.parametrize("script", SCRIPTS.values(), ids=SCRIPTS.keys())
+def test_every_frame_matches_model_while_playing(game, machine, script):
     bbc, labels = game
+    peek = bbc.memory.address.peek
+    world = World()
+    hands = Hands()
     previous, previous_hero, _, _ = read_state(bbc, labels)
-    moved = 0
-    for frame in range(120):
-        if frame == 0:
-            for key in keys:
-                bbc.keyboard.key_down(key)
-        if frame == 90:
-            for key in keys:
-                bbc.keyboard.key_up(key)
-        next_frame(bbc, labels)
-        state, hero = assert_screen_matches_model(bbc, machine, labels)
-        _, _, inputs, _ = read_state(bbc, labels)
-        expected_hero = player.step(previous_hero, inputs, tile_at)
-        assert hero == expected_hero
-        direction = (1 if inputs & camera.INPUT_RIGHT else 0) - (1 if inputs & camera.INPUT_LEFT else 0)
-        focus_x, focus_y = player.focus(expected_hero)
-        assert state == camera.plan_camera(replace(previous, focus_x=focus_x, focus_y=focus_y), direction)
-        moved += abs(state.dx) + abs(state.dy)
-        previous, previous_hero = state, hero
-    if keys != ["K"]:
-        assert moved > 10, "the camera hardly moved"
+    moved = changes = 0
+    for frames, keys in script:
+        press(bbc, keys, True)
+        for _ in range(frames):
+            next_frame(bbc, labels)
+            _, _, inputs, _ = read_state(bbc, labels)
+            expected_hero = player.step(previous_hero, inputs, world.tile_at)
+            hands, action, _ = actions.act(hands, expected_hero, inputs, world)
+            changes += action != actions.NONE
+            state, hero = assert_screen_matches_model(bbc, machine, labels, world.tile_at)
+            assert hero == expected_hero
+            assert (peek[labels["zp_inventory"]], peek[labels["zp_cooldown"]]) == (hands.inventory, hands.cooldown)
+            direction = (1 if inputs & camera.INPUT_RIGHT else 0) - (1 if inputs & camera.INPUT_LEFT else 0)
+            focus_x, focus_y = player.focus(expected_hero)
+            assert state == camera.plan_camera(replace(previous, focus_x=focus_x, focus_y=focus_y), direction)
+            moved += abs(state.dx) + abs(state.dy)
+            previous, previous_hero = state, hero
+        press(bbc, keys, False)
+    if any("L" in keys or "SPACE" in keys for _, keys in script):
+        assert changes > 3, "hardly anything was dug or placed"

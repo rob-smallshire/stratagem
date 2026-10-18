@@ -1,5 +1,6 @@
 \ MAIN: the game, in user RAM. For now: the player walks (Z, X) and jumps
-\ (K) about the world, and the camera follows, scrolling smoothly.
+\ (K) about the world, digs (L) and places blocks (SPACE), aiming down (M)
+\ or up (K) or ahead, and the camera follows, scrolling smoothly.
 \
 \ Each frame, just after vertical sync, the screen is flipped: the CRTC is
 \ given the new start address, and any newly exposed columns are drawn,
@@ -16,6 +17,8 @@ INKEY_Z = &100 - 98
 INKEY_X = &100 - 67
 INKEY_K = &100 - 71
 INKEY_M = &100 - 102
+INKEY_L = &100 - 87
+INKEY_SPACE = &100 - 99
 
 .main_start
 {
@@ -35,6 +38,8 @@ INKEY_M = &100 - 102
     STA zp_player_vx
     STA zp_player_vy
     STA zp_player_on_ground
+    STA zp_inventory
+    STA zp_cooldown
     LDA #1
     STA zp_player_facing
     LDA #LO(PLAYER_START_X)
@@ -72,6 +77,7 @@ INKEY_M = &100 - 102
 .frame_shown                    \ The screen now shows the camera's view
     JSR read_input
     JSR update_player
+    JSR player_action
     JSR plan_camera
     JSR apply_plan
     JMP main_loop
@@ -94,6 +100,12 @@ INKEY_M = &100 - 102
     JSR read_key
     LDX #INKEY_M
     LDA #INPUT_DOWN
+    JSR read_key
+    LDX #INKEY_L
+    LDA #INPUT_ACTION
+    JSR read_key
+    LDX #INKEY_SPACE
+    LDA #INPUT_PLACE
     \ Fall through
 }
 
@@ -881,6 +893,7 @@ INKEY_M = &100 - 102
 \ Data
 
 INCLUDE "asm/player.asm"
+INCLUDE "asm/actions.asm"
 
 .main_end
 
