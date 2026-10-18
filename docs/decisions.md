@@ -30,3 +30,7 @@ A running log of design decisions. Add to it whenever one is made.
 - **Keys:** Z left, X right, K up, M down, L action, plus SPACE and SHIFT:
   an emerging standard that suits emulators and real machines. Other keys
   may be added.
+- **Scrolling:** cell granularity (2 pixels, 8 lines); 31 of 32 rows
+  displayed so new rows are drawn hidden; new columns drawn after vsync
+  ahead of the beam; both axes per frame; a camera window with an eased
+  lead; a 32 x 32 tile cache in low RAM. See `architecture.md`.

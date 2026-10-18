@@ -20,7 +20,7 @@ BANK_END     = &C000
 ROW_BYTES        = 512
 CELL_BYTES       = 8
 TILE_BYTES       = 64
-MAX_CELLS        = 64           \ Cells in the renderer's cell list
+TILE_CACHE_SIZE  = 32           \ The tile cache is TILE_CACHE_SIZE square
 
 \ CRTC
 CRTC_ADDRESS = &FE00

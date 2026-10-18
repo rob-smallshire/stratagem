@@ -93,14 +93,44 @@ four-colour sprite can be recoloured by palette. The palette handling is
 kept in one module, so that a Video NULA's programmable palette can later
 give true 16 colours.
 
-Geometry: 128 x 256 pixels, as in Exile
-Enhanced. That is 64 character columns by 32 rows, 16K at `&4000`, with the
-hardware wrap set for a 16K screen. Scrolling is by CRTC start address,
-with new strips plotted at the leading edges.
+Screen memory is 16K at `&4000` with the hardware wrap set for 16K: 64
+character columns (128 pixels) by 32 rows. Only 31 rows (248 lines) are
+displayed; the 32nd is hidden. Tiles are 8 x 16 pixels, so each is eight
+cells (character cells of 8 bytes): four across, two down.
 
-This leaves screen-side `&3000`-`&3FFF` as 4K that only render code can
-see, a good place for more graphics. A full 160-pixel-wide 20K screen
-remains possible; it costs that 4K and a quarter more plotting per redraw.
+## Scrolling
+
+Scrolling moves the CRTC start address, so the unit is a cell: 2 pixels
+horizontally and 8 lines vertically. Studying Exile (see
+`docs/reference/exile/README.md`), Stratagem keeps its camera ideas and
+improves on its drawing:
+
+- **Tear-free at 50 Hz.** Exile wipes and redraws an exposed strip while it
+  is on screen, scrolls at most at 25 Hz, and one axis per update. Here,
+  because only 31 of the 32 rows are displayed, a new top or bottom row is
+  always the hidden row, and is drawn before the flip, unseen. New columns
+  are drawn just after vertical sync, a row at a time, so each cell is
+  finished long before the beam reaches it. Both axes can move in one
+  frame; the corner cells belong to the columns.
+- **A camera window.** The camera keeps the focus (the player, later)
+  inside a window around the centre, so small movements don't scroll. The
+  window shifts against the direction of travel by a lead that eases in, as
+  Exile's scrolling velocity does, to show more of what lies ahead. The
+  step grows with the distance outside the window (up to 2 columns a
+  frame), and the view is redrawn only if the focus leaves it.
+- **A tile cache.** A 32 x 32 ring of tile numbers in low RAM holds the
+  tiles of the view. The world bank fills a new tile row or column only
+  when the camera crosses a tile boundary, and the renderer reads tiles
+  straight from it (as collision code will). Exile instead calls its world
+  function for every strip, and each tile row is exposed twice and each
+  tile column four times.
+
+Each frame: wait for vertical sync; flip (set the start address, draw new
+columns); move the marker; read input; move the focus; plan the camera;
+update the tile cache; draw a new row into the hidden row. In the worst
+case (two columns and a row) this takes about 30,000 of a frame's 40,000
+cycles, leaving roughly a quarter for the game; `render_columns` is the
+first place to optimise.
 
 ## World
 
@@ -124,20 +154,17 @@ as in Exile). The world is never stored whole, since 64K is too much:
   the generator.
 
 The renderer never calls `tile_at` itself, because bank W is not visible
-while the screen is paged in. Instead, game code fills a strip buffer in
-low RAM with the tile numbers and palettes for the next strip, and the
-renderer draws from that.
+while the screen is paged in. Instead it reads the tile cache in low RAM,
+which the world bank fills.
 
-## Frame structure (sketch)
+## Frame structure (sketch, beyond scrolling)
 
-1. Game update (screen off): input, physics, objects, world edits.
-2. Prepare (screen off): decide the scroll, fill strip buffers for exposed
-   edges, build the sprite list.
-3. Render (screen on, in the render region): unplot or restore old
-   sprites, plot strips, plot sprites, then set the CRTC start address at
-   a safe point in the frame.
-4. The IRQ handler (in low RAM) handles vsync and timer events: palette
-   splits (for example, Exile's water line) and sound.
+1. After vertical sync: flip, then restore and redraw sprites in the order
+   the beam reaches them.
+2. Game update (screen off): input, physics, objects, world edits.
+3. Prepare: plan the camera, update the tile cache, draw the hidden row.
+4. The IRQ handler (in low RAM) handles timer events: palette splits (for
+   example, Exile's water line) and sound.
 
 ## Build and test
 

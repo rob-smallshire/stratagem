@@ -17,17 +17,33 @@ GUARD &90
 .zp_romsel_render   SKIP 1      \ ROMSEL while render code runs: render bank + bit 7
 .zp_bank_world      SKIP 1      \ ROMSEL for the world bank
 
+\ Render parameters, set by the game before calling a render routine
+.zp_render_u        SKIP 1      \ World cell column (only the low 7 bits matter)
+.zp_render_v        SKIP 1      \ World cell row (only the low 6 bits matter)
+.zp_render_count    SKIP 1      \ Cells along a row, or rows down columns
+.zp_render_width    SKIP 1      \ Columns side by side (render_columns)
+.zp_render_base     SKIP 2      \ Screen address of the first cell
+
 \ Renderer workspace (used only by render code)
 .zp_screen          SKIP 2      \ Screen address of the current cell
 .zp_screen_lower    SKIP 2      \ A second screen address
 .zp_tile            SKIP 2      \ Graphics of the current cell
+.zp_row_pointer     SKIP 2      \ The tile cache row being drawn
+.zp_render_half     SKIP 1      \ 0 or 32: the half of the tile being drawn
+.zp_render_column   SKIP 1      \ World cell column being drawn
+.zp_render_across   SKIP 1      \ Columns still to draw across a row
 
-\ World generator workspace (used only by world code)
+\ World workspace (used only by world code)
 .zp_world_x         SKIP 1
 .zp_world_y         SKIP 1
 .zp_world_depth     SKIP 1
 .zp_world_fine      SKIP 1
 .zp_world_temp      SKIP 1
+.zp_fill_x          SKIP 1      \ fill_cache: first tile
+.zp_fill_y          SKIP 1
+.zp_fill_count      SKIP 1      \ ... how many
+.zp_fill_down       SKIP 1      \ ... non-zero for down a column, else along a row
+.zp_fill_pointer    SKIP 2
 
 \ Camera (modelled by tools/stratagem/camera.py)
 .zp_input           SKIP 1      \ INPUT_* bits for this frame
@@ -44,21 +60,25 @@ GUARD &90
 .zp_relative_x      SKIP 1      \ Focus column and row within the view
 .zp_relative_y      SKIP 1
 
+\ Tile cache: the tile rectangle it holds, inclusive
+.zp_cached_left     SKIP 1
+.zp_cached_right    SKIP 1
+.zp_cached_top      SKIP 1
+.zp_cached_bottom   SKIP 1
+.zp_view_left       SKIP 1      \ The tile rectangle the view needs
+.zp_view_right      SKIP 1
+.zp_view_top        SKIP 1
+.zp_view_bottom     SKIP 1
+
 \ Game
 .zp_screen_start    SKIP 2      \ Screen address of the view's top-left cell
 .zp_frame           SKIP 1      \ Incremented once per pass of the main loop
 .zp_marker_address  SKIP 2      \ Screen address of the marker's top line
 .zp_marker_drawn    SKIP 1      \ Non-zero while the marker is on the screen
-.zp_columns_planned SKIP 1      \ New columns to draw at the next flip
-.zp_cell_u          SKIP 2      \ World cell being prepared
-.zp_cell_v          SKIP 2
-.zp_cell_count      SKIP 1      \ Cells still to prepare
-.zp_cell_down       SKIP 1      \ Non-zero to prepare down a column
-.zp_cell_tile       SKIP 1      \ The tile the cell is in
-.zp_cell_index      SKIP 1      \ Index into the cell list
+.zp_columns_width   SKIP 1      \ New columns to draw at the next flip...
+.zp_columns_u       SKIP 1      \ ... from this world column
+.zp_columns_base    SKIP 2      \ ... at this screen address
 .zp_rows_left       SKIP 1      \ Rows still to draw in a redraw
-.zp_view_column     SKIP 1      \ View column of a new column being prepared
-.zp_new_column      SKIP 1      \ Which of the new columns
 .zp_temp            SKIP 2
 
 \ Values of zp_machine

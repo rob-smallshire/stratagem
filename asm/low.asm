@@ -18,12 +18,23 @@ MACRO SELECT_ROMSEL
     STA ROMSEL
 ENDMACRO
 
-\ Draw cells cell_first to cell_end - 1 of the cell list (see render_cells).
-.call_render_cells
+\ Draw zp_render_count cells along a world row (see render_row).
+.call_render_row
 {
     LDA zp_romsel_render
     SELECT_ROMSEL
-    JSR render_cells
+    JSR render_row
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    RTS
+}
+
+\ Draw zp_render_width columns of zp_render_count cells (see render_columns).
+.call_render_columns
+{
+    LDA zp_romsel_render
+    SELECT_ROMSEL
+    JSR render_columns
     LDA zp_romsel_game
     SELECT_ROMSEL
     RTS
@@ -64,15 +75,16 @@ ENDMACRO
     RTS
 }
 
-\ The cell list, shared by the game, which fills it, and the renderer: the
-\ graphics address of each cell, and where to draw them: from cell_base,
-\ each cell_step bytes after the last.
-.cell_source_low    SKIP MAX_CELLS
-.cell_source_high   SKIP MAX_CELLS
-.cell_base          SKIP 2
-.cell_step          SKIP 2
-.cell_first         SKIP 1
-.cell_end           SKIP 1
+\ Fill the tile cache from the world (see fill_cache).
+.call_fill_cache
+{
+    LDA zp_bank_world
+    SELECT_ROMSEL
+    JSR fill_cache
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    RTS
+}
 
 \ ---------------------------------------------------------------------------
 \ Loader
@@ -245,5 +257,12 @@ ENDMACRO
 INCLUDE "asm/machine.asm"
 
 .strat_end
+
+\ The tile cache: the tiles around the view, which the world fills and the
+\ renderer (and later the game) reads. A 32 x 32 ring: tile (x, y) is at
+\ tile_cache + (y MOD 32) * 32 + (x MOD 32). It overlays nothing, so it isn't
+\ saved.
+ALIGN &100
+.tile_cache         SKIP TILE_CACHE_SIZE * TILE_CACHE_SIZE
 
 SAVE "STRAT", strat_start, strat_end

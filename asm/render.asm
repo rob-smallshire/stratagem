@@ -11,8 +11,19 @@ GUARD RENDER_CODE
 .render_start
     EQUB 0, 0, 0, 0, 0, 0, 0, 0 \ Not a ROM header: &8007 = 0 and &8001 <> "("
 
+ALIGN TILE_BYTES                \ So a cell's offset in a tile never carries
 .tile_graphics
     TILE_GRAPHICS
+
+\ The graphics address of each tile.
+.tile_address_low
+    FOR tile, 0, TILE_COUNT - 1
+        EQUB LO(tile_graphics + tile * TILE_BYTES)
+    NEXT
+.tile_address_high
+    FOR tile, 0, TILE_COUNT - 1
+        EQUB HI(tile_graphics + tile * TILE_BYTES)
+    NEXT
 
 CLEAR RENDER_CODE, RENDER_END
 ORG RENDER_CODE
@@ -20,44 +31,164 @@ GUARD RENDER_END
 
 MARKER_COLOUR = &3F             \ Both pixels colour 7
 
-\ Copy cells cell_first to cell_end - 1 of the cell list to the screen: each
-\ is eight bytes from its cell_source, drawn at cell_base, cell_base +
-\ cell_step, and so on, wrapping at the end of the screen. A cell never
-\ crosses the end of the screen, as cells are 8-byte aligned.
-.render_cells
-{
-    LDA cell_base
-    STA zp_screen
-    LDA cell_base + 1
-    STA zp_screen + 1
-    LDX cell_first
-.cell_loop
-    LDA cell_source_low,X
-    STA zp_tile
-    LDA cell_source_high,X
-    STA zp_tile + 1
+\ Copy the eight bytes of the cell at zp_tile to the screen at pointer.
+MACRO COPY_CELL pointer
     LDY #7
     FOR line, 7, 1, -1
         LDA (zp_tile),Y
-        STA (zp_screen),Y
+        STA (pointer),Y
         DEY
     NEXT
     LDA (zp_tile),Y
-    STA (zp_screen),Y
+    STA (pointer),Y
+ENDMACRO
+
+\ Point zp_row_pointer at the tile cache row holding world cell row
+\ zp_render_v, and set zp_render_half to the offset of its half of a tile.
+.set_row_pointer
+{
+    LDA zp_render_v
+    LSR A
+    AND #TILE_CACHE_SIZE - 1    \ Tile row in the cache
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC #HI(tile_cache)
+    STA zp_row_pointer + 1
+    TYA
+    AND #7
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA zp_row_pointer
+    LDA zp_render_v
+    AND #1
+    LSR A                       \ 1 -> 32
+    ROR A
+    ROR A
+    ROR A
+    STA zp_render_half
+    RTS
+}
+
+\ Set zp_tile to the graphics of the cell in column A of the cache row at
+\ zp_row_pointer.
+MACRO SET_CELL_GRAPHICS
+    TAX
+    LSR A
+    LSR A
+    AND #TILE_CACHE_SIZE - 1
+    TAY
+    LDA (zp_row_pointer),Y      \ The tile
+    TAY
+    TXA
+    AND #3
+    ASL A
+    ASL A
+    ASL A
+    ORA zp_render_half
+    ORA tile_address_low,Y
+    STA zp_tile
+    LDA tile_address_high,Y
+    STA zp_tile + 1
+ENDMACRO
+
+\ Draw zp_render_count cells along world cell row zp_render_v, from column
+\ zp_render_u, at zp_render_base onwards, wrapping at the end of the screen.
+\ The tiles come from the tile cache.
+.render_row
+{
+    LDA zp_render_base
+    STA zp_screen
+    LDA zp_render_base + 1
+    STA zp_screen + 1
+    JSR set_row_pointer
+.tile_loop
+    LDA zp_render_u
+    SET_CELL_GRAPHICS
+.cell_loop
+    COPY_CELL zp_screen
     CLC
     LDA zp_screen
-    ADC cell_step
+    ADC #CELL_BYTES
     STA zp_screen
+    BCC same_page
+    INC zp_screen + 1
     LDA zp_screen + 1
-    ADC cell_step + 1
     CMP #HI(SCREEN_END)
-    BCC no_wrap
-    SBC #HI(SCREEN_END - SCREEN_START)
-.no_wrap
+    BNE same_page
+    LDA #HI(SCREEN_START)
     STA zp_screen + 1
-    INX
-    CPX cell_end
-    BNE cell_loop
+.same_page
+    DEC zp_render_count
+    BEQ done
+    INC zp_render_u
+    LDA zp_render_u
+    AND #3
+    BEQ tile_loop               \ Into the next tile
+    CLC                         \ The next cell of the same tile: no carry,
+    LDA zp_tile                 \ as tiles are aligned
+    ADC #CELL_BYTES
+    STA zp_tile
+    JMP cell_loop
+.done
+    RTS
+}
+
+\ Draw zp_render_width columns of zp_render_count cells, from world cell
+\ (zp_render_u, zp_render_v), at zp_render_base onwards. They are drawn a row
+\ at a time, so that the top of every column is drawn first, ahead of the
+\ beam.
+.render_columns
+{
+    LDA zp_render_base
+    STA zp_screen
+    LDA zp_render_base + 1
+    STA zp_screen + 1
+.row_loop
+    JSR set_row_pointer
+    LDA zp_screen
+    STA zp_screen_lower
+    LDA zp_screen + 1
+    STA zp_screen_lower + 1
+    LDA zp_render_u
+    STA zp_render_column
+    LDA zp_render_width
+    STA zp_render_across
+.column_loop
+    LDA zp_render_column
+    SET_CELL_GRAPHICS
+    COPY_CELL zp_screen_lower
+    DEC zp_render_across
+    BEQ row_done
+    INC zp_render_column
+    CLC                         \ The next column: a cell on, wrapping
+    LDA zp_screen_lower
+    ADC #CELL_BYTES
+    STA zp_screen_lower
+    BCC column_loop
+    INC zp_screen_lower + 1
+    LDA zp_screen_lower + 1
+    CMP #HI(SCREEN_END)
+    BNE column_loop
+    LDA #HI(SCREEN_START)
+    STA zp_screen_lower + 1
+    BNE column_loop
+.row_done
+    CLC                         \ The next row
+    LDA zp_screen + 1
+    ADC #HI(ROW_BYTES)
+    JSR wrap_screen_high
+    STA zp_screen + 1
+    INC zp_render_v
+    DEC zp_render_count
+    BEQ done
+    JMP row_loop
+.done
     RTS
 }
 

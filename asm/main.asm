@@ -32,7 +32,7 @@ INKEY_M = &100 - 102
     STA zp_camera_x + 1
     STA zp_camera_y
     STA zp_camera_y + 1
-    STA zp_columns_planned
+    STA zp_columns_width
     STA zp_marker_drawn
     LDA #LO(INITIAL_FOCUS_X)
     STA zp_focus_x
@@ -61,9 +61,9 @@ INKEY_M = &100 - 102
     INC zp_frame
     LDA #19                     \ Wait for vertical sync
     JSR OSBYTE
-    JSR undraw_marker
-    JSR flip
-    JSR draw_marker
+    JSR flip                    \ The time-critical part, first
+    JSR undraw_marker           \ The camera moves only while the marker is
+    JSR draw_marker             \ well inside the view, clear of new columns
 .frame_shown                    \ The screen now shows the camera's view
     JSR read_input
     JSR update_focus
@@ -449,8 +449,8 @@ INKEY_M = &100 - 102
 \ Applying the plan
 
 \ Redraw the whole view, or move the screen start by the planned movement,
-\ draw the new row (if any) into the hidden row, and prepare the new
-\ columns (if any) to be drawn at the flip.
+\ bring the tile cache up to date, draw the new row (if any) into the
+\ hidden row, and plan the new columns (if any) to be drawn at the flip.
 .apply_plan
 {
     LDA zp_redraw
@@ -480,13 +480,14 @@ INKEY_M = &100 - 102
     ADC zp_temp + 1
     JSR wrap_both_ways
     STA zp_screen_start + 1
+    JSR update_tile_cache
     LDA zp_plan_dy
     BEQ no_row
     JSR draw_new_row
 .no_row
     LDA zp_plan_dx
     BEQ no_columns
-    JMP prepare_new_columns
+    JMP plan_new_columns
 .no_columns
     RTS
 }
@@ -507,6 +508,139 @@ INKEY_M = &100 - 102
     RTS
 }
 
+\ Set zp_view_left/right/top/bottom to the tiles the view at the camera
+\ shows.
+.view_tiles
+{
+    LDA zp_camera_x + 1         \ Left: camera_x >> 2
+    STA zp_temp
+    LDA zp_camera_x
+    LSR zp_temp
+    ROR A
+    LSR zp_temp
+    ROR A
+    STA zp_view_left
+    CLC                         \ Right: (camera_x + VIEW_COLUMNS - 1) >> 2
+    LDA zp_camera_x
+    ADC #VIEW_COLUMNS - 1
+    STA zp_temp
+    LDA zp_camera_x + 1
+    ADC #0
+    LSR A
+    ROR zp_temp
+    LSR A
+    ROR zp_temp
+    LDA zp_temp
+    STA zp_view_right
+    LDA zp_camera_y + 1         \ Top: camera_y >> 1
+    LSR A
+    LDA zp_camera_y
+    ROR A
+    STA zp_view_top
+    CLC                         \ Bottom: (camera_y + VIEW_ROWS - 1) >> 1
+    LDA zp_camera_y
+    ADC #VIEW_ROWS - 1
+    STA zp_temp
+    LDA zp_camera_y + 1
+    ADC #0
+    LSR A
+    LDA zp_temp
+    ROR A
+    STA zp_view_bottom
+    RTS
+}
+
+\ Bring the tile cache up to date for the view at the camera, which has
+\ moved by at most a tile each way: fill any new tile columns, then any new
+\ tile rows (across the new columns too, so the corner is filled).
+.update_tile_cache
+{
+    JSR view_tiles
+    LDA zp_view_bottom          \ Columns are filled over the view's rows
+    SEC
+    SBC zp_view_top
+    STA zp_temp + 1
+    INC zp_temp + 1             \ Tiles in a column
+.right_loop
+    LDA zp_cached_right
+    CMP zp_view_right
+    BCS right_done              \ Only ever expand: cached_right >= view_right
+    INC zp_cached_right
+    LDA zp_cached_right
+    JSR fill_tile_column
+    JMP right_loop
+.right_done
+.left_loop
+    LDA zp_view_left
+    CMP zp_cached_left
+    BCS left_done               \ view_left >= cached_left
+    DEC zp_cached_left
+    LDA zp_cached_left
+    JSR fill_tile_column
+    JMP left_loop
+.left_done
+    LDA zp_view_right           \ Rows are filled over the view's columns
+    SEC
+    SBC zp_view_left
+    STA zp_temp + 1
+    INC zp_temp + 1             \ Tiles in a row
+.down_loop
+    LDA zp_cached_bottom
+    CMP zp_view_bottom
+    BCS down_done               \ cached_bottom >= view_bottom
+    INC zp_cached_bottom
+    LDA zp_cached_bottom
+    JSR fill_tile_row
+    JMP down_loop
+.down_done
+.up_loop
+    LDA zp_view_top
+    CMP zp_cached_top
+    BCS up_done                 \ view_top >= cached_top
+    DEC zp_cached_top
+    LDA zp_cached_top
+    JSR fill_tile_row
+    JMP up_loop
+.up_done
+    \ The cache now holds exactly the view's tiles.
+    LDA zp_view_left
+    STA zp_cached_left
+    LDA zp_view_right
+    STA zp_cached_right
+    LDA zp_view_top
+    STA zp_cached_top
+    LDA zp_view_bottom
+    STA zp_cached_bottom
+    RTS
+}
+
+\ Fill the cache for tile column A, zp_temp + 1 tiles from the view's top.
+.fill_tile_column
+{
+    STA zp_fill_x
+    LDA zp_view_top
+    STA zp_fill_y
+    LDA #&FF
+    BNE fill                    \ Always branches
+}
+
+\ Fill the cache for tile row A, zp_temp + 1 tiles from the view's left.
+.fill_tile_row
+{
+    STA zp_fill_y
+    LDA zp_view_left
+    STA zp_fill_x
+    LDA #0
+}
+
+.fill
+{
+    STA zp_fill_down
+    LDA zp_temp + 1
+    STA zp_fill_count
+    JMP call_fill_cache
+}
+
 \ Draw the view's new top or bottom row, which is in the hidden row until the
 \ flip. When the camera also moves sideways, the row's cells at the new
 \ columns are left to the column drawing: they are outside the hidden row.
@@ -520,18 +654,15 @@ INKEY_M = &100 - 102
     TYA
     CLC
     ADC zp_camera_y
-    STA zp_cell_v
-    LDA zp_camera_y + 1
-    ADC #0
-    STA zp_cell_v + 1
-    TYA                         \ cell_base = screen_start + row * ROW_BYTES
+    STA zp_render_v
+    TYA                         \ Base = screen_start + row * ROW_BYTES
     ASL A
     CLC
     ADC zp_screen_start + 1
     JSR wrap_both_ways
-    STA cell_base + 1
+    STA zp_render_base + 1
     LDA zp_screen_start
-    STA cell_base
+    STA zp_render_base
     \ The first column drawn: -dx if moving left, otherwise 0.
     LDA zp_plan_dx
     BPL first_column_zero
@@ -543,23 +674,20 @@ INKEY_M = &100 - 102
     LDA #0
 .first_column_set
     STA zp_temp
-    ASL A                       \ cell_base += first * CELL_BYTES (at most 16)
+    ASL A                       \ Base += first * CELL_BYTES (at most 16)
     ASL A
     ASL A
     CLC
-    ADC cell_base
-    STA cell_base
-    LDA cell_base + 1
+    ADC zp_render_base
+    STA zp_render_base
+    LDA zp_render_base + 1
     ADC #0
     JSR wrap_both_ways
-    STA cell_base + 1
-    CLC                         \ u = camera_x + first
-    LDA zp_camera_x
+    STA zp_render_base + 1
+    LDA zp_camera_x             \ u = camera_x + first
+    CLC
     ADC zp_temp
-    STA zp_cell_u
-    LDA zp_camera_x + 1
-    ADC #0
-    STA zp_cell_u + 1
+    STA zp_render_u
     \ Count = VIEW_COLUMNS - |dx|
     LDA zp_plan_dx
     BPL dx_absolute
@@ -571,26 +699,16 @@ INKEY_M = &100 - 102
     LDA #VIEW_COLUMNS
     SEC
     SBC zp_temp
-    STA zp_cell_count
-    STA cell_end
-    LDA #0
-    STA zp_cell_down
-    STA cell_first
-    LDX #0
-    JSR prepare_cells
-    LDA #CELL_BYTES
-    STA cell_step
-    LDA #0
-    STA cell_step + 1
-    JMP call_render_cells
+    STA zp_render_count
+    JMP call_render_row
 }
 
-\ Prepare the view's new columns, to be drawn at the flip.
-.prepare_new_columns
+\ Plan the view's new columns, to be drawn at the flip.
+.plan_new_columns
 {
     LDA zp_plan_dx
     BMI left
-    STA zp_columns_planned
+    STA zp_columns_width
     LDA #VIEW_COLUMNS           \ New columns VIEW_COLUMNS - dx onwards
     SEC
     SBC zp_plan_dx
@@ -599,215 +717,112 @@ INKEY_M = &100 - 102
     EOR #&FF
     CLC
     ADC #1
-    STA zp_columns_planned
+    STA zp_columns_width
     LDA #0                      \ New columns 0 onwards
 .first_set
-    STA zp_view_column
-    LDX #0                      \ Index into the cell list
-    LDY #0                      \ Which new column
-.column_loop
-    STY zp_new_column
-    \ column_base[Y] = screen_start + column * CELL_BYTES, wrapped
-    LDA zp_view_column
-    ASL A
-    ASL A
-    ASL A
     STA zp_temp
-    LDA #0
-    ROL A
-    STA column_base_high,Y
     CLC
+    ADC zp_camera_x
+    STA zp_columns_u
+    LDA #0                      \ Base = screen_start + first * CELL_BYTES
+    STA zp_temp + 1
     LDA zp_temp
+    ASL A
+    ASL A
+    ASL A
+    ROL zp_temp + 1
+    CLC
     ADC zp_screen_start
-    STA column_base_low,Y
-    LDA column_base_high,Y
+    STA zp_columns_base
+    LDA zp_temp + 1
     ADC zp_screen_start + 1
     JSR wrap_both_ways
-    STA column_base_high,Y
-    CLC                         \ u = camera_x + column, v = camera_y
-    LDA zp_camera_x
-    ADC zp_view_column
-    STA zp_cell_u
-    LDA zp_camera_x + 1
-    ADC #0
-    STA zp_cell_u + 1
-    LDA zp_camera_y
-    STA zp_cell_v
-    LDA zp_camera_y + 1
-    STA zp_cell_v + 1
-    LDA #VIEW_ROWS
-    STA zp_cell_count
-    STA zp_cell_down
-    JSR prepare_cells
-    INC zp_view_column
-    LDY zp_new_column
-    INY
-    CPY zp_columns_planned
-    BNE column_loop
+    STA zp_columns_base + 1
     RTS
 }
 
 \ After vertical sync: point the CRTC at the new screen start, and draw the
-\ planned columns, each top-down, ahead of the beam.
+\ planned columns, a row at a time, ahead of the beam.
 .flip
 {
     JSR set_crtc_start
-    LDA #LO(ROW_BYTES)
-    STA cell_step
-    LDA #HI(ROW_BYTES)
-    STA cell_step + 1
-    LDA #0
-    STA cell_first
-    LDY #0
-.column_loop
-    CPY zp_columns_planned
+    LDA zp_columns_width
     BEQ done
-    LDA column_base_low,Y
-    STA cell_base
-    LDA column_base_high,Y
-    STA cell_base + 1
-    LDA cell_first
-    CLC
-    ADC #VIEW_ROWS
-    STA cell_end
-    STY zp_new_column
-    JSR call_render_cells
-    LDA cell_end
-    STA cell_first
-    LDY zp_new_column
-    INY
-    BNE column_loop
-.done
+    STA zp_render_width
+    LDA zp_columns_u
+    STA zp_render_u
+    LDA zp_camera_y
+    STA zp_render_v
+    LDA #VIEW_ROWS
+    STA zp_render_count
+    LDA zp_columns_base
+    STA zp_render_base
+    LDA zp_columns_base + 1
+    STA zp_render_base + 1
+    JSR call_render_columns
     LDA #0
-    STA zp_columns_planned
+    STA zp_columns_width
+.done
     RTS
 }
 
-\ Draw the whole view at the camera, a row at a time.
+\ Fill the tile cache for the view at the camera, and draw the whole view, a
+\ row at a time.
 .redraw_view
 {
     LDA #0
     STA zp_marker_drawn         \ The marker is drawn over
-    STA zp_columns_planned
-    STA cell_first
-    LDA #VIEW_COLUMNS
-    STA cell_end
-    LDA #CELL_BYTES
-    STA cell_step
-    LDA #0
-    STA cell_step + 1
+    STA zp_columns_width
+    JSR view_tiles
+    LDA zp_view_right
+    SEC
+    SBC zp_view_left
+    STA zp_temp + 1
+    INC zp_temp + 1             \ Tiles in a row
+    LDA zp_view_top
+    STA zp_cached_top
+.fill_loop
+    LDA zp_cached_top
+    JSR fill_tile_row
+    LDA zp_cached_top
+    INC zp_cached_top
+    CMP zp_view_bottom
+    BNE fill_loop
+    LDA zp_view_left
+    STA zp_cached_left
+    LDA zp_view_right
+    STA zp_cached_right
+    LDA zp_view_top
+    STA zp_cached_top
+    LDA zp_view_bottom
+    STA zp_cached_bottom
+
     LDA zp_screen_start
-    STA cell_base
+    STA zp_render_base
     LDA zp_screen_start + 1
-    STA cell_base + 1
+    STA zp_temp                 \ Base of each row, high byte
     LDA zp_camera_y
-    STA zp_cell_v
-    LDA zp_camera_y + 1
-    STA zp_cell_v + 1
+    STA zp_temp + 1             \ World row of each row
     LDA #VIEW_ROWS
     STA zp_rows_left
 .row_loop
+    LDA zp_temp
+    STA zp_render_base + 1
     LDA zp_camera_x
-    STA zp_cell_u
-    LDA zp_camera_x + 1
-    STA zp_cell_u + 1
+    STA zp_render_u
+    LDA zp_temp + 1
+    STA zp_render_v
     LDA #VIEW_COLUMNS
-    STA zp_cell_count
-    LDA #0
-    STA zp_cell_down
-    LDX #0
-    JSR prepare_cells
-    JSR call_render_cells
-    INC zp_cell_v               \ prepare_cells left it unchanged along a row
-    BNE v_done
-    INC zp_cell_v + 1
-.v_done
+    STA zp_render_count
+    JSR call_render_row
+    INC zp_temp + 1
     CLC
-    LDA cell_base + 1
+    LDA zp_temp
     ADC #HI(ROW_BYTES)
     JSR wrap_both_ways
-    STA cell_base + 1
+    STA zp_temp
     DEC zp_rows_left
     BNE row_loop
-    RTS
-}
-
-\ Fill the cell list from index X with the graphics addresses of
-\ zp_cell_count world cells from (zp_cell_u, zp_cell_v), along the row, or
-\ down the column if zp_cell_down is non-zero.
-.prepare_cells
-{
-    JSR fetch_tile
-.cell_loop
-    LDA zp_cell_v               \ Offset in the tile: (v AND 1) * 32 + (u AND 3) * 8
-    AND #1
-    LSR A
-    ROR A
-    ROR A
-    ROR A
-    STA zp_temp
-    LDA zp_cell_u
-    AND #3
-    ASL A
-    ASL A
-    ASL A
-    ORA zp_temp
-    LDY zp_cell_tile
-    CLC
-    ADC tile_address_low,Y
-    STA cell_source_low,X
-    LDA tile_address_high,Y
-    ADC #0
-    STA cell_source_high,X
-    INX
-    DEC zp_cell_count
-    BEQ done
-    LDA zp_cell_down
-    BNE down
-    INC zp_cell_u
-    BNE u_done
-    INC zp_cell_u + 1
-.u_done
-    LDA zp_cell_u
-    AND #3
-    BNE cell_loop               \ Still in the same tile
-    JSR fetch_tile
-    JMP cell_loop
-.down
-    INC zp_cell_v
-    BNE v_done
-    INC zp_cell_v + 1
-.v_done
-    LDA zp_cell_v
-    AND #1
-    BNE cell_loop
-    JSR fetch_tile
-    JMP cell_loop
-.done
-    RTS
-}
-
-\ Set zp_cell_tile to the tile containing world cell (zp_cell_u, zp_cell_v).
-\ Preserves X.
-.fetch_tile
-{
-    STX zp_cell_index
-    LDA zp_cell_u + 1           \ Tile x = u >> 2
-    STA zp_temp + 1
-    LDA zp_cell_u
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
-    TAX
-    LDA zp_cell_v + 1           \ Tile y = v >> 1
-    LSR A
-    LDA zp_cell_v
-    ROR A
-    TAY
-    JSR call_tile_at
-    STA zp_cell_tile
-    LDX zp_cell_index
     RTS
 }
 
@@ -935,19 +950,6 @@ INKEY_M = &100 - 102
 
 \ ---------------------------------------------------------------------------
 \ Data
-
-\ The graphics address of each tile, in the render region.
-.tile_address_low
-    FOR tile, 0, TILE_COUNT - 1
-        EQUB LO(tile_graphics + tile * TILE_BYTES)
-    NEXT
-.tile_address_high
-    FOR tile, 0, TILE_COUNT - 1
-        EQUB HI(tile_graphics + tile * TILE_BYTES)
-    NEXT
-
-.column_base_low    SKIP MAX_STEP_X
-.column_base_high   SKIP MAX_STEP_X
 
 .main_end
 

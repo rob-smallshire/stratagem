@@ -49,8 +49,22 @@ def expected_screen(state: Camera, screen_start: int) -> dict[int, int]:
     return image
 
 
+TILE_CACHE_SIZE = 32       # asm/layout.asm
+
+
+def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Camera) -> None:
+    cache = bbc.memory.address.peek[labels["tile_cache"]:labels["tile_cache"] + TILE_CACHE_SIZE ** 2]
+    wrong = []
+    for ty in range(state.camera_y >> 1, (state.camera_y + camera.VIEW_ROWS - 1 >> 1) + 1):
+        for tx in range(state.camera_x >> 2, (state.camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1):
+            if cache[(ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE] != tile_at(tx, ty):
+                wrong.append((tx, ty))
+    assert wrong[:8] == [], f"{len(wrong)} cached tiles are wrong"
+
+
 def assert_screen_matches_model(bbc: Beebium, machine, labels: dict[str, int]) -> Camera:
     state, _, screen_start = read_state(bbc, labels)
+    assert_tile_cache_holds_view(bbc, labels, state)
     expected = expected_screen(state, screen_start)
     actual = bbc.memory.region(machine.screen_region).peek[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]

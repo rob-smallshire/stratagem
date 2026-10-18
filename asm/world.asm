@@ -86,6 +86,49 @@ GUARD BANK_END
     RTS
 }
 
+\ Fill zp_fill_count tiles of the tile cache from world tile (zp_fill_x,
+\ zp_fill_y), along the row, or down the column if zp_fill_down is non-zero.
+.fill_cache
+{
+.loop
+    LDX zp_fill_x
+    LDY zp_fill_y
+    JSR tile_at
+    PHA
+    TYA                         \ tile_cache + (y MOD 32) * 32 + (x MOD 32)
+    AND #TILE_CACHE_SIZE - 1
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC #HI(tile_cache)
+    STA zp_fill_pointer + 1
+    TYA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA zp_fill_pointer
+    TXA
+    AND #TILE_CACHE_SIZE - 1
+    ORA zp_fill_pointer
+    STA zp_fill_pointer
+    LDY #0
+    PLA
+    STA (zp_fill_pointer),Y
+    LDA zp_fill_down
+    BNE down
+    INC zp_fill_x
+    JMP next
+.down
+    INC zp_fill_y
+.next
+    DEC zp_fill_count
+    BNE loop
+    RTS
+}
+
 .world_heights
     WORLD_HEIGHTS
 .world_perm
