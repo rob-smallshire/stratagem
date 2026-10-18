@@ -23,7 +23,7 @@ GUARD BANK_END
     TYA
     SEC
     SBC world_heights,X         \ Depth below the surface
-    BCC air
+    BCC sky
     BEQ grass
     STA zp_world_depth
     LDA world_perm,X            \ Fine hash: perm[perm[x] EOR y]
@@ -63,6 +63,9 @@ GUARD BANK_END
 .air
     LDA #TILE_AIR
     BEQ done
+.sky
+    LDA #TILE_SKY
+    BNE done
 .water
     LDA #TILE_WATER
     BNE done

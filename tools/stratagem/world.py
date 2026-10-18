@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import random
 
-from stratagem.tiles import AIR, BEDROCK, GEM, GRASS, ORE, SOIL, STONE, WATER
+from stratagem.tiles import AIR, BEDROCK, GEM, GRASS, ORE, SKY, SOIL, STONE, WATER
 
 WORLD_SIZE = 256
 SEED = 1988
@@ -46,7 +46,7 @@ def tile_at(x: int, y: int) -> int:
         return BEDROCK
     h = HEIGHTS[x]
     if y < h:
-        return AIR
+        return SKY
     if y == h:
         return GRASS
     fine = PERM[PERM[x] ^ y]
