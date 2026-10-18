@@ -9,7 +9,7 @@ Each frame: walking eases the horizontal velocity towards WALK_SPEED in the
 direction held (faster on the ground than in the air). UP jumps from the
 ground (holding it jumps again on landing); in the air, a fresh press of UP
 jumps again if the player has the double jump ability and hasn't used it
-since landing. Gravity accelerates the fall, up to MAX_FALL.
+since landing. While ACTION (dig) is held, UP aims instead, and doesn't jump. Gravity accelerates the fall, up to MAX_FALL.
 
 Then the player moves horizontally and vertically, each separately. A tile
 is solid in some of its quarter-cells (2 pixels by 4 lines), by its shape,
@@ -28,7 +28,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from stratagem.camera import INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.tiles import QUARTER_LINES, QUARTER_PIXELS, solid_quarter_cells
 
 PLAYER_WIDTH = 6        # pixels
@@ -107,7 +107,7 @@ def step(player: Player, inputs: int, tile_at: TileAt, abilities: int = STARTING
     facing = direction or player.facing
     vy = player.vy
     air_jumps = player.air_jumps
-    up = bool(inputs & INPUT_UP)
+    up = bool(inputs & INPUT_UP) and not inputs & INPUT_ACTION
     if up and player.on_ground:
         vy = -JUMP_SPEED
     elif up and not player.jump_held and air_jumps:

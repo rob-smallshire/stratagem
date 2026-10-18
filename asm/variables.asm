@@ -29,3 +29,22 @@ GUARD &0800
 .view_top        SKIP 1
 .view_bottom     SKIP 1
 
+\ Digging diagonally (see diagonal in asm/actions.asm)
+.diagonal_dx     SKIP 1      \ Directions held: -1, 0 or 1
+.diagonal_dy     SKIP 1
+.ramp_shape      SKIP 1      \ The ramp to shape the step into, or 0
+.ground          SKIP 2      \ The line just below the player's feet
+.left_column     SKIP 1      \ The columns of the player's edges
+.right_column    SKIP 1
+.rect_left       SKIP 2      \ A rectangle of the path, in pixels and lines
+.rect_right      SKIP 2
+.rect_top        SKIP 2
+.rect_bottom     SKIP 2
+.keep_row        SKIP 1      \ Tiles never cleared: this row, these columns
+.keep_first      SKIP 1
+.keep_last       SKIP 1
+.scan_row        SKIP 1      \ first_obstruction: the row being scanned
+.first_row       SKIP 1
+.first_column    SKIP 1
+.last_column     SKIP 1
+.span_first      SKIP 1      \ region_mask: the first column or row

@@ -31,12 +31,41 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 \ Dig the diggable tile aimed at, if any.
 .dig
 {
+    JSR held_directions         \ Diagonally?
+    LDA diagonal_dx
+    BEQ straight
+    LDA diagonal_dy
+    BEQ straight
+    JSR diagonal
+    BCC diagonal_found
+.exit
+    RTS
+.diagonal_found
+    LDA ramp_shape
+    BEQ erode
+    \ Shape the step into a ramp.
+    JSR target_tile
+    STA action_tile
+    JSR target_background
+    ORA ramp_shape
+    STA zp_world_new_shape
+    LDA action_tile
+    JSR change_target
+    BCS exit
+    LDA #DIG_FRAMES
+    STA cooldown
+    LDA #ACTION_DIG
+    STA action
+    RTS
+.straight
     LDA #0                      \ Aim for something diggable
     STA want
     JSR aim
-    BCS done
+    BCS exit
+    JSR dig_direction
+.erode
     \ Erode it: by its material's quarters, from its own side if it is
-    \ already shaped, otherwise from the side the player digs from.
+    \ already shaped, otherwise from dig_side.
     JSR target_tile
     TAX
     STX action_tile          \ The material, unless nothing is left
@@ -47,8 +76,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LDA target_shape
     AND #SHAPE_BITS
     BNE shaped
-    JSR dig_direction           \ Whole: erode from the player's side
-    LDX dig_side
+    LDX dig_side                \ Whole: erode from dig_side
     LDA whole_dig_1,X
     CPY #1
     BEQ dug
@@ -122,6 +150,36 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LDA #ACTION_PLACE
     STA action
 .done
+    RTS
+}
+
+\ Set diagonal_dx and diagonal_dy to the directions held: -1, 0 or 1.
+.held_directions
+{
+    LDX #0
+    LDA zp_input
+    AND #INPUT_LEFT OR INPUT_RIGHT
+    CMP #INPUT_RIGHT
+    BNE not_right
+    INX
+.not_right
+    CMP #INPUT_LEFT
+    BNE not_left
+    DEX
+.not_left
+    STX diagonal_dx
+    LDX #0
+    LDA zp_input
+    AND #INPUT_UP OR INPUT_DOWN
+    CMP #INPUT_DOWN
+    BNE not_down
+    INX
+.not_down
+    CMP #INPUT_UP
+    BNE not_up
+    DEX
+.not_up
+    STX diagonal_dy
     RTS
 }
 
@@ -282,6 +340,476 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LSR A
     ROR zp_temp
     LDA zp_temp
+    RTS
+}
+
+\ Choose where digging diagonally works next, by diagonal_dx and diagonal_dy:
+\ the step to shape into a ramp (ramp_shape, non-zero) if it is whole and
+\ diggable, otherwise the first tile in the way (ramp_shape zero), at
+\ target_x/y, with dig_side the side the player digs from; or none, with
+\ carry set. Going down, the path is a tile across at the player's height,
+\ then a tile down, never clearing the floor under the player, and the step
+\ is that floor under the leading edge; going up, the path is a tile up,
+\ then across, and the step is the tile ahead at the feet. See actions.py.
+.diagonal
+{
+    JSR player_pixels           \ zp_box_x/y = px, py
+    CLC                         \ ground = py + PLAYER_HEIGHT
+    LDA zp_box_y
+    ADC #PLAYER_HEIGHT
+    STA ground
+    LDA zp_box_y + 1
+    ADC #0
+    STA ground + 1
+    LDX #FROM_LEFT
+    LDA diagonal_dx
+    BPL side_set
+    LDX #FROM_RIGHT
+.side_set
+    STX dig_side
+    \ The columns of the player's edges.
+    LDA zp_box_x
+    STA zp_temp
+    LDA zp_box_x + 1
+    JSR column_of
+    STA left_column
+    CLC
+    LDA zp_box_x
+    ADC #PLAYER_WIDTH - 1
+    STA zp_temp
+    LDA zp_box_x + 1
+    ADC #0
+    JSR column_of
+    STA right_column
+    \ The rectangle swept across: left = min(px, px + 8 dx), right = left +
+    \ TILE_WIDTH + PLAYER_WIDTH.
+    LDA zp_box_x
+    STA rect_left
+    LDA zp_box_x + 1
+    STA rect_left + 1
+    LDA diagonal_dx
+    BPL swept_left_set
+    SEC
+    LDA rect_left
+    SBC #TILE_WIDTH
+    STA rect_left
+    BCS swept_left_set
+    DEC rect_left + 1
+.swept_left_set
+    CLC
+    LDA rect_left
+    ADC #TILE_WIDTH + PLAYER_WIDTH
+    STA rect_right
+    LDA rect_left + 1
+    ADC #0
+    STA rect_right + 1
+    LDA diagonal_dy
+    BPL down
+    JMP up
+.down
+    \ Down: the step is the floor under the leading edge, at row ground >> 4.
+    LDX right_column
+    LDY #RAMP_DOWN_RIGHT
+    LDA diagonal_dx
+    BPL down_edge_set
+    LDX left_column
+    LDY #RAMP_DOWN_LEFT
+.down_edge_set
+    STX target_x
+    STY ramp_shape
+    LDA #&FF                    \ Nothing kept unless the floor is in the world
+    STA keep_row
+    LDA ground
+    STA zp_temp
+    LDA ground + 1
+    JSR row_of_checked
+    BCS down_paths              \ Out of the world
+    STA target_y
+    STA keep_row                \ The floor under the player is never cleared
+    JSR whole_and_diggable
+    BCS down_paths
+    JMP found_step
+.down_paths
+    LDA left_column
+    STA keep_first
+    LDA right_column
+    STA keep_last
+    LDA zp_box_y                \ Across at the player's height
+    STA rect_top
+    LDA zp_box_y + 1
+    STA rect_top + 1
+    LDA ground
+    STA rect_bottom
+    LDA ground + 1
+    STA rect_bottom + 1
+    JSR first_obstruction
+    BCS down_then
+    JMP found_tile
+.down_then
+    LDA zp_box_x                \ Then down, a tile across
+    STA rect_left
+    LDA zp_box_x + 1
+    STA rect_left + 1
+    LDA diagonal_dx
+    BMI down_left
+    CLC
+    LDA rect_left
+    ADC #TILE_WIDTH
+    STA rect_left
+    BCC down_left_set
+    INC rect_left + 1
+    BNE down_left_set           \ Always branches
+.down_left
+    SEC
+    LDA rect_left
+    SBC #TILE_WIDTH
+    STA rect_left
+    BCS down_left_set
+    DEC rect_left + 1
+.down_left_set
+    CLC
+    LDA rect_left
+    ADC #PLAYER_WIDTH
+    STA rect_right
+    LDA rect_left + 1
+    ADC #0
+    STA rect_right + 1
+    CLC
+    LDA ground
+    ADC #TILE_HEIGHT
+    STA rect_bottom
+    LDA ground + 1
+    ADC #0
+    STA rect_bottom + 1
+    JSR first_obstruction
+    BCS nothing
+    JMP found_tile
+.up
+    \ Up: the step is the tile ahead at row (ground >> 4) - 1.
+    LDX right_column
+    INX
+    LDY #RAMP_UP_RIGHT
+    LDA diagonal_dx
+    BPL up_ahead_set
+    LDX left_column
+    DEX
+    LDY #RAMP_UP_LEFT
+.up_ahead_set
+    STX target_x
+    STY ramp_shape
+    LDA #&FF                    \ Nothing is kept
+    STA keep_row
+    LDA ground
+    STA zp_temp
+    LDA ground + 1
+    JSR row_of
+    SEC
+    SBC #1
+    BCC up_path                 \ Above the top of the world
+    STA target_y
+    JSR whole_and_diggable
+    BCC found_step
+.up_path
+    SEC                         \ A tile up: top = py - 16, bottom = ground - 16
+    LDA zp_box_y
+    SBC #TILE_HEIGHT
+    STA rect_top
+    LDA zp_box_y + 1
+    SBC #0
+    STA rect_top + 1
+    BCS top_set                 \ Above the top of the world: from row 0
+    LDA #0
+    STA rect_top
+    STA rect_top + 1
+.top_set
+    SEC
+    LDA ground
+    SBC #TILE_HEIGHT
+    STA rect_bottom
+    LDA ground + 1
+    SBC #0
+    STA rect_bottom + 1
+    BCC nothing                 \ Wholly above the world
+    JSR first_obstruction
+    BCC found_tile
+.nothing
+    SEC
+    RTS
+.found_step
+    CLC
+    RTS
+.found_tile
+    LDA #0
+    STA ramp_shape
+    CLC
+    RTS
+}
+
+\ Return in A the tile row of the line at A (high), zp_temp (low), with carry
+\ set if it is outside the world.
+.row_of_checked
+{
+    CMP #HI(256 * TILE_HEIGHT)
+    BCS outside
+    JSR row_of
+    CLC
+.outside
+    RTS
+}
+
+\ Return carry clear if the tile at target_x/y is whole and diggable.
+.whole_and_diggable
+{
+    JSR target_tile
+    TAX
+    LDA material_quarters,X
+    BEQ no
+    LDA target_shape
+    AND #SHAPE_BITS
+    BNE no
+    CLC
+    RTS
+.no
+    SEC
+    RTS
+}
+
+\ Find the first diggable tile with solid parts in the rectangle rect_left
+\ to rect_right, rect_top to rect_bottom (pixels and lines, right and bottom
+\ exclusive): the lowest row first, and in a row, from the player's side, in
+\ the direction diagonal_dx. Skip tiles in keep_row from keep_first to
+\ keep_last. Return it in target_x/y with carry clear, or carry set if none.
+.first_obstruction
+{
+    \ Rows: from (bottom - 1) >> 4 up to top >> 4, within the world.
+    SEC
+    LDA rect_bottom
+    SBC #1
+    STA zp_temp
+    LDA rect_bottom + 1
+    SBC #0
+    CMP #HI(256 * TILE_HEIGHT)
+    BCC bottom_in_world
+    LDA #HI(256 * TILE_HEIGHT) - 1  \ Below the world: from its last row
+    LDX #&FF
+    STX zp_temp
+.bottom_in_world
+    JSR row_of
+    STA scan_row
+    LDA rect_top
+    STA zp_temp
+    LDA rect_top + 1
+    JSR row_of
+    STA first_row
+    \ Columns: left >> 3 to (right - 1) >> 3, within the world.
+    LDA rect_left
+    STA zp_temp
+    LDA rect_left + 1
+    JSR column_of
+    STA first_column
+    SEC
+    LDA rect_right
+    SBC #1
+    STA zp_temp
+    LDA rect_right + 1
+    SBC #0
+    CMP #HI(256 * TILE_WIDTH)
+    BCC right_in_world
+    LDA #HI(256 * TILE_WIDTH) - 1
+    LDX #&FF
+    STX zp_temp
+.right_in_world
+    JSR column_of
+    STA last_column
+.row_loop
+    LDA scan_row
+    STA target_y
+    LDX first_column            \ From the player's side
+    LDA diagonal_dx
+    BPL column_start_set
+    LDX last_column
+.column_start_set
+    STX target_x
+.column_loop
+    LDA target_y                \ Kept?
+    CMP keep_row
+    BNE not_kept
+    LDA target_x
+    CMP keep_first
+    BCC not_kept
+    LDA keep_last
+    CMP target_x
+    BCS next_column
+.not_kept
+    JSR target_tile
+    TAX
+    LDA material_quarters,X
+    BEQ next_column
+    JSR region_mask             \ The quarter-cells of the tile in the rectangle
+    LDX target_shape
+    LDA zp_hit_bits
+    AND shape_mask_low,X
+    STA zp_hit_bits
+    LDA zp_hit_bits + 1
+    AND shape_mask_high,X
+    ORA zp_hit_bits
+    BNE found
+.next_column
+    LDA diagonal_dx
+    BMI leftwards
+    LDA target_x
+    CMP last_column
+    BEQ next_row
+    INC target_x
+    JMP column_loop
+.leftwards
+    LDA target_x
+    CMP first_column
+    BEQ next_row
+    DEC target_x
+    JMP column_loop
+.next_row
+    LDA scan_row
+    CMP first_row
+    BEQ none
+    DEC scan_row
+    JMP row_loop
+.none
+    SEC
+    RTS
+.found
+    CLC
+    RTS
+}
+
+\ Set zp_hit_bits to the quarter-cells of the tile at target_x/y within the
+\ rectangle: columns from max(left - x * 8, 0) >> 1 to (min(right - x * 8,
+\ 8) - 1) >> 1, rows likewise. Leaves target_shape as the shape number.
+.region_mask
+{
+    LDA target_shape
+    AND #SHAPE_BITS
+    STA target_shape
+    \ The tile's left, x * 8, in zp_temp.
+    LDA #0
+    STA zp_temp + 1
+    LDA target_x
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    STA zp_temp
+    SEC                         \ First column: (left - x * 8) clamped to 0..8
+    LDA rect_left
+    SBC zp_temp
+    TAX
+    LDA rect_left + 1
+    SBC zp_temp + 1
+    JSR clamp_to_x
+    LSR A
+    STA span_first
+    SEC                         \ Last column: (right - x * 8) clamped to 0..8
+    LDA rect_right
+    SBC zp_temp
+    TAX
+    LDA rect_right + 1
+    SBC zp_temp + 1
+    JSR clamp_to_x
+    SEC
+    SBC #1
+    LSR A
+    STA zp_temp2
+    LDA span_first              \ Index first * 4 + last
+    ASL A
+    ASL A
+    ORA zp_temp2
+    TAY
+    LDA column_span_low,Y
+    STA zp_hit_bits
+    LDA column_span_high,Y
+    STA zp_hit_bits + 1
+    \ The tile's top, y * 16, in zp_temp.
+    LDA #0
+    STA zp_temp + 1
+    LDA target_y
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    ASL A
+    ROL zp_temp + 1
+    STA zp_temp
+    SEC                         \ First row: (top - y * 16) clamped to 0..16
+    LDA rect_top
+    SBC zp_temp
+    TAX
+    LDA rect_top + 1
+    SBC zp_temp + 1
+    JSR clamp_to_y
+    LSR A
+    LSR A
+    STA span_first
+    SEC                         \ Last row: (bottom - y * 16) clamped to 0..16
+    LDA rect_bottom
+    SBC zp_temp
+    TAX
+    LDA rect_bottom + 1
+    SBC zp_temp + 1
+    JSR clamp_to_y
+    SEC
+    SBC #1
+    LSR A
+    LSR A
+    STA zp_temp2
+    LDA span_first
+    ASL A
+    ASL A
+    ORA zp_temp2
+    TAY
+    LDA zp_hit_bits
+    AND row_span_low,Y
+    STA zp_hit_bits
+    LDA zp_hit_bits + 1
+    AND row_span_high,Y
+    STA zp_hit_bits + 1
+    RTS
+}
+
+\ Return in A the signed 16-bit value A (high), X (low) clamped to 0..8.
+.clamp_to_x
+{
+    BMI zero
+    BNE eight
+    CPX #TILE_WIDTH + 1
+    BCS eight
+    TXA
+    RTS
+.eight
+    LDA #TILE_WIDTH
+    RTS
+.zero
+    LDA #0
+    RTS
+}
+
+\ Return in A the signed 16-bit value A (high), X (low) clamped to 0..16.
+.clamp_to_y
+{
+    BMI zero
+    BNE sixteen
+    CPX #TILE_HEIGHT + 1
+    BCS sixteen
+    TXA
+    RTS
+.sixteen
+    LDA #TILE_HEIGHT
+    RTS
+.zero
+    LDA #0
     RTS
 }
 

@@ -114,7 +114,7 @@ def test_initial_view_matches_model(game, machine, game_build):
 
 
 KEY_INPUTS = {"Z": camera.INPUT_LEFT, "X": camera.INPUT_RIGHT, "K": camera.INPUT_UP, "M": camera.INPUT_DOWN,
-              "L": actions.INPUT_ACTION, "SPACE": actions.INPUT_PLACE}
+              "L": camera.INPUT_ACTION, "SPACE": camera.INPUT_PLACE}
 SCRIPTS = {
     "walk-right": [(90, ["X"]), (30, [])],
     "walk-left": [(90, ["Z"]), (30, [])],
@@ -125,6 +125,8 @@ SCRIPTS = {
     "dig-down": [(60, ["M", "L"]), (20, [])],
     "tunnel-right": [(90, ["X", "L"]), (10, [])],
     "dig-down-then-build": [(40, ["M", "L"]), (30, ["SPACE"]), (30, ["K", "SPACE"]), (20, ["X"])],
+    "tunnel-down-left": [(150, ["Z", "M", "L"]), (10, [])],
+    "tunnel-up-right": [(60, ["M", "L"]), (150, ["X", "K", "L"]), (10, [])],
 }
 
 

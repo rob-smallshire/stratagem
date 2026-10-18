@@ -7,11 +7,12 @@ import pytest
 
 from mos6502 import Machine6502
 from stratagem import actions, player
-from stratagem.actions import INPUT_ACTION, INPUT_PLACE, Hands
+from stratagem.actions import Hands
+from stratagem.camera import INPUT_ACTION, INPUT_PLACE
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.tiles import SHAPE_BITS, SHAPE_FULL
-from stratagem.world import CHUNK_SIZE, World
+from stratagem.world import CHUNK_SIZE, RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World
 from test_player import PlayerHarness, _random_start
 
 RTS = 0x60
@@ -32,7 +33,10 @@ def machine(game_build):
 
 INPUTS = [
     INPUT_ACTION, INPUT_ACTION | INPUT_DOWN, INPUT_ACTION | INPUT_UP, INPUT_ACTION | INPUT_RIGHT,
-    INPUT_ACTION | INPUT_LEFT, INPUT_PLACE, INPUT_PLACE | INPUT_UP, INPUT_PLACE | INPUT_DOWN,
+    INPUT_ACTION | INPUT_LEFT,
+    INPUT_ACTION | INPUT_LEFT | INPUT_DOWN, INPUT_ACTION | INPUT_RIGHT | INPUT_DOWN,
+    INPUT_ACTION | INPUT_LEFT | INPUT_UP, INPUT_ACTION | INPUT_RIGHT | INPUT_UP,
+    INPUT_ACTION | INPUT_LEFT | INPUT_DOWN, INPUT_ACTION | INPUT_RIGHT | INPUT_UP, INPUT_PLACE, INPUT_PLACE | INPUT_UP, INPUT_PLACE | INPUT_DOWN,
     INPUT_PLACE | INPUT_LEFT, INPUT_RIGHT, INPUT_LEFT, INPUT_UP, INPUT_RIGHT | INPUT_UP, 0,
 ]
 
@@ -46,12 +50,13 @@ def test_actions_match_model(machine, game_build):
     hands = Hands()
     done = {actions.DIG: 0, actions.PLACE: 0}
     partial_seen = set()
+    ramps = 0
     for episode in range(60):
         state = _random_start(rng, world)
         inputs = 0
         cached_at = None
         for _ in range(150):
-            if rng.random() < 0.08:
+            if rng.random() < 0.04:
                 inputs = rng.choice(INPUTS)
             here = (state.px // 8, state.py // 16)
             if cached_at is None or abs(here[0] - cached_at[0]) > 4 or abs(here[1] - cached_at[1]) > 4:
@@ -72,9 +77,12 @@ def test_actions_match_model(machine, game_build):
                 assert (memory[labels["target_x"]], memory[labels["target_y"]]) == target
                 done[action] += 1
                 partial_seen.add(world.tile_at(*target))
+                if world.tile_at(*target)[1] & SHAPE_BITS in (RAMP_TOP_LEFT, RAMP_TOP_RIGHT):
+                    ramps += 1
             state = expected
     assert done[actions.DIG] > 50 and done[actions.PLACE] > 20, done
     assert any(shape & SHAPE_BITS != SHAPE_FULL for _, shape in partial_seen), "no tile was ever partly dug"
+    assert ramps > 10, "diagonal digging hardly ever shaped a ramp"
     # The 6502 world agrees with the model everywhere it was changed.
     for index in world.directory:
         x0, y0 = index % 32 * CHUNK_SIZE, index // 32 * CHUNK_SIZE

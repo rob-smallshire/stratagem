@@ -41,6 +41,11 @@ def tiles_source() -> str:
         lines.append(f"{name} = {getattr(tiles, name)}")
     for name in ("RAMP_TOP_LEFT", "RAMP_TOP_RIGHT", "RAMP_BOTTOM_LEFT", "RAMP_BOTTOM_RIGHT"):
         lines.append(f"SHAPE_{name} = {getattr(world, name)}")
+    # Ramps for digging diagonally: down to the left is low on the left.
+    lines.append(f"RAMP_DOWN_LEFT = {world.RAMP_TOP_LEFT}")
+    lines.append(f"RAMP_DOWN_RIGHT = {world.RAMP_TOP_RIGHT}")
+    lines.append(f"RAMP_UP_LEFT = {world.RAMP_TOP_RIGHT}")
+    lines.append(f"RAMP_UP_RIGHT = {world.RAMP_TOP_LEFT}")
     lines.append("")
     lines.append("\\ Each material's graphics: a page of four cell variants for each background.")
     lines.append("MACRO MATERIAL_PAGES")
@@ -82,7 +87,7 @@ def camera_source() -> str:
         lines.append(f"{name} = {getattr(screen, name)}")
     for name in ("CAMERA_X_MAX", "CAMERA_Y_MAX", "WINDOW_LEFT", "WINDOW_RIGHT",
                  "WINDOW_TOP", "WINDOW_BOTTOM", "LEAD_MAX", "MAX_STEP_X", "CENTRE_X", "CENTRE_Y",
-                 "INPUT_LEFT", "INPUT_RIGHT", "INPUT_UP", "INPUT_DOWN"):
+                 "INPUT_LEFT", "INPUT_RIGHT", "INPUT_UP", "INPUT_DOWN", "INPUT_ACTION", "INPUT_PLACE"):
         lines.append(f"{name} = {getattr(camera, name)}")
     return "\n".join(lines) + "\n"
 
@@ -109,7 +114,7 @@ def player_source() -> str:
     lines.append("ENDMACRO")
     lines.append("")
     lines.append("")
-    for name in ("INPUT_ACTION", "INPUT_PLACE", "PLACE_FRAMES", "INVENTORY_MAX", "DIG_FRAMES"):
+    for name in ("PLACE_FRAMES", "INVENTORY_MAX", "DIG_FRAMES"):
         lines.append(f"{name} = {getattr(actions, name)}")
     lines.append(f"PLACED_TILE = {actions.PLACED_TILE}")
     for name in ("FROM_LEFT", "FROM_RIGHT", "FROM_TOP", "FROM_BOTTOM"):
@@ -160,6 +165,18 @@ def shapes_source() -> str:
 
     lines += _words("box_columns", [columns_mask(i - 8) for i in range(16)])
     lines += _words("box_rows", [rows_mask(i - 24) for i in range(40)])
+    # Quarter-cells in columns c0..c1 (all rows), and in rows r0..r1 (all
+    # columns), indexed by c0 * 4 + c1 (or r0 * 4 + r1); empty if c0 > c1.
+    def column_span(index: int) -> int:
+        c0, c1 = divmod(index, 4)
+        return sum(0x1111 << c for c in range(c0, c1 + 1))
+
+    def row_span(index: int) -> int:
+        r0, r1 = divmod(index, 4)
+        return sum(0xF << (4 * r) for r in range(r0, r1 + 1))
+
+    lines += _words("column_span", [column_span(i) for i in range(16)])
+    lines += _words("row_span", [row_span(i) for i in range(16)])
     lines.append(".lowest_bit")           # of a nibble; 4 if none
     lines += _bytes_lines([next((b for b in range(4) if n >> b & 1), 4) for n in range(16)])
     lines.append(".highest_bit")

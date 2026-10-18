@@ -67,9 +67,9 @@
     LDA zp_temp
     STA zp_player_vx
 .vx_done
-    \ Jump from the ground, or again in the air with a fresh press of UP.
-    LDA zp_input
-    AND #INPUT_UP
+    \ Jump from the ground, or again in the air with a fresh press of UP; but
+    \ while digging, UP aims instead.
+    JSR up_held
     BEQ no_jump
     LDA zp_player_on_ground
     BEQ in_the_air
@@ -107,8 +107,7 @@
 .air_jumps_set
     STA zp_player_air_jumps
 .air_jumps_kept
-    LDA zp_input
-    AND #INPUT_UP
+    JSR up_held
     BEQ held_set
     LDA #&FF
 .held_set
@@ -155,6 +154,20 @@
     ADC #LEFT_FACING
 .frame_set
     STA zp_player_frame
+    RTS
+}
+
+\ Return Z clear if UP is held for jumping: held, and ACTION (digging) not.
+.up_held
+{
+    LDA zp_input
+    AND #INPUT_UP OR INPUT_ACTION
+    CMP #INPUT_UP
+    BEQ held
+    LDA #0
+    RTS
+.held
+    LDA #&FF
     RTS
 }
 

@@ -55,3 +55,9 @@ A running log of design decisions. Add to it whenever one is made.
   climbing) and down (ground snapping).
 - **Language workspace:** `&0400`-`&07FF` holds non-pointer variables now
   that zero page is full (`asm/variables.asm`).
+- **Diagonal digging:** holding a horizontal and a vertical direction with L
+  digs a 45 degree sloping tunnel: dig whatever is solid in the path of a
+  one-tile diagonal step (across then down, or up then across), lowest
+  first, but first shape the step into a ramp (the floor under the leading
+  edge going down, the tile ahead at the feet going up). While L is held, K
+  aims rather than jumps.
