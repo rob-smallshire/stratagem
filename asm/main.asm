@@ -46,6 +46,7 @@ INKEY_M = &100 - 102
     STA zp_screen_start
     LDA #HI(SCREEN_START)
     STA zp_screen_start + 1
+    JSR call_world_reset
     JSR setup_screen
     JSR call_render_clear
     JSR plan_camera             \ The focus is outside the view, so redraw

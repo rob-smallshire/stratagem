@@ -75,6 +75,32 @@ ENDMACRO
     RTS
 }
 
+\ Change the tile at world (X, Y) to A; carry set if the world is full.
+.call_set_tile
+{
+    PHA
+    LDA zp_bank_world
+    SELECT_ROMSEL
+    PLA
+    JSR set_tile
+    PHP
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    PLP
+    RTS
+}
+
+\ Forget every change to the world.
+.call_world_reset
+{
+    LDA zp_bank_world
+    SELECT_ROMSEL
+    JSR world_reset
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    RTS
+}
+
 \ Fill the tile cache from the world (see fill_cache).
 .call_fill_cache
 {

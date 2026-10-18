@@ -44,6 +44,11 @@ GUARD &90
 .zp_fill_count      SKIP 1      \ ... how many
 .zp_fill_down       SKIP 1      \ ... non-zero for down a column, else along a row
 .zp_fill_pointer    SKIP 2
+.zp_world_pointer   SKIP 2      \ Directory entry, then slot
+.zp_world_tile      SKIP 1      \ set_tile: the new tile
+.zp_world_target_x  SKIP 1      \ set_tile: where
+.zp_world_target_y  SKIP 1
+.zp_world_index     SKIP 1      \ set_tile: index into a slot being filled
 
 \ Camera (modelled by tools/stratagem/camera.py)
 .zp_input           SKIP 1      \ INPUT_* bits for this frame

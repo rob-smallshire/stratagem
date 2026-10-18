@@ -41,7 +41,8 @@ def _make_tables(seed: int) -> tuple[list[int], list[int]]:
 HEIGHTS, PERM = _make_tables(SEED)
 
 
-def tile_at(x: int, y: int) -> int:
+def generate_tile(x: int, y: int) -> int:
+    """The tile the generator puts at (x, y): the world before any changes."""
     if x == 0 or x == WORLD_SIZE - 1 or y == WORLD_SIZE - 1:
         return BEDROCK
     h = HEIGHTS[x]
@@ -62,6 +63,44 @@ def tile_at(x: int, y: int) -> int:
     return STONE
 
 
-def view_tiles(view_x: int, view_y: int, size: int = 16) -> list[list[int]]:
-    """The tiles of a size x size view whose top-left tile is (view_x, view_y)."""
-    return [[tile_at(view_x + i, view_y + j) for i in range(size)] for j in range(size)]
+tile_at = generate_tile   # the world as generated, before any changes
+
+
+CHUNK_SIZE = 8                              # tiles square
+CHUNKS_ACROSS = WORLD_SIZE // CHUNK_SIZE    # 32
+SLOT_COUNT = 208                            # changed chunks the world bank holds
+
+
+class World:
+    """The world with the player's changes, modelling the world bank: a
+    directory of chunks, and SLOT_COUNT slots that hold changed chunks. The
+    first change to a chunk copies its generated tiles into the next free
+    slot; when none is free, the change is refused."""
+
+    def __init__(self) -> None:
+        self.directory: dict[int, int] = {}     # chunk index -> slot (1-based)
+        self.slots: list[bytearray] = []
+
+    @staticmethod
+    def chunk_index(x: int, y: int) -> int:
+        return (y // CHUNK_SIZE) * CHUNKS_ACROSS + x // CHUNK_SIZE
+
+    def tile_at(self, x: int, y: int) -> int:
+        slot = self.directory.get(self.chunk_index(x, y))
+        if slot is None:
+            return generate_tile(x, y)
+        return self.slots[slot - 1][(y % CHUNK_SIZE) * CHUNK_SIZE + x % CHUNK_SIZE]
+
+    def set_tile(self, x: int, y: int, tile: int) -> bool:
+        index = self.chunk_index(x, y)
+        slot = self.directory.get(index)
+        if slot is None:
+            if len(self.slots) == SLOT_COUNT:
+                return False
+            x0, y0 = x - x % CHUNK_SIZE, y - y % CHUNK_SIZE
+            self.slots.append(bytearray(
+                generate_tile(x0 + i, y0 + j) for j in range(CHUNK_SIZE) for i in range(CHUNK_SIZE)
+            ))
+            slot = self.directory[index] = len(self.slots)
+        self.slots[slot - 1][(y % CHUNK_SIZE) * CHUNK_SIZE + x % CHUNK_SIZE] = tile
+        return True
