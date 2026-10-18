@@ -126,7 +126,9 @@ SCRIPTS = {
     "tunnel-right": [(90, ["X", "L"]), (10, [])],
     "dig-down-then-build": [(40, ["M", "L"]), (30, ["SPACE"]), (30, ["K", "SPACE"]), (20, ["X"])],
     "tunnel-down-left": [(150, ["Z", "M", "L"]), (10, [])],
-    "dig-into-slope": [(40, ["X"]), (150, ["Z", "M", "L"]), (10, [])],
+    "tunnel-down-right": [(150, ["X", "M", "L"]), (10, [])],
+    "dig-into-slope-left": [(40, ["X"]), (150, ["Z", "M", "L"]), (10, [])],
+    "dig-into-slope-right": [(40, ["Z"]), (150, ["X", "M", "L"]), (10, [])],
     "tunnel-up-right": [(60, ["M", "L"]), (150, ["X", "K", "L"]), (10, [])],
 }
 

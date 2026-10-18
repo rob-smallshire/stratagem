@@ -68,3 +68,10 @@ A running log of design decisions. Add to it whenever one is made.
 - **Even digging:** when several tiles need digging (a wall as high as the
   player, or the path of a diagonal step), dig the one with the most solid
   left (the lowest, of equals), so they are cut back together.
+- **No cavities:** a dig always opens space next to the space the player is
+  in. Digging erodes from the side nearest the player (when that leaves no
+  exact shape, the largest shape within what is left). Diagonal digging is
+  worked column by column, nearest first; going down, in a column: across,
+  then the step (cut back to a ramp even if partly dug), then down; going up,
+  the step, then up. "Most left" applies only across, at the player's
+  height. tests/test_digging_model.py checks it in every direction.

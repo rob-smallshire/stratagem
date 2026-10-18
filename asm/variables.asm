@@ -32,19 +32,33 @@ GUARD &0800
 \ Digging diagonally (see diagonal in asm/actions.asm)
 .diagonal_dx     SKIP 1      \ Directions held: -1, 0 or 1
 .diagonal_dy     SKIP 1
-.ramp_shape      SKIP 1      \ The ramp to shape the step into, or 0
+.ramp_shape      SKIP 1      \ The ramp to cut the step to, or 0
 .ground          SKIP 2      \ The line just below the player's feet
 .left_column     SKIP 1      \ The columns of the player's edges
 .right_column    SKIP 1
-.rect_left       SKIP 2      \ A rectangle of the path, in pixels and lines
+.part0_left      SKIP 2      \ The parts of the path, in pixels and lines
+.part0_right     SKIP 2
+.part0_top       SKIP 2
+.part0_bottom    SKIP 2
+.part1_left      SKIP 2
+.part1_right     SKIP 2
+.part1_top       SKIP 2
+.part1_bottom    SKIP 2
+.rect_left       SKIP 2      \ The rectangle being scanned
 .rect_right      SKIP 2
 .rect_top        SKIP 2
 .rect_bottom     SKIP 2
-.keep_row        SKIP 1      \ Tiles never cleared: this row, these columns
+.step_x          SKIP 1      \ The step, if step_valid
+.step_y          SKIP 1
+.step_valid      SKIP 1
+.keep_row        SKIP 1      \ The floor kept: this row, these columns
 .keep_first      SKIP 1
 .keep_last       SKIP 1
-.scan_row        SKIP 1      \ first_obstruction: the row being scanned
+.scan_column     SKIP 1      \ The column being worked
+.scan_mode       SKIP 1      \ SCAN_*
+.scan_keeps      SKIP 1      \ Non-zero to skip the floor kept
 .first_row       SKIP 1
+.last_row        SKIP 1
 .first_column    SKIP 1
 .last_column     SKIP 1
 .span_first      SKIP 1      \ region_mask: the first column or row

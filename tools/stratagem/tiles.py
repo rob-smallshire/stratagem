@@ -120,14 +120,52 @@ def shape_of(side: int, depths: tuple[int, ...]) -> int | None:
     return None if mask == 0 else SHAPE_BY_MASK[mask]
 
 
+def erode(mask: int, side: int, quarters: int) -> int:
+    """A mask eroded from `side`: along each strip running in from that side,
+    the first `quarters` solid quarter-cells removed."""
+    for strip in range(QUARTERS):
+        left = quarters
+        for depth in range(QUARTERS):
+            row, column = _quarter_cell(side, strip, depth)
+            bit = 1 << (row * QUARTERS + column)
+            if mask & bit and left:
+                mask &= ~bit
+                left -= 1
+    return mask
+
+
+@cache
 def dig_shape(shape: int, quarters: int, side: int) -> int | None:
-    """The shape left after digging `quarters` more from a tile of `shape`:
-    from its own side if it is already eroded, otherwise (whole) from `side`.
-    None if nothing is left."""
-    if shape == SHAPE_FULL:
-        return shape_of(side, (quarters,) * QUARTERS)
-    s = SHAPES[shape]
-    return shape_of(s.side, tuple(depth + quarters for depth in s.depths))
+    """The shape left after digging `quarters` from `side` of a tile of
+    `shape`, or None if nothing is left. Eroding a shape from a side it
+    wasn't made from can leave a pattern that isn't a shape; then it is the
+    largest shape within that pattern (the first, of equals), so a dig never
+    leaves solid what it should have removed: the near side always goes."""
+    return best_within(erode(SHAPES[shape].mask, side, quarters))
+
+
+@cache
+def best_within(mask: int) -> int | None:
+    """The largest shape within a pattern of quarter-cells (the first, of
+    equals), or None if there is none."""
+    best, best_count = None, 0
+    for number, candidate in enumerate(SHAPES):
+        if candidate.mask & ~mask == 0:
+            count = bin(candidate.mask).count("1")
+            if count > best_count:
+                best, best_count = number, count
+    return best
+
+
+@cache
+def cut_to(shape: int, target: int) -> int | None | bool:
+    """A tile of `shape` cut back to within `target`: the largest shape within
+    both, or None if that leaves nothing; False if it is within target
+    already, so there is nothing to cut."""
+    mask = SHAPES[shape].mask
+    if mask & ~SHAPES[target].mask == 0:
+        return False
+    return best_within(mask & SHAPES[target].mask)
 
 
 def solid_count(material: int, shape: int) -> int:

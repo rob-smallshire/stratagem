@@ -19,10 +19,10 @@ the tiles above it are cleared, lowest first, up to the head (going up, a
 tile higher), so that, still walking, the player moves down (or up) the
 ramp into the space (see diagonal).
 
-Digging erodes the tile by quarters, from the side the player digs from
-(digging rightwards erodes it from the left, downwards from the top), or if
-it is already shaped, from the side its shape was eroded from:
-QUARTERS_PER_DIG of them, by how hard the material is. So soft ground goes
+Digging erodes the tile by quarters from the side nearest the player
+(digging rightwards erodes it from the left, downwards from the top):
+QUARTERS_PER_DIG of them, by how hard the material is (see
+tiles.dig_shape). So soft ground goes
 in one dig and stone in four, and you see it go. When nothing is left the
 tile is empty (sky or cave, by its background), and a block goes into the
 inventory (up to INVENTORY_MAX). Each dig starts a cooldown. Placing puts
@@ -38,7 +38,7 @@ from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, 
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
                              QUARTER_LINES, QUARTER_PIXELS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE, background,
-                             dig_shape, solid_count, solid_quarter_cells)
+                             cut_to, dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
 QUARTERS_PER_DIG = {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1}
@@ -87,70 +87,92 @@ def aim(player: Player, inputs: int, wanted, most_left_of=None) -> tuple[int, in
     return target if wanted(*target) else None
 
 
-def _first_obstruction(tile_at, left: int, right: int, top: int, bottom: int, dx: int,
-                       keep_row: int = -1, keep_columns: range = range(0)) -> tuple[int, int] | None:
-    """The diggable tile with solid parts within a rectangle (in pixels and
-    lines, right and bottom exclusive) with the most solid left; of equals,
-    the first met scanning the lowest row first, and in a row, the nearest
-    column to the player first (columns in the direction dx). Tiles in
-    keep_row and keep_columns are skipped."""
-    columns = range(left // TILE_WIDTH, (right - 1) // TILE_WIDTH + 1)
-    best, best_left = None, -1
-    for ty in range((bottom - 1) // TILE_HEIGHT, top // TILE_HEIGHT - 1, -1):
-        for tx in columns if dx > 0 else reversed(columns):
-            if (ty == keep_row and tx in keep_columns) or not _in_world(tx, ty):
-                continue
-            material, shape = tile_at(tx, ty)
-            if material not in QUARTERS_PER_DIG:
-                continue
-            for row, column in solid_quarter_cells(material, shape):
-                x0, y0 = tx * TILE_WIDTH + column * QUARTER_PIXELS, ty * TILE_HEIGHT + row * QUARTER_LINES
-                if x0 < right and x0 + QUARTER_PIXELS > left and y0 < bottom and y0 + QUARTER_LINES > top:
-                    left_here = solid_count(material, shape)
-                    if left_here > best_left:
-                        best, best_left = (tx, ty), left_here
-                    break
-    return best
+Rect = tuple[int, int, int, int]       # left, right, top, bottom: pixels and lines, exclusive
+
+
+def _in_path(tile_at, tx: int, ty: int, rects: list[Rect]) -> bool:
+    """Whether any solid quarter-cell of a tile lies within any of rects."""
+    material, shape = tile_at(tx, ty)
+    for row, column in solid_quarter_cells(material, shape):
+        x0, y0 = tx * TILE_WIDTH + column * QUARTER_PIXELS, ty * TILE_HEIGHT + row * QUARTER_LINES
+        for left, right, top, bottom in rects:
+            if x0 < right and x0 + QUARTER_PIXELS > left and y0 < bottom and y0 + QUARTER_LINES > top:
+                return True
+    return False
 
 
 def diagonal(player: Player, dx: int, dy: int, tile_at) -> tuple[tuple[int, int] | None, int | None]:
     """Where digging diagonally works next: (a step to shape, its ramp), or
     (a tile to clear, None), or (None, None).
 
-    Going down, the path is a tile across at the player's height, then a
-    tile down; going up, a tile up, then across. Whatever is solid in that
-    path is cleared, lowest first; but first the step is shaped into a 45
-    degree ramp, if it is whole: going down, the floor under the player's
-    leading edge (which is never cleared), going up, the tile ahead at the
-    feet, which the player then walks up.
+    The path of a one-tile diagonal step going down is in two parts: first
+    across at the player's height, then a tile down (to a tile boundary).
+    Going up, it is a tile up: anything rising ahead at the player's height
+    is climbed, or if too high, is in that part too. It is worked column by column, nearest the player
+    first, and in each column, part by part, so that a dig always opens
+    space next to the space the player is in. In a column, the step, if it
+    is there and not dug as far as a 45 degree ramp, is cut back to one: going down, the
+    floor under the player's leading edge, once what is across above it is
+    clear; going up, first, the tile ahead at the feet, which the player
+    then walks up. Otherwise the first part of the path with diggable tiles
+    with solid parts in it is dug: across, the one of them with the most left
+    (the lowest, of equals), so that a wall as high as the player is cut back
+    evenly; up or down, the nearest (going up, the lowest; down, the
+    highest). Going up, the step is never cleared: it is
+    the ramp to walk up. Going down, the floor under the player is never
+    cleared in the part going down; but where it stands up into the path
+    across (a slope rising ahead), it is dug.
     """
     px, py = player.px, player.py
     ground = py + PLAYER_HEIGHT                 # the line just below the feet
     across = dx * TILE_WIDTH
     left, right = min(px, px + across), max(px, px + across) + PLAYER_WIDTH
+    under = range(px // TILE_WIDTH, (px + PLAYER_WIDTH - 1) // TILE_WIDTH + 1)
     if dy > 0:
         edge = (px + PLAYER_WIDTH - 1) // TILE_WIDTH if dx > 0 else px // TILE_WIDTH
         step = (edge, ground // TILE_HEIGHT)
         ramp = RAMP_TOP_RIGHT if dx > 0 else RAMP_TOP_LEFT
+        keep = {(tx, ground // TILE_HEIGHT) for tx in under}
+        below = (ground + TILE_HEIGHT) // TILE_HEIGHT * TILE_HEIGHT
+        rects = [(left, right, py, ground), (px + across, px + across + PLAYER_WIDTH, py, below)]
     else:
         ahead = (px + PLAYER_WIDTH - 1) // TILE_WIDTH + 1 if dx > 0 else px // TILE_WIDTH - 1
         step = (ahead, ground // TILE_HEIGHT - 1)
         ramp = RAMP_TOP_LEFT if dx > 0 else RAMP_TOP_RIGHT
-    if _in_world(*step):
-        material, shape = tile_at(*step)
-        if material in QUARTERS_PER_DIG and shape & SHAPE_BITS == SHAPE_FULL:
-            return step, ramp
-    if dy > 0:
-        # Across, then down; but never the floor under the player.
-        floor_row = ground // TILE_HEIGHT
-        under = range(px // TILE_WIDTH, (px + PLAYER_WIDTH - 1) // TILE_WIDTH + 1)
-        target = (_first_obstruction(tile_at, left, right, py, ground, dx, floor_row, under)
-                  or _first_obstruction(tile_at, px + across, px + across + PLAYER_WIDTH,
-                                        py, ground + TILE_HEIGHT, dx, floor_row, under))
-    else:
-        # Up, then across.
-        target = _first_obstruction(tile_at, left, right, py - TILE_HEIGHT, ground - TILE_HEIGHT, dx)
-    return target, None
+        keep = set()
+        # Anything rising ahead at the player's height is climbed (or, if too
+        # high, is in this part too), so the path is just a tile up.
+        rects = [(left, right, py - TILE_HEIGHT, ground - TILE_HEIGHT)]
+    columns = range(left // TILE_WIDTH, (right - 1) // TILE_WIDTH + 1)
+    # The order of work in a column: going up, the ramp, then across, then
+    # up; going down, across, then the ramp (under what was across), then down.
+    order = ["ramp", 0] if dy < 0 else [0, "ramp", 1]
+    for tx in columns if dx > 0 else reversed(columns):
+        for part in order:
+            if part == "ramp":
+                if tx == step[0] and _in_world(*step):
+                    material, shape = tile_at(*step)
+                    if material in QUARTERS_PER_DIG and cut_to(shape & SHAPE_BITS, ramp) is not False:
+                        return step, ramp
+                continue
+            rect = rects[part]
+            best, best_left = None, 0
+            rows = range((rect[3] - 1) // TILE_HEIGHT, rect[2] // TILE_HEIGHT - 1, -1)
+            if dy > 0 and part == 1:
+                rows = reversed(rows)       # Going down: the highest, nearest, first
+            for ty in rows:
+                if (part == 1 and (tx, ty) in keep) or (dy < 0 and (tx, ty) == step) or not _in_world(tx, ty):
+                    continue
+                material, shape = tile_at(tx, ty)
+                if material in QUARTERS_PER_DIG and _in_path(tile_at, tx, ty, [rect]):
+                    if dy < 0 or part == 1:
+                        return (tx, ty), None   # Up or down: the nearest
+                    left_here = solid_count(material, shape)
+                    if left_here > best_left:
+                        best, best_left = (tx, ty), left_here
+            if best is not None:
+                return best, None
+    return None, None
 
 
 def _in_world(x: int, y: int) -> bool:
@@ -172,6 +194,17 @@ def dig_direction(player: Player, inputs: int) -> int:
     return FROM_LEFT if player.facing > 0 else FROM_RIGHT
 
 
+def near_side(player: Player, target: tuple[int, int], dx: int) -> int:
+    """The side of a tile nearest the player, digging diagonally: the top of
+    a tile wholly below the feet, the bottom of one wholly above the head,
+    otherwise the side towards the player."""
+    if target[1] * TILE_HEIGHT >= player.py + PLAYER_HEIGHT:
+        return FROM_TOP
+    if (target[1] + 1) * TILE_HEIGHT <= player.py:
+        return FROM_BOTTOM
+    return FROM_LEFT if dx > 0 else FROM_RIGHT
+
+
 def diggable(tile: tuple[int, int]) -> bool:
     return tile[0] in QUARTERS_PER_DIG
 
@@ -188,7 +221,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
         dy = (1 if inputs & INPUT_DOWN else 0) - (1 if inputs & INPUT_UP else 0)
         if dx and dy:
             target, ramp = diagonal(player, dx, dy, world.tile_at)
-            side = FROM_LEFT if dx > 0 else FROM_RIGHT
+            side = near_side(player, target, dx) if target else None
         else:
             target = aim(player, inputs, lambda x, y: in_world(x, y) and diggable(world.tile_at(x, y)),
                          most_left_of=world.tile_at)
@@ -197,8 +230,11 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             material, shape = world.tile_at(*target)
             behind = background_bits(*target)
             if ramp is not None:
-                if world.set_tile(*target, (material, ramp | behind)):
-                    return Hands(hands.inventory, DIG_FRAMES), DIG, target
+                left = cut_to(shape & SHAPE_BITS, ramp)
+                tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
+                if world.set_tile(*target, tile):
+                    inventory = min(hands.inventory + 1, INVENTORY_MAX) if left is None else hands.inventory
+                    return Hands(inventory, DIG_FRAMES), DIG, target
                 return hands, NONE, None
             left = dig_shape(shape & SHAPE_BITS, QUARTERS_PER_DIG[material], side)
             tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)

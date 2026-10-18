@@ -138,16 +138,21 @@ def shapes_source() -> str:
     lines += _words("shape_mask", [tiles.SHAPES[s].mask if s < tiles.SHAPE_COUNT else 0 for s in shapes])
     lines.append(".shape_solid_count")    # quarter-cells solid in each shape
     lines += _bytes_lines([bin(tiles.SHAPES[s].mask).count("1") if s < tiles.SHAPE_COUNT else 0 for s in shapes])
-    # What a dig of 1 or 2 quarters leaves of each shape, eroding from its
-    # own side (&FF: nothing); a whole tile is eroded from the dig's side,
-    # given by the whole_dig tables. A dig of 4 quarters leaves nothing.
+    # What a dig of 1 or 2 quarters from each side leaves of each shape, by
+    # side * MAX_SHAPES + shape (&FF: nothing). A dig of 4 leaves nothing.
     for quarters in (1, 2):
-        lines.append(f".shape_dig_{quarters}")
-        lines += _bytes_lines([0xFF if s == 0 or s >= tiles.SHAPE_COUNT else
-                               (lambda r: 0xFF if r is None else r)(tiles.dig_shape(s, quarters, 0))
-                               for s in shapes])
-        lines.append(f".whole_dig_{quarters}")
-        lines += _bytes_lines([tiles.dig_shape(tiles.SHAPE_FULL, quarters, side) for side in range(4)])
+        lines.append(f".dig_{quarters}")
+        lines += _bytes_lines([(lambda r: 0xFF if r is None else r)(tiles.dig_shape(shape, quarters, side))
+                               if shape < tiles.SHAPE_COUNT else 0xFF
+                               for side in range(4) for shape in shapes])
+    # Each shape cut back to within each ramp (&FE: within it already, nothing
+    # to cut; &FF: nothing left).
+    for name in ("RAMP_TOP_LEFT", "RAMP_TOP_RIGHT"):
+        ramp = getattr(world, name)
+        lines.append(f".cut_{name.lower()}")
+        lines += _bytes_lines([(lambda r: 0xFE if r is False else 0xFF if r is None else r)(tiles.cut_to(shape, ramp))
+                               if shape < tiles.SHAPE_COUNT else 0xFE
+                               for shape in shapes])
     # Quarter-cells a player box overlaps in a tile, by the box's position
     # relative to the tile, offset to be positive: columns by x + 8 (x in
     # -7..7), rows by y + 24 (y in -23..15).
