@@ -24,3 +24,9 @@ A running log of design decisions. Add to it whenever one is made.
   wrap, as in Exile Enhanced; screen-side `&3000`-`&3FFF` is render-only RAM.
 - **World size:** 256 x 256 tiles. A bigger game comes later from several
   worlds stored on disc.
+- **Tiles:** 8 x 16 pixels (4 bytes x 16 lines = 64 bytes; roughly square
+  given MODE 2's wide pixels), so the view is 16 x 16 tiles and the world is
+  16 x 16 screens.
+- **Keys:** Z left, X right, K up, M down, L action, plus SPACE and SHIFT:
+  an emerging standard that suits emulators and real machines. Other keys
+  may be added.

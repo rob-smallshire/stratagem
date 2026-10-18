@@ -27,11 +27,12 @@ class Machine:
     name: str
     variant: str
     preset: str
+    screen_region: str      # the Beebium memory region the video reads
 
 
 MACHINES = [
-    Machine("b-plus-128k", "model-b-plus-128k", "model-b-plus-128k"),
-    Machine("integra-b", "model-b-integra-b", "model-b-integra-b-disc"),
+    Machine("b-plus-128k", "model-b-plus-128k", "model-b-plus-128k", "shadow_ram"),
+    Machine("integra-b", "model-b-integra-b", "model-b-integra-b-disc", "main_ram"),
 ]
 
 Launcher = Callable[[Machine], Beebium]
@@ -66,24 +67,33 @@ def game_build() -> BuildResult:
         pytest.skip(str(e))
 
 
-def boot_until_ready(bbc: Beebium, game_build: BuildResult, program: str) -> dict[str, int]:
-    """Boot the game disc and run until `program` reports BOOT_READY.
-    Returns that program's labels."""
-    labels = game_build.labels[program]
-    status_address = labels["zp_boot_status"]
-    # Shift-Break before the OS has finished starting garbles the boot
-    # (beebium #125), so wait for the language's prompt first.
+def wait_for_prompt(bbc: Beebium) -> None:
     prompt = bbc.run_until_or_timeout(
         lambda: bbc.video.screen_text().text.rstrip().endswith(">"),
         BOOT_TIMEOUT_EMULATED_SECONDS,
     )
-    assert prompt, "no prompt after power-on"
+    assert prompt, "no prompt"
+
+
+def boot_until_ready(bbc: Beebium, game_build: BuildResult, source: str, command: str | None = None) -> dict[str, int]:
+    """Boot the game disc, or with `command` insert it and type that command
+    instead, and run until the program reports BOOT_READY. Returns the
+    labels of the source that program was assembled from."""
+    labels = game_build.labels[source]
+    status_address = labels["zp_boot_status"]
+    # Shift-Break before the OS has finished starting garbles the boot
+    # (beebium #125), so wait for the language's prompt first.
+    wait_for_prompt(bbc)
     bbc.disc.set_spin_up_delay(False)
-    bbc.boot_disc(str(game_build.disc_filepath))
+    if command is None:
+        bbc.boot_disc(str(game_build.disc_filepath))
+    else:
+        bbc.disc.drive(0).insert(str(game_build.disc_filepath))
+        bbc.keyboard.type(command + "\r")
     ready = bbc.run_until_or_timeout(
         lambda: bbc.memory.address.peek[status_address] == BOOT_READY,
         BOOT_TIMEOUT_EMULATED_SECONDS,
     )
-    assert ready, f"{program} did not become ready within {BOOT_TIMEOUT_EMULATED_SECONDS} emulated seconds"
+    assert ready, f"{source} did not become ready within {BOOT_TIMEOUT_EMULATED_SECONDS} emulated seconds"
     bbc.run_for_emulated_seconds(SETTLE_EMULATED_SECONDS)
     return labels

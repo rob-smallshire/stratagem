@@ -12,6 +12,9 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
 - Free sideways RAM slots, as found by `PROBE`: B+128K 0, 1, 12, 13;
   Integra-B 4-7, all writable by default. **V**
 
+- OSFILE writes the file's catalogue information back into its control
+  block, so set the block up afresh for every call. **V**
+
 ## BBC B+ 128K
 
 - The shadow RAM is the screen. The CPU reaches it at `&3000`-`&7FFF` only

@@ -23,9 +23,17 @@ uv run python -m stratagem.index_disassembly SRC INDEX   # index a Level 7 disas
 
 ## Conventions
 
-- Each program is a beebasm source in `asm/` that SAVEs a file of the same
-  name, listed in `PROGRAMS` in `tools/stratagem/build.py`. Assemble from
-  the project root (INCLUDE paths are relative to it).
+- `asm/stratagem.asm` assembles every part of the game together (one label
+  namespace) and SAVEs each as a file: `STRAT` (low RAM: trampolines,
+  shared buffers, loader; run by !BOOT), `RENDER` (render region), `WORLD`
+  (world bank) and `MAIN` (user RAM). `PROBE` is a separate diagnostic.
+  Sources are listed in `SOURCES` in `tools/stratagem/build.py`; assemble
+  from the project root (INCLUDE paths are relative to it). Each part
+  CLEARs its address range before its ORG.
+- Tables are generated from Python (`tools/stratagem/gen_tables.py` into
+  `build/generated/`): never hand-edit them. `world.py`, `tiles.py` and
+  `screen.py` model the 6502 exactly; tests compare byte for byte (py65 for
+  `tile_at`, Beebium screen memory for the view).
 - Declare variables with ORG/SKIP so that they become labels; tests look up
   addresses by label name, never by a hard-coded address.
 - Code that writes the screen, and the data it reads, must be outside
