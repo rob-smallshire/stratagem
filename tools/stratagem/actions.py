@@ -11,14 +11,15 @@ one, from the feet up to the head. (A partly dug tile may hold some of the
 player, in its dug part; it can still be dug. A tile is only placed where
 it would not overlap the player.)
 
-Digging removes quarters of the tile, from the side the player digs from
-(digging rightwards removes it from the left, downwards from the top), or
-from the side it is already dug from: QUARTERS_PER_DIG of them, by how hard
-the material is. So soft ground goes in one dig and stone in four, and you
-see it go. When the last quarter goes the tile is AIR, and a block goes
-into the inventory (up to INVENTORY_MAX). Each dig starts a cooldown.
-Placing puts SOIL in an empty tile (AIR or SKY), using a block. If the
-world has no room for a change, nothing happens.
+Digging erodes the tile by quarters, from the side the player digs from
+(digging rightwards erodes it from the left, downwards from the top), or if
+it is already shaped, from the side its shape was eroded from:
+QUARTERS_PER_DIG of them, by how hard the material is. So soft ground goes
+in one dig and stone in four, and you see it go. When nothing is left the
+tile is empty (sky or cave, by its background), and a block goes into the
+inventory (up to INVENTORY_MAX). Each dig starts a cooldown. Placing puts
+whole SOIL in an empty tile (AIR or SKY), using a block. If the world has
+no room for a change, nothing happens.
 """
 
 from __future__ import annotations
@@ -27,9 +28,9 @@ from dataclasses import dataclass
 
 from stratagem.camera import INPUT_DOWN, INPUT_UP
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
-from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS,
-                             ORE, QUARTERS, SKY, SOIL, STONE, kind_info, partial_kind)
-from stratagem.world import World
+from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
+                             SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE, background, dig_shape)
+from stratagem.world import World, background_bits
 
 INPUT_ACTION = 16
 INPUT_PLACE = 32
@@ -89,8 +90,8 @@ def dig_direction(player: Player, inputs: int) -> int:
     return FROM_LEFT if player.facing > 0 else FROM_RIGHT
 
 
-def diggable(kind: int) -> bool:
-    return kind_info(kind)[0] in QUARTERS_PER_DIG
+def diggable(tile: tuple[int, int]) -> bool:
+    return tile[0] in QUARTERS_PER_DIG
 
 
 def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands, int, tuple[int, int] | None]:
@@ -105,17 +106,16 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
     if inputs & INPUT_ACTION:
         target = aim(player, inputs, lambda x, y: in_world(x, y) and diggable(world.tile_at(x, y)))
         if target is not None:
-            material, direction, removed = kind_info(world.tile_at(*target))
-            if not removed:
-                direction = dig_direction(player, inputs)
-            removed += QUARTERS_PER_DIG[material]
-            kind = AIR if removed >= QUARTERS else partial_kind(material, direction, removed)
-            if world.set_tile(*target, kind):
-                inventory = min(hands.inventory + 1, INVENTORY_MAX) if kind == AIR else hands.inventory
+            material, shape = world.tile_at(*target)
+            behind = background_bits(*target)
+            left = dig_shape(shape & SHAPE_BITS, QUARTERS_PER_DIG[material], dig_direction(player, inputs))
+            tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
+            if world.set_tile(*target, tile):
+                inventory = min(hands.inventory + 1, INVENTORY_MAX) if left is None else hands.inventory
                 return Hands(inventory, DIG_FRAMES), DIG, target
     elif inputs & INPUT_PLACE and hands.inventory:
-        target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y) in EMPTY
+        target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
                      and not overlaps_player(player, x, y))
-        if target is not None and world.set_tile(*target, PLACED_TILE):
+        if target is not None and world.set_tile(*target, (PLACED_TILE, SHAPE_FULL | background_bits(*target))):
             return Hands(hands.inventory - 1, PLACE_FRAMES), PLACE, target
     return hands, NONE, None

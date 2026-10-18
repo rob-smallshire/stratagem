@@ -9,7 +9,7 @@ from stratagem import player, sprites
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.player import Player
-from stratagem.tiles import AIR, DIGGABLE, DIRECTIONS, SOIL, STONE, partial_kind
+from stratagem.tiles import AIR, BACKGROUND_SKY, DIGGABLE, SHAPE_COUNT, SHAPE_FULL, SOIL, STONE
 from stratagem.world import HEIGHTS, World
 
 TILE_CACHE_SIZE = 32       # asm/layout.asm
@@ -34,11 +34,13 @@ class PlayerHarness:
 
     def fill_cache(self, world: World, centre_tx: int, centre_ty: int) -> None:
         """Fill the 32 x 32 tile cache ring with the world around a tile."""
-        base = self.labels["tile_cache"]
+        materials, shapes = self.labels["tile_cache"], self.labels["tile_cache_shapes"]
         for ty in range(centre_ty - 15, centre_ty + 17):
             for tx in range(centre_tx - 15, centre_tx + 17):
-                tile = world.tile_at(tx, ty) if 0 <= tx < 256 and 0 <= ty < 256 else STONE
-                self.memory[base + (ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE] = tile
+                material, shape = world.tile_at(tx, ty) if 0 <= tx < 256 and 0 <= ty < 256 else (STONE, SHAPE_FULL)
+                index = (ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE
+                self.memory[materials + index] = material
+                self.memory[shapes + index] = shape
 
     def write(self, state: Player, inputs: int, abilities: int = player.STARTING_ABILITIES) -> None:
         m, l = self.memory, self.labels
@@ -86,14 +88,14 @@ def _random_start(rng: random.Random, world: World) -> Player:
                           air_jumps=rng.randrange(2), jump_held=rng.random() < 0.5)
 
 
-def _random_kind(rng: random.Random) -> int:
-    """Mostly air or soil; often a partly dug tile."""
+def _random_tile(rng: random.Random) -> tuple[int, int]:
+    """Mostly air or soil; often a shaped diggable tile."""
     choice = rng.random()
     if choice < 0.4:
-        return AIR
+        return AIR, SHAPE_FULL
     if choice < 0.6:
-        return SOIL
-    return partial_kind(rng.choice(DIGGABLE), rng.randrange(DIRECTIONS), rng.randint(1, 3))
+        return SOIL, SHAPE_FULL
+    return rng.choice(DIGGABLE), rng.randrange(1, SHAPE_COUNT) | rng.choice([0, BACKGROUND_SKY])
 
 
 def test_player_matches_model(main_machine, game_build):
@@ -101,7 +103,7 @@ def test_player_matches_model(main_machine, game_build):
     rng = random.Random(1989)
     world = World()
     frames = 0
-    seen = {"climbed a ledge": 0, "jumped in the air": 0, "stopped on a partly dug tile": 0}
+    seen = {"climbed a ledge": 0, "jumped in the air": 0, "stopped on a shaped tile": 0, "followed the ground down": 0}
     for episode in range(120):
         state = _random_start(rng, world)
         abilities = rng.choice([0, player.ABILITY_DOUBLE_JUMP])
@@ -116,9 +118,9 @@ def test_player_matches_model(main_machine, game_build):
                 tx = state.px // 8 + rng.choice([-2, -1, 1, 2])
                 ty = state.py // 16 + rng.randrange(-1, 3)
                 if 0 < tx < 255 and 0 <= ty < 255:
-                    world.set_tile(tx, ty, _random_kind(rng))
+                    world.set_tile(tx, ty, _random_tile(rng))
                     if player.box_free(world.tile_at, state.px, state.py) is False:
-                        world.set_tile(tx, ty, AIR)
+                        world.set_tile(tx, ty, (AIR, SHAPE_FULL))
                     cached_at = None
             here = (state.px // 8, state.py // 16)
             if cached_at is None or abs(here[0] - cached_at[0]) > 4 or abs(here[1] - cached_at[1]) > 4:
@@ -135,7 +137,9 @@ def test_player_matches_model(main_machine, game_build):
             if not state.on_ground and expected.air_jumps < state.air_jumps:
                 seen["jumped in the air"] += 1
             if expected.on_ground and (expected.py + player.PLAYER_HEIGHT) % player.TILE_HEIGHT:
-                seen["stopped on a partly dug tile"] += 1
+                seen["stopped on a shaped tile"] += 1
+            if state.on_ground and expected.on_ground and expected.py > state.py:
+                seen["followed the ground down"] += 1
             state = expected
             frames += 1
     assert frames == 18_000

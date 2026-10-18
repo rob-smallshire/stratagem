@@ -11,19 +11,20 @@ GUARD RENDER_CODE
 .render_start
     EQUB 0, 0, 0, 0, 0, 0, 0, 0 \ Not a ROM header: &8007 = 0 and &8001 <> "("
 
-ALIGN TILE_BYTES                \ So a cell's offset in a tile never carries
-.tile_graphics
-    TILE_GRAPHICS
+\ Each material's graphics, two pages: its four cell variants (full, top
+\ half, bottom half, empty) against a cave background, then against the sky.
+ALIGN &100
+.material_pages
+    MATERIAL_PAGES
 
-\ The graphics address of each tile.
-.tile_address_low
-    FOR tile, 0, KIND_COUNT - 1
-        EQUB LO(tile_graphics + tile * TILE_BYTES)
-    NEXT
-.tile_address_high
-    FOR tile, 0, KIND_COUNT - 1
-        EQUB HI(tile_graphics + tile * TILE_BYTES)
-    NEXT
+\ For each cell of a tile (half * 4 + column), the offset in its material's
+\ page of that cell in each shape: MAX_SHAPES bytes per cell, so a half's
+\ four cells fill a page.
+.cell_offsets
+    CELL_OFFSETS
+
+.quarter_offsets                \ Each column's MAX_SHAPES-byte row of a page
+    EQUB 0, MAX_SHAPES, 2 * MAX_SHAPES, 3 * MAX_SHAPES
 
 \ Sprite frames: SPRITE_BYTES mask bytes then SPRITE_BYTES data bytes each.
 .sprite_frames
@@ -65,8 +66,9 @@ MACRO COPY_CELL pointer
     STA (pointer),Y
 ENDMACRO
 
-\ Point zp_row_pointer at the tile cache row holding world cell row
-\ zp_render_v, and set zp_render_half to the offset of its half of a tile.
+\ Point zp_row_pointer and zp_shape_row_pointer at the tile cache rows
+\ holding world cell row zp_render_v, and zp_offsets_pointer at the
+\ CELL_OFFSETS page for its half of a tile.
 .set_row_pointer
 {
     LDA zp_render_v
@@ -79,6 +81,8 @@ ENDMACRO
     CLC
     ADC #HI(tile_cache)
     STA zp_row_pointer + 1
+    ADC #HI(tile_cache_shapes - tile_cache)
+    STA zp_shape_row_pointer + 1
     TYA
     AND #7
     ASL A
@@ -87,36 +91,47 @@ ENDMACRO
     ASL A
     ASL A
     STA zp_row_pointer
+    STA zp_shape_row_pointer
     LDA zp_render_v
     AND #1
-    LSR A                       \ 1 -> 32
-    ROR A
-    ROR A
-    ROR A
-    STA zp_render_half
+    CLC
+    ADC #HI(cell_offsets)
+    STA zp_offsets_pointer + 1
     RTS
 }
 
-\ Set zp_tile to the graphics of the cell in column A of the cache row at
-\ zp_row_pointer.
+\ Set zp_tile to the graphics of the cell in world cell column A of the cache
+\ rows at zp_row_pointer and zp_shape_row_pointer: the material's page for
+\ the background, at the offset CELL_OFFSETS gives for the shape. Leaves the
+\ shape number in zp_render_shape and zp_offsets_pointer at the cell's row.
 MACRO SET_CELL_GRAPHICS
     TAX
     LSR A
     LSR A
     AND #TILE_CACHE_SIZE - 1
     TAY
-    LDA (zp_row_pointer),Y      \ The tile
-    TAY
+    LDA (zp_shape_row_pointer),Y
+    STA zp_render_shape
+    LDA (zp_row_pointer),Y      \ The material: two pages each
+    ASL A
+    BIT zp_render_shape         \ Plus one for the sky background
+    BVC cave
+    ORA #1
+.cave
+    CLC
+    ADC #HI(material_pages)
+    STA zp_tile + 1
     TXA
     AND #3
-    ASL A
-    ASL A
-    ASL A
-    ORA zp_render_half
-    ORA tile_address_low,Y
+    TAY
+    LDA quarter_offsets,Y
+    STA zp_offsets_pointer
+    LDA zp_render_shape
+    AND #SHAPE_BITS
+    STA zp_render_shape
+    TAY
+    LDA (zp_offsets_pointer),Y
     STA zp_tile
-    LDA tile_address_high,Y
-    STA zp_tile + 1
 ENDMACRO
 
 \ Draw zp_render_count cells along world cell row zp_render_v, from column
@@ -152,9 +167,12 @@ ENDMACRO
     LDA zp_render_u
     AND #3
     BEQ tile_loop               \ Into the next tile
-    CLC                         \ The next cell of the same tile: no carry,
-    LDA zp_tile                 \ as tiles are aligned
-    ADC #CELL_BYTES
+    LDA zp_offsets_pointer      \ The next cell of the same tile: the next
+    CLC                         \ CELL_OFFSETS row, in the same page
+    ADC #MAX_SHAPES
+    STA zp_offsets_pointer
+    LDY zp_render_shape
+    LDA (zp_offsets_pointer),Y
     STA zp_tile
     JMP cell_loop
 .done
@@ -167,23 +185,24 @@ ENDMACRO
 \ the beam.
 .render_columns
 {
-    \ Each column's tile column in the cache and cell offset in its tiles.
+    \ Each column's tile column in the cache, and its CELL_OFFSETS row.
     LDX #0
     LDA zp_render_u
 .setup_loop
-    TAY
+    PHA
     LSR A
     LSR A
     AND #TILE_CACHE_SIZE - 1
     STA column_tile,X
-    TYA
+    PLA
+    PHA
     AND #3
-    ASL A
-    ASL A
-    ASL A
+    TAY
+    LDA quarter_offsets,Y
     STA column_offset,X
-    INY
-    TYA
+    PLA
+    CLC
+    ADC #1
     INX
     CPX zp_render_width
     BNE setup_loop
@@ -200,14 +219,24 @@ ENDMACRO
     STA zp_screen_lower + 1
 .column_loop
     LDY column_tile,X
-    LDA (zp_row_pointer),Y      \ The tile
-    TAY
-    LDA tile_address_low,Y
-    ORA zp_render_half
-    ORA column_offset,X
-    STA zp_tile
-    LDA tile_address_high,Y
+    LDA (zp_shape_row_pointer),Y
+    STA zp_render_shape
+    LDA (zp_row_pointer),Y      \ The material: two pages each
+    ASL A
+    BIT zp_render_shape         \ Plus one for the sky background
+    BVC cave
+    ORA #1
+.cave
+    CLC
+    ADC #HI(material_pages)
     STA zp_tile + 1
+    LDA column_offset,X
+    STA zp_offsets_pointer
+    LDA zp_render_shape
+    AND #SHAPE_BITS
+    TAY
+    LDA (zp_offsets_pointer),Y
+    STA zp_tile
     COPY_CELL zp_screen_lower
     INX
     CPX zp_render_width
@@ -235,7 +264,9 @@ ENDMACRO
     STA zp_screen + 1
     INC zp_render_v
     DEC zp_render_count
-    BNE row_loop
+    BEQ done
+    JMP row_loop
+.done
     RTS
 }
 

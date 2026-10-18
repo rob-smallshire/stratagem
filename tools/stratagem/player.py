@@ -11,13 +11,16 @@ ground (holding it jumps again on landing); in the air, a fresh press of UP
 jumps again if the player has the double jump ability and hasn't used it
 since landing. Gravity accelerates the fall, up to MAX_FALL.
 
-Then the player moves horizontally and vertically, each separately. Tiles
-are solid in a rectangle (whole, or what is left of a partly dug tile), so a
-move that would overlap solid rectangles stops flush against the nearest of
-them. Walking into a ledge at most a tile high climbs it, if there is room
-above. Every move is less than a tile, so the player can never pass through
-one; and as the player was clear before the move, any rectangle it would
-overlap lies wholly beyond its old position.
+Then the player moves horizontally and vertically, each separately. A tile
+is solid in some of its quarter-cells (2 pixels by 4 lines), by its shape,
+so a move that would overlap solid quarter-cells stops flush against the
+nearest of them. Walking into a ledge at most a tile high climbs it, if
+there is room above, so a slope is climbed a quarter-cell step at a time;
+and a player who was standing doesn't fall off a step down shallower than
+SNAP_DOWN lines (a quarter-cell step), but follows the ground down it. Every move is less than a
+tile, so the player can never pass through one; and as the player was clear
+before the move, anything it would overlap lies wholly beyond its old
+position.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from stratagem.camera import INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.tiles import kind_rect
+from stratagem.tiles import QUARTER_LINES, QUARTER_PIXELS, solid_quarter_cells
 
 PLAYER_WIDTH = 6        # pixels
 PLAYER_HEIGHT = 24      # lines
@@ -41,11 +44,12 @@ JUMP_SPEED = 72         # sixteenths of a line a frame, upwards
 AIR_JUMP_SPEED = 64
 GRAVITY = 4
 MAX_FALL = 96
+SNAP_DOWN = 5           # lines probed below: follows steps down of up to 4
 
 ABILITY_DOUBLE_JUMP = 1
 STARTING_ABILITIES = ABILITY_DOUBLE_JUMP    # until abilities can be earned
 
-TileAt = Callable[[int, int], int]
+TileAt = Callable[[int, int], tuple[int, int]]
 Rect = tuple[int, int, int, int]            # left, right, top, bottom; exclusive
 
 
@@ -70,19 +74,17 @@ class Player:
 
 
 def hits(tile_at: TileAt, px: int, py: int) -> list[Rect]:
-    """The solid rectangles, in world pixels and lines, that a player box at
-    (px, py) would overlap."""
+    """The solid quarter-cells, as rectangles in world pixels and lines, that
+    a player box at (px, py) would overlap."""
     found = []
     for ty in range(py // TILE_HEIGHT, (py + PLAYER_HEIGHT - 1) // TILE_HEIGHT + 1):
         for tx in range(px // TILE_WIDTH, (px + PLAYER_WIDTH - 1) // TILE_WIDTH + 1):
-            rect = kind_rect(tile_at(tx, ty))
-            if rect is None:
-                continue
-            left, right, top, bottom = rect
-            left, right = tx * TILE_WIDTH + left, tx * TILE_WIDTH + right
-            top, bottom = ty * TILE_HEIGHT + top, ty * TILE_HEIGHT + bottom
-            if px < right and px + PLAYER_WIDTH > left and py < bottom and py + PLAYER_HEIGHT > top:
-                found.append((left, right, top, bottom))
+            for row, column in solid_quarter_cells(*tile_at(tx, ty)):
+                left = tx * TILE_WIDTH + column * QUARTER_PIXELS
+                top = ty * TILE_HEIGHT + row * QUARTER_LINES
+                right, bottom = left + QUARTER_PIXELS, top + QUARTER_LINES
+                if px < right and px + PLAYER_WIDTH > left and py < bottom and py + PLAYER_HEIGHT > top:
+                    found.append((left, right, top, bottom))
     return found
 
 
@@ -139,6 +141,9 @@ def step(player: Player, inputs: int, tile_at: TileAt, abilities: int = STARTING
         new_y, vy = 0, 0
     px, new_py = x >> 4, new_y >> 4
     found = hits(tile_at, px, new_py)
+    if not found and player.on_ground and vy > 0:
+        # Follow the ground down a small step, rather than fall off it.
+        found = hits(tile_at, px, (y >> 4) + SNAP_DOWN)
     if not found:
         y = new_y
     elif vy > 0:

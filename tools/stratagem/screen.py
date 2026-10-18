@@ -89,16 +89,17 @@ def cell_address(screen_start: int, column: int, row: int) -> int:
 
 
 def render_view(screen_start: int, camera_x: int, camera_y: int,
-                tile_at: Callable[[int, int], int], graphics: list[bytes]) -> dict[int, int]:
+                tile_at: Callable[[int, int], tuple[int, int]],
+                tile_bytes: Callable[[tuple[int, int]], bytes]) -> dict[int, int]:
     """The expected bytes of the displayed screen, as a mapping from address
     to byte, with the view's top-left cell, world cell (camera_x, camera_y),
-    at screen_start."""
+    at screen_start. tile_bytes gives a tile's 64 bytes."""
     image = {}
     for row in range(VIEW_ROWS):
         v = camera_y + row
         for column in range(VIEW_COLUMNS):
             u = camera_x + column
-            data = graphics[tile_at(u // CELLS_PER_TILE_X, v // CELLS_PER_TILE_Y)]
+            data = tile_bytes(tile_at(u // CELLS_PER_TILE_X, v // CELLS_PER_TILE_Y))
             offset = cell_offset(u, v)
             address = cell_address(screen_start, column, row)
             for line in range(CELL_BYTES):

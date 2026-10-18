@@ -73,7 +73,8 @@ ENDMACRO
     RTS
 }
 
-\ Return in A the tile at world (X, Y). Preserves X and Y.
+\ Return the tile at world (X, Y): the material in A and the shape in
+\ zp_world_shape. Preserves X and Y.
 .call_tile_at
 {
     LDA zp_bank_world
@@ -86,7 +87,8 @@ ENDMACRO
     RTS
 }
 
-\ Change the tile at world (X, Y) to A; carry set if the world is full.
+\ Change the tile at world (X, Y) to material A and shape zp_world_new_shape;
+\ carry set if the world is full.
 .call_set_tile
 {
     PHA
@@ -296,10 +298,11 @@ INCLUDE "asm/machine.asm"
 .strat_end
 
 \ The tile cache: the tiles around the view, which the world fills and the
-\ renderer (and later the game) reads. A 32 x 32 ring: tile (x, y) is at
-\ tile_cache + (y MOD 32) * 32 + (x MOD 32). It overlays nothing, so it isn't
-\ saved.
+\ renderer and the game read. A 32 x 32 ring: the material of tile (x, y) is
+\ at tile_cache + (y MOD 32) * 32 + (x MOD 32), and its shape at the same
+\ offset in tile_cache_shapes. It overlays nothing, so it isn't saved.
 ALIGN &100
 .tile_cache         SKIP TILE_CACHE_SIZE * TILE_CACHE_SIZE
+.tile_cache_shapes  SKIP TILE_CACHE_SIZE * TILE_CACHE_SIZE
 
 SAVE "STRAT", strat_start, strat_end

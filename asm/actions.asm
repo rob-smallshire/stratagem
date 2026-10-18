@@ -3,93 +3,129 @@
 ACTION_NONE  = 0
 ACTION_DIG   = 1
 ACTION_PLACE = 2
+OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 
 \ Dig or place, by zp_input, after the player has moved.
 .player_action
 {
     LDA #ACTION_NONE
-    STA zp_action
-    LDA zp_cooldown
+    STA action
+    LDA cooldown
     BEQ ready
-    DEC zp_cooldown
+    DEC cooldown
     RTS
 .ready
     LDA zp_input
     AND #INPUT_ACTION
-    BEQ try_place
-    LDA #0                      \ Aim for something diggable
-    STA zp_want
-    JSR aim
-    BCS done
-    \ Remove quarters of it: from the side it is dug from, or if whole, from
-    \ the side the player digs from.
-    JSR target_tile
-    TAX
-    LDY kind_material,X
-    LDA kind_direction,X
-    STA zp_dig_direction
-    LDA kind_removed,X
-    BNE direction_set
-    JSR dig_direction
-    LDA #0
-.direction_set
-    CLC
-    ADC material_quarters,Y
-    CMP #QUARTERS
-    BCC partly
-    LDA #TILE_AIR               \ All gone
-    BCS change
-.partly
-    \ Kind = PARTIAL_BASE + (slot * DIRECTIONS + direction) * 3 + removed - 1
-    STA zp_temp
-    LDA material_slot,Y
-    ASL A
-    ASL A
-    ORA zp_dig_direction
-    STA zp_temp + 1
-    ASL A
-    CLC
-    ADC zp_temp + 1             \ * 3
-    ADC zp_temp
-    ADC #PARTIAL_BASE - 1
-.change
-    STA zp_action_tile
-    JSR change_target
-    BCS done                    \ The world is full
-    LDA #DIG_FRAMES
-    STA zp_cooldown
-    LDA #ACTION_DIG
-    STA zp_action
-    LDA zp_action_tile
-    BNE done                    \ Only a whole tile goes into the inventory
-    LDA zp_inventory
-    CMP #INVENTORY_MAX
-    BCS done
-    INC zp_inventory
-    RTS
-.try_place
+    BEQ not_digging
+    JMP dig
+.not_digging
     LDA zp_input
     AND #INPUT_PLACE
     BEQ done
-    LDA zp_inventory
-    BEQ done
-    LDA #&FF                    \ Aim for an empty tile
-    STA zp_want
-    JSR aim
-    BCS done
-    LDA #PLACED_TILE
-    JSR change_target
-    BCS done
-    DEC zp_inventory
-    LDA #PLACE_FRAMES
-    STA zp_cooldown
-    LDA #ACTION_PLACE
-    STA zp_action
+    JMP place
 .done
     RTS
 }
 
-\ Set zp_dig_direction to the side of a tile a dig removes first: the side
+\ Dig the diggable tile aimed at, if any.
+.dig
+{
+    LDA #0                      \ Aim for something diggable
+    STA want
+    JSR aim
+    BCS done
+    \ Erode it: by its material's quarters, from its own side if it is
+    \ already shaped, otherwise from the side the player digs from.
+    JSR target_tile
+    TAX
+    STX action_tile          \ The material, unless nothing is left
+    LDA material_quarters,X
+    CMP #QUARTERS
+    BCS nothing_left
+    TAY                         \ 1 or 2 quarters
+    LDA target_shape
+    AND #SHAPE_BITS
+    BNE shaped
+    JSR dig_direction           \ Whole: erode from the player's side
+    LDX dig_side
+    LDA whole_dig_1,X
+    CPY #1
+    BEQ dug
+    LDA whole_dig_2,X
+    BNE dug                     \ Always branches: something is left
+.shaped
+    TAX
+    LDA shape_dig_1,X
+    CPY #1
+    BEQ eroded
+    LDA shape_dig_2,X
+.eroded
+    CMP #&FF
+    BNE dug
+.nothing_left
+    \ Nothing left: empty, showing its background.
+    JSR target_background       \ A = BACKGROUND_SKY or 0
+    STA zp_world_new_shape
+    LDX #TILE_AIR
+    ORA #0
+    BEQ empty_set
+    LDX #TILE_SKY
+.empty_set
+    STX action_tile
+    JMP change
+.dug
+    STA zp_world_new_shape
+    JSR target_background
+    ORA zp_world_new_shape
+    STA zp_world_new_shape
+.change
+    LDA action_tile
+    JSR change_target
+    BCS done                    \ The world is full
+    LDA #DIG_FRAMES
+    STA cooldown
+    LDA #ACTION_DIG
+    STA action
+    LDA zp_world_new_shape      \ Only a tile dug away entirely goes into the
+    AND #SHAPE_BITS             \ inventory: an empty material, so SHAPE_FULL
+    BNE done
+    LDX action_tile
+    LDA material_passable,X
+    BEQ done
+    LDA inventory
+    CMP #INVENTORY_MAX
+    BCS done
+    INC inventory
+    RTS
+.done
+    RTS
+}
+
+\ Place a block in the empty tile aimed at, if any and if one is carried.
+.place
+{
+    LDA inventory
+    BEQ done
+    LDA #&FF                    \ Aim for an empty tile
+    STA want
+    JSR aim
+    BCS done
+    JSR target_background
+    STA zp_world_new_shape      \ SHAPE_FULL with the background
+    LDA #PLACED_TILE
+    JSR change_target
+    BCS done
+    DEC inventory
+    LDA #PLACE_FRAMES
+    STA cooldown
+    LDA #ACTION_PLACE
+    STA action
+.done
+    RTS
+}
+
+\ Set dig_side to the side of a tile a dig removes first: the side
 \ the player is on.
 .dig_direction
 {
@@ -106,12 +142,12 @@ ACTION_PLACE = 2
     BPL set
     LDX #FROM_RIGHT
 .set
-    STX zp_dig_direction
+    STX dig_side
     RTS
 }
 
-\ Choose the tile to dig or place at, zp_target_x/y, by zp_input and what
-\ zp_want wants. Return with carry clear if there is one, set if not.
+\ Choose the tile to dig or place at, target_x/y, by zp_input and what
+\ want wants. Return with carry clear if there is one, set if not.
 .aim
 {
     JSR player_pixels           \ zp_box_x/y = px, py
@@ -126,7 +162,7 @@ ACTION_PLACE = 2
     LDA zp_box_y + 1
     ADC #0
     JSR row_of
-    STA zp_target_y
+    STA target_y
     JMP wanted
 .not_down
     LDA zp_input
@@ -143,7 +179,7 @@ ACTION_PLACE = 2
     LDA zp_box_y + 1
     SBC #0
     JSR row_of
-    STA zp_target_y
+    STA target_y
     JMP wanted
 .ahead
     \ The column of the pixel just ahead: (px + PLAYER_WIDTH) >> 3, or
@@ -166,16 +202,16 @@ ACTION_PLACE = 2
     SBC #0
 .column_found
     JSR column_of
-    STA zp_target_x
+    STA target_x
     JSR feet_row                \ From the feet up to the head
-    STA zp_target_y
+    STA target_y
 .row_loop
     JSR wanted_here
     BCC found
     JSR head_row
-    CMP zp_target_y
+    CMP target_y
     BEQ none
-    DEC zp_target_y
+    DEC target_y
     JMP row_loop
 .wanted
     JSR wanted_here
@@ -186,7 +222,7 @@ ACTION_PLACE = 2
     RTS
 }
 
-\ Set zp_target_x to the player's middle column: (px + PLAYER_WIDTH / 2) >> 3.
+\ Set target_x to the player's middle column: (px + PLAYER_WIDTH / 2) >> 3.
 .middle_column
 {
     CLC
@@ -196,7 +232,7 @@ ACTION_PLACE = 2
     LDA zp_box_x + 1
     ADC #0
     JSR column_of
-    STA zp_target_x
+    STA target_x
     RTS
 }
 
@@ -249,52 +285,72 @@ ACTION_PLACE = 2
     RTS
 }
 
-\ Return in A the tile at zp_target_x/y, from the tile cache, and point
-\ zp_ptr at its row in the cache with Y its column.
+\ Return in A the material of the tile at target_x/y, from the tile cache,
+\ and its shape in target_shape; point zp_ptr at its row in the cache
+\ (of materials) with Y its column.
 .target_tile
 {
-    LDA zp_target_y
+    LDA target_y
     AND #TILE_CACHE_SIZE - 1
     LSR A
     LSR A
     LSR A
     CLC
-    ADC #HI(tile_cache)
+    ADC #HI(tile_cache_shapes)
     STA zp_ptr + 1
-    LDA zp_target_y
+    LDA target_y
     ASL A
     ASL A
     ASL A
     ASL A
     ASL A
     STA zp_ptr
-    LDA zp_target_x
+    LDA target_x
     AND #TILE_CACHE_SIZE - 1
     TAY
+    LDA (zp_ptr),Y
+    STA target_shape
+    LDA zp_ptr + 1
+    SEC
+    SBC #HI(tile_cache_shapes - tile_cache)
+    STA zp_ptr + 1
     LDA (zp_ptr),Y
     RTS
 }
 
-\ Return carry clear if the tile at zp_target_x/y is what zp_want wants:
+\ Return in A the background bits for the tile at target_x/y:
+\ BACKGROUND_SKY if it is at or above its column's surface, otherwise 0.
+.target_background
+{
+    LDX target_x
+    LDA surface_heights,X
+    CMP target_y
+    LDA #0
+    BCC done
+    LDA #BACKGROUND_SKY
+.done
+    RTS
+}
+
+\ Return carry clear if the tile at target_x/y is what want wants:
 \ something diggable, or an empty tile clear of the player.
 .wanted_here
 {
     JSR target_tile
     TAX
-    LDA zp_want
+    LDA want
     BNE want_empty
-    LDY kind_material,X
-    LDA material_quarters,Y
+    LDA material_quarters,X
     BNE yes
 .no
     SEC
     RTS
 .want_empty
-    LDA kind_empty,X
+    LDA material_empty,X
     BEQ no
     \ Clear of the player: not (px - x * 8 in -5..7 and py - y * 16 in
-    \ -23..15), working with HIT_OFFSET added.
-    LDA zp_target_x
+    \ -23..15), working with OVERLAP_OFFSET added.
+    LDA target_x
     ASL A
     ASL A
     ASL A
@@ -303,12 +359,12 @@ ACTION_PLACE = 2
     SEC
     SBC zp_temp
     CLC
-    ADC #HIT_OFFSET
-    CMP #HIT_OFFSET + TILE_WIDTH
+    ADC #OVERLAP_OFFSET
+    CMP #OVERLAP_OFFSET + TILE_WIDTH
     BCS yes
-    CMP #HIT_OFFSET - PLAYER_WIDTH + 1
+    CMP #OVERLAP_OFFSET - PLAYER_WIDTH + 1
     BCC yes
-    LDA zp_target_y
+    LDA target_y
     ASL A
     ASL A
     ASL A
@@ -318,10 +374,10 @@ ACTION_PLACE = 2
     SEC
     SBC zp_temp
     CLC
-    ADC #HIT_OFFSET
-    CMP #HIT_OFFSET + TILE_HEIGHT
+    ADC #OVERLAP_OFFSET
+    CMP #OVERLAP_OFFSET + TILE_HEIGHT
     BCS yes
-    CMP #HIT_OFFSET - PLAYER_HEIGHT + 1
+    CMP #OVERLAP_OFFSET - PLAYER_HEIGHT + 1
     BCC yes
     SEC                         \ It would overlap the player
     RTS
@@ -330,7 +386,8 @@ ACTION_PLACE = 2
     RTS
 }
 
-\ Change the tile at zp_target_x/y to A in the world and the tile cache, and
+\ Change the tile at target_x/y to material A and shape zp_world_new_shape
+\ in the world and the tile cache, and
 \ queue it to be redrawn on the screen. (The screen may still show the
 \ player's sprite where it was before this frame's move, over the tile, so
 \ the tile is redrawn at the next flip, between removing the sprite and
@@ -338,21 +395,27 @@ ACTION_PLACE = 2
 .change_target
 {
     PHA
-    LDX zp_target_x
-    LDY zp_target_y
+    LDX target_x
+    LDY target_y
     JSR call_set_tile
     PLA
     BCS done
     PHA
-    JSR target_tile
+    JSR target_tile             \ Points zp_ptr at the row of materials
     PLA
     STA (zp_ptr),Y
-    LDA zp_target_x
-    STA zp_redraw_tile_x
-    LDA zp_target_y
-    STA zp_redraw_tile_y
+    LDA zp_ptr + 1
+    CLC
+    ADC #HI(tile_cache_shapes - tile_cache)
+    STA zp_ptr + 1
+    LDA zp_world_new_shape
+    STA (zp_ptr),Y
+    LDA target_x
+    STA redraw_tile_x
+    LDA target_y
+    STA redraw_tile_y
     LDA #&FF
-    STA zp_redraw_tile
+    STA redraw_tile
     CLC
 .done
     RTS
@@ -361,27 +424,27 @@ ACTION_PLACE = 2
 \ Redraw the tile queued by change_target, if any.
 .redraw_queued_tile
 {
-    LDA zp_redraw_tile
+    LDA redraw_tile
     BEQ done
     LDA #0
-    STA zp_redraw_tile
-    LDA zp_redraw_tile_x
-    STA zp_target_x
-    LDA zp_redraw_tile_y
-    STA zp_target_y
+    STA redraw_tile
+    LDA redraw_tile_x
+    STA target_x
+    LDA redraw_tile_y
+    STA target_y
     JMP redraw_target
 .done
     RTS
 }
 
-\ Redraw the visible cells of the tile at zp_target_x/y: two cell rows of up
+\ Redraw the visible cells of the tile at target_x/y: two cell rows of up
 \ to four cells.
 .redraw_target
 {
     \ Column of its first cell in the view: 4 * x - camera_x, signed.
     LDA #0
     STA zp_temp + 1
-    LDA zp_target_x
+    LDA target_x
     ASL A
     ROL zp_temp + 1
     ASL A
@@ -425,7 +488,7 @@ ACTION_PLACE = 2
     LDX #0
 .half_loop
     STX zp_temp + 1
-    LDA zp_target_y             \ View row = 2 * y + half - camera_y
+    LDA target_y             \ View row = 2 * y + half - camera_y
     ASL A
     STA zp_ptr
     LDA #0

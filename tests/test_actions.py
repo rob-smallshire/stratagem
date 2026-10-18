@@ -10,7 +10,7 @@ from stratagem import actions, player
 from stratagem.actions import INPUT_ACTION, INPUT_PLACE, Hands
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.tiles import PARTIAL_BASE
+from stratagem.tiles import SHAPE_BITS, SHAPE_FULL
 from stratagem.world import CHUNK_SIZE, World
 from test_player import PlayerHarness, _random_start
 
@@ -58,26 +58,27 @@ def test_actions_match_model(machine, game_build):
                 harness.fill_cache(world, *here)
                 cached_at = here
             harness.write(state, inputs)
-            memory[labels["zp_inventory"]] = hands.inventory
-            memory[labels["zp_cooldown"]] = hands.cooldown
+            memory[labels["inventory"]] = hands.inventory
+            memory[labels["cooldown"]] = hands.cooldown
             machine.call(labels["update_player"])
             machine.call(labels["player_action"])
             actual, _, _, _ = harness.read()
             expected = player.step(state, inputs, world.tile_at)
             assert actual == expected, f"from {state} with inputs {inputs}"
             hands, action, target = actions.act(hands, expected, inputs, world)
-            assert (memory[labels["zp_inventory"]], memory[labels["zp_cooldown"]]) == (hands.inventory, hands.cooldown)
-            assert memory[labels["zp_action"]] == action, f"at {expected} with inputs {inputs}"
+            assert (memory[labels["inventory"]], memory[labels["cooldown"]]) == (hands.inventory, hands.cooldown)
+            assert memory[labels["action"]] == action, f"at {expected} with inputs {inputs}"
             if target is not None:
-                assert (memory[labels["zp_target_x"]], memory[labels["zp_target_y"]]) == target
+                assert (memory[labels["target_x"]], memory[labels["target_y"]]) == target
                 done[action] += 1
                 partial_seen.add(world.tile_at(*target))
             state = expected
     assert done[actions.DIG] > 50 and done[actions.PLACE] > 20, done
-    assert any(kind >= PARTIAL_BASE for kind in partial_seen), "no tile was ever partly dug"
+    assert any(shape & SHAPE_BITS != SHAPE_FULL for _, shape in partial_seen), "no tile was ever partly dug"
     # The 6502 world agrees with the model everywhere it was changed.
     for index in world.directory:
         x0, y0 = index % 32 * CHUNK_SIZE, index // 32 * CHUNK_SIZE
         for y in range(y0, y0 + CHUNK_SIZE):
             for x in range(x0, x0 + CHUNK_SIZE):
-                assert machine.call(labels["tile_at"], x=x, y=y).mpu.a == world.tile_at(x, y), (x, y)
+                mpu = machine.call(labels["tile_at"], x=x, y=y).mpu
+                assert (mpu.a, memory[labels["zp_world_shape"]]) == world.tile_at(x, y), (x, y)

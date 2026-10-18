@@ -320,6 +320,8 @@
 
 .move_vertically
 {
+    LDA zp_player_on_ground
+    STA zp_was_on_ground
     LDA #0
     STA zp_player_on_ground
     \ new_y = y + vy, not above the top of the world
@@ -357,6 +359,23 @@
     STA zp_box_y
     JSR find_hits
     BCS blocked
+    \ Follow the ground down a small step, rather than fall off it.
+    LDA zp_was_on_ground
+    BEQ fall
+    LDA zp_player_vy
+    BEQ fall
+    BMI fall
+    JSR player_pixels           \ The box SNAP_DOWN lines below where it was
+    CLC
+    LDA zp_box_y
+    ADC #SNAP_DOWN
+    STA zp_box_y
+    BCC snap_added
+    INC zp_box_y + 1
+.snap_added
+    JSR find_hits
+    BCS blocked
+.fall
     LDA zp_new_y
     STA zp_player_y
     LDA zp_new_y + 1
@@ -468,7 +487,13 @@
     ASL A
     ASL A
     STA zp_ptr
-    \ The box's top relative to the row, plus HIT_OFFSET: box_y - row * 16.
+    LDA zp_ptr                  \ ... and the shapes
+    STA zp_shape_ptr
+    LDA zp_ptr + 1
+    CLC
+    ADC #HI(tile_cache_shapes - tile_cache)
+    STA zp_shape_ptr + 1
+    \ The box's top relative to the row, plus 24: box_y - row * 16 + 24.
     LDA zp_box_row
     ASL A
     ASL A
@@ -479,7 +504,7 @@
     SEC
     SBC zp_temp
     CLC
-    ADC #HIT_OFFSET
+    ADC #24
     STA zp_hit_relative_y
     LDA zp_box_x + 1            \ First column: zp_box_x >> 3
     STA zp_temp
@@ -495,17 +520,16 @@
     LDA zp_box_column
     AND #TILE_CACHE_SIZE - 1
     TAY
-    LDA (zp_ptr),Y
-    TAX                         \ The kind
-    LDA kind_passable,X
+    LDA (zp_ptr),Y              \ The material
+    TAX
+    LDA material_passable,X
     BNE next_column
-    LDA zp_hit_relative_y       \ Overlapping vertically?
-    CMP kind_bottom_bound,X
-    BCS next_column
-    CMP kind_top_bound,X
-    BEQ next_column
-    BCC next_column
-    LDA zp_box_column           \ ... and horizontally: box_x - column * 8
+    LDA (zp_shape_ptr),Y        \ The shape
+    AND #SHAPE_BITS
+    TAX
+    \ The quarter-cells the box overlaps, by its position relative to the
+    \ tile, that are solid: box_columns[x + 8] AND box_rows[y + 24] AND mask.
+    LDA zp_box_column
     ASL A
     ASL A
     ASL A
@@ -514,12 +538,23 @@
     SEC
     SBC zp_temp
     CLC
-    ADC #HIT_OFFSET
-    CMP kind_right_bound,X
-    BCS next_column
-    CMP kind_left_bound,X
+    ADC #8
+    TAY
+    LDA box_columns_low,Y
+    AND shape_mask_low,X
+    STA zp_hit_bits
+    LDA box_columns_high,Y
+    AND shape_mask_high,X
+    STA zp_hit_bits + 1
+    LDY zp_hit_relative_y
+    LDA zp_hit_bits
+    AND box_rows_low,Y
+    STA zp_hit_bits
+    LDA zp_hit_bits + 1
+    AND box_rows_high,Y
+    STA zp_hit_bits + 1
+    ORA zp_hit_bits
     BEQ next_column
-    BCC next_column
     JSR record_hit
 .next_column
     LDA zp_box_column
@@ -537,12 +572,67 @@
     RTS
 }
 
-\ Record the solid part of kind X, in tile (zp_box_column, zp_box_row), as
-\ hit: widen zp_hit_left/right/top/bottom to include it.
+\ Record the quarter-cells zp_hit_bits of the tile (zp_box_column, zp_box_row)
+\ as hit: widen zp_hit_left/right/top/bottom to include them.
 .record_hit
 {
     LDA #1
     STA zp_hit_any
+    \ Their columns: the OR of the mask's four rows (nibbles).
+    LDA zp_hit_bits
+    ORA zp_hit_bits + 1
+    STA zp_temp
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    ORA zp_temp
+    AND #&0F
+    TAY
+    LDA lowest_bit,Y            \ Left and right, in pixels within the tile
+    ASL A
+    STA zp_rect_left
+    LDA highest_bit,Y
+    ASL A
+    ADC #2                      \ Carry is clear
+    STA zp_rect_right
+    \ Their rows: which of the four nibbles are non-zero.
+    LDY #0
+    LDA zp_hit_bits
+    AND #&0F
+    BEQ no_row_0
+    LDY #1
+.no_row_0
+    LDA zp_hit_bits
+    AND #&F0
+    BEQ no_row_1
+    TYA
+    ORA #2
+    TAY
+.no_row_1
+    LDA zp_hit_bits + 1
+    AND #&0F
+    BEQ no_row_2
+    TYA
+    ORA #4
+    TAY
+.no_row_2
+    LDA zp_hit_bits + 1
+    AND #&F0
+    BEQ no_row_3
+    TYA
+    ORA #8
+    TAY
+.no_row_3
+    LDA lowest_bit,Y            \ Top and bottom, in lines within the tile
+    ASL A
+    ASL A
+    STA zp_rect_top
+    LDA highest_bit,Y
+    ASL A
+    ASL A
+    ADC #4                      \ Carry is clear
+    STA zp_rect_bottom
     \ Column * 8 and row * 16, 16 bits, in zp_temp and zp_temp2.
     LDA #0
     STA zp_temp + 1
@@ -569,7 +659,7 @@
     \ Left: keep the least.
     CLC
     LDA zp_temp
-    ADC kind_solid_left,X
+    ADC zp_rect_left
     TAY
     LDA zp_temp + 1
     ADC #0
@@ -585,7 +675,7 @@
     \ Right: keep the greatest.
     CLC
     LDA zp_temp
-    ADC kind_solid_right,X
+    ADC zp_rect_right
     TAY
     LDA zp_temp + 1
     ADC #0
@@ -602,7 +692,7 @@
     \ Top: keep the least.
     CLC
     LDA zp_temp2
-    ADC kind_solid_top,X
+    ADC zp_rect_top
     TAY
     LDA zp_temp2 + 1
     ADC #0
@@ -618,7 +708,7 @@
     \ Bottom: keep the greatest.
     CLC
     LDA zp_temp2
-    ADC kind_solid_bottom,X
+    ADC zp_rect_bottom
     TAY
     LDA zp_temp2 + 1
     ADC #0
@@ -635,5 +725,5 @@
     RTS
 }
 
-\ The properties of each kind of tile.
-INCLUDE "build/generated/kinds.asm"
+\ The properties of materials and shapes.
+INCLUDE "build/generated/shapes.asm"

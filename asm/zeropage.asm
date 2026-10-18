@@ -28,8 +28,10 @@ GUARD &90
 .zp_screen          SKIP 2      \ Screen address of the current cell
 .zp_screen_lower    SKIP 2      \ A second screen address
 .zp_tile            SKIP 2      \ Graphics of the current cell
-.zp_row_pointer     SKIP 2      \ The tile cache row being drawn
-.zp_render_half     SKIP 1      \ 0 or 32: the half of the tile being drawn
+.zp_row_pointer     SKIP 2      \ The tile cache row being drawn: materials
+.zp_shape_row_pointer SKIP 2    \ ... and shapes
+.zp_offsets_pointer SKIP 2      \ The CELL_OFFSETS row for a cell
+.zp_render_shape    SKIP 1      \ The shape of the tile being drawn
 .zp_render_column   SKIP 1      \ World cell column being drawn
 .zp_render_across   SKIP 1      \ Columns still to draw across a row
 
@@ -45,7 +47,13 @@ GUARD &90
 .zp_fill_down       SKIP 1      \ ... non-zero for down a column, else along a row
 .zp_fill_pointer    SKIP 2
 .zp_world_pointer   SKIP 2      \ Directory entry, then slot
-.zp_world_tile      SKIP 1      \ set_tile: the new tile
+.zp_world_shape     SKIP 1      \ tile_at, generate_tile: the shape
+.zp_world_tile      SKIP 1      \ set_tile: the new material...
+.zp_world_new_shape SKIP 1      \ ... and shape
+.zp_generate_x      SKIP 1      \ generate_tile: where
+.zp_generate_y      SKIP 1
+.zp_generate_material SKIP 1    \ ... the material there
+.zp_generate_open   SKIP 1      \ ... which neighbours are open
 .zp_world_target_x  SKIP 1      \ set_tile: where
 .zp_world_target_y  SKIP 1
 .zp_world_index     SKIP 1      \ set_tile: index into a slot being filled
@@ -90,32 +98,16 @@ GUARD &90
 .zp_hit_right       SKIP 2
 .zp_hit_top         SKIP 2
 .zp_hit_bottom      SKIP 2
-.zp_hit_relative_y  SKIP 1
+.zp_hit_relative_y  SKIP 1      \ ... the box's top relative to a tile row, + 24
+.zp_hit_bits        SKIP 2      \ ... the quarter-cells hit in a tile
+.zp_rect_left       SKIP 1      \ ... their extremes, within the tile
+.zp_rect_right      SKIP 1
+.zp_rect_top        SKIP 1
+.zp_rect_bottom     SKIP 1
+.zp_shape_ptr       SKIP 2      \ ... the tile cache row of shapes
+.zp_was_on_ground   SKIP 1      \ On the ground before this frame's move
 .zp_stop            SKIP 2      \ Where a blocked horizontal move stops
 .zp_lift            SKIP 2      \ Height of a ledge to climb
-
-\ Digging and placing (modelled by tools/stratagem/actions.py)
-.zp_inventory       SKIP 1      \ Blocks carried
-.zp_cooldown        SKIP 1      \ Frames until the next dig or place
-.zp_action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
-.zp_target_x        SKIP 1      \ The tile aimed at
-.zp_target_y        SKIP 1
-.zp_want            SKIP 1      \ Aiming for: 0 diggable, otherwise empty
-.zp_action_tile     SKIP 1      \ The kind a dig leaves
-.zp_dig_direction   SKIP 1      \ The side a dig removes from
-.zp_redraw_tile     SKIP 1      \ Non-zero if a changed tile awaits redrawing...
-.zp_redraw_tile_x   SKIP 1      \ ... here
-.zp_redraw_tile_y   SKIP 1
-
-\ Tile cache: the tile rectangle it holds, inclusive
-.zp_cached_left     SKIP 1
-.zp_cached_right    SKIP 1
-.zp_cached_top      SKIP 1
-.zp_cached_bottom   SKIP 1
-.zp_view_left       SKIP 1      \ The tile rectangle the view needs
-.zp_view_right      SKIP 1
-.zp_view_top        SKIP 1
-.zp_view_bottom     SKIP 1
 
 \ Game
 .zp_screen_start    SKIP 2      \ Screen address of the view's top-left cell
@@ -127,6 +119,7 @@ GUARD &90
 .zp_columns_u       SKIP 1      \ ... from this world column
 .zp_columns_base    SKIP 2      \ ... at this screen address
 .zp_rows_left       SKIP 1      \ Rows still to draw in a redraw
+.zp_split_row       SKIP 1      \ New columns are drawn above it, then below
 .zp_temp            SKIP 2
 .zp_temp2           SKIP 2
 

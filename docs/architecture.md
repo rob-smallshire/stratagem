@@ -125,31 +125,43 @@ improves on its drawing:
   function for every strip, and each tile row is exposed twice and each
   tile column four times.
 
-Each frame: wait for vertical sync; flip (set the start address, draw new
-columns); move the marker; read input; move the focus; plan the camera;
-update the tile cache; draw a new row into the hidden row. In the worst
+Each frame: wait for vertical sync; set the start address; draw the new
+columns' rows above the sprite; remove the sprite, redraw any changed
+tile, and draw the sprite; draw the rest of the new columns (each phase
+measured to finish thousands of cycles before the beam reaches its rows);
+then read input, move the player, dig or place, plan the camera, update the
+tile cache and draw a new row into the hidden row. In the worst
 case (two columns and a row) this takes about 30,000 of a frame's 40,000
 cycles, leaving roughly a quarter for the game; `render_columns` is the
 first place to optimise.
 
 ## World
 
-A 256 x 256 tile world, one byte per tile. The byte is a *kind*, an index
-into generated tables (`tools/stratagem/tiles.py`): a material whole, or a
-diggable material partly dug from one side by quarters. Each kind has its
-own 64 bytes of graphics in the render region, so the renderer is unchanged,
-and a solid rectangle for collision (`find_hits` in `asm/player.asm`). Slopes
-will be further kinds, with Exile-style height maps. The world is never stored whole, since 64K is too much:
+A 256 x 256 tile world, two bytes per tile: a material and a shape
+(`tools/stratagem/tiles.py`). A shape is a 4 x 4 grid of solid quarter-cells
+(2 pixels by 4 lines), made by eroding a whole tile from one side to four
+depths: flat (partly dug), 45 degree and 22.5 degree ramps, from any side,
+giving 61 shapes. The shape byte also holds a background bit (sky or cave,
+by whether the tile is at or above its column's surface), which shows
+through its empty parts. Each material has two 256-byte pages of graphics
+(one per background) of four cell variants (full, top half, bottom half,
+empty), and a table gives each shape's cells' offsets, so any material
+draws in any shape. Collision is by 16-bit masks (`find_hits` in
+`asm/player.asm`). The generator rounds off surface steps and cave corners
+with ramps.
+
+The world is never stored whole, since 64K is too much:
 
 - Immutable terrain (bedrock, water, lava, portals; see `game-design.md`)
   is never modified, so it needs no storage beyond the generator and the
   map overlay.
 - The base world is procedural, computed from (x, y) by a fast hash-driven
   generator, as in Exile, so unmodified land costs nothing.
-- Modified land is stored as chunks of 8 x 8 tiles (64 bytes). A
+- Modified land is stored as chunks of 8 x 8 tiles (128 bytes). A
   directory of one byte per chunk (1K for 32 x 32 chunks) maps each chunk
-  to a slot in the modified-chunk store, or to "procedural". About 12K of
-  bank W holds about 190 modified chunks, roughly a fifth of the world.
+  to a slot in the modified-chunk store, or to "procedural". About 13K of
+  bank W holds 104 modified chunks, about a tenth of the world; compressing
+  them, and spilling them to disc, are to come.
   When the store fills, chunks spill to disc with OSGBPB, which is also the
   basis of saving a game.
 - The game can grow later through several worlds on disc, each a 256 x 256

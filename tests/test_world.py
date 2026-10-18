@@ -17,17 +17,20 @@ def world_machine(game_build):
 
 def test_tile_at_matches_model_everywhere(world_machine, game_build):
     tile_at_address = game_build.labels["STRATAGEM"]["tile_at"]
+    shape_address = game_build.labels["STRATAGEM"]["zp_world_shape"]
     mismatches = []
     for y in range(WORLD_SIZE):
         for x in range(WORLD_SIZE):
             mpu = world_machine.call(tile_at_address, x=x, y=y).mpu
-            if (mpu.a, mpu.x, mpu.y) != (tile_at(x, y), x, y):
-                mismatches.append(((x, y), (mpu.a, mpu.x, mpu.y), tile_at(x, y)))
+            actual = ((mpu.a, mpu.memory[shape_address]), mpu.x, mpu.y)
+            if actual != (tile_at(x, y), x, y):
+                mismatches.append(((x, y), actual, tile_at(x, y)))
     assert mismatches[:10] == []
 
 
 def test_changes_match_model_until_the_world_is_full(world_machine, game_build):
     import random
+    from stratagem.tiles import MATERIAL_COUNT, SHAPE_COUNT
     from stratagem.world import CHUNK_SIZE, SLOT_COUNT, World
 
     labels = game_build.labels["STRATAGEM"]
@@ -38,8 +41,10 @@ def test_changes_match_model_until_the_world_is_full(world_machine, game_build):
     refused = 0
     for step in range(1500):
         cx, cy = rng.choice(chunks[: 20 + step // 5])
-        x, y, tile = cx * CHUNK_SIZE + rng.randrange(CHUNK_SIZE), cy * CHUNK_SIZE + rng.randrange(CHUNK_SIZE), rng.randrange(9)
-        mpu = world_machine.call(labels["set_tile"], a=tile, x=x, y=y).mpu
+        x, y = cx * CHUNK_SIZE + rng.randrange(CHUNK_SIZE), cy * CHUNK_SIZE + rng.randrange(CHUNK_SIZE)
+        tile = (rng.randrange(MATERIAL_COUNT), rng.randrange(SHAPE_COUNT) | rng.choice([0, 0x40]))
+        world_machine.mpu.memory[labels["zp_world_new_shape"]] = tile[1]
+        mpu = world_machine.call(labels["set_tile"], a=tile[0], x=x, y=y).mpu
         accepted = world.set_tile(x, y, tile)
         assert (mpu.p & 1 == 0) == accepted, f"set_tile({x}, {y}) carry disagrees"
         assert (mpu.x, mpu.y) == (x, y)
@@ -51,4 +56,5 @@ def test_changes_match_model_until_the_world_is_full(world_machine, game_build):
         for j in range(CHUNK_SIZE):
             for i in range(CHUNK_SIZE):
                 x, y = cx * CHUNK_SIZE + i, cy * CHUNK_SIZE + j
-                assert world_machine.call(tile_at_address, x=x, y=y).mpu.a == world.tile_at(x, y), (x, y)
+                mpu = world_machine.call(tile_at_address, x=x, y=y).mpu
+                assert (mpu.a, mpu.memory[labels["zp_world_shape"]]) == world.tile_at(x, y), (x, y)

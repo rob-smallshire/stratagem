@@ -1,5 +1,6 @@
-\ WORLD: the world bank. For now just the placeholder generator, which
-\ tools/stratagem/world.py models exactly.
+\ WORLD: the world bank: the placeholder generator, which
+\ tools/stratagem/world.py models exactly, and the store of changed chunks.
+\ A tile is a material and a shape (see tools/stratagem/tiles.py).
 
 CLEAR BANK_START, BANK_END
 ORG BANK_START
@@ -9,10 +10,12 @@ GUARD BANK_END
     EQUB 0, 0, 0, 0, 0, 0, 0, 0 \ Not a ROM header: &8007 = 0 and &8001 <> "("
 
 CHUNK_SIZE = 8
-SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
+CHUNK_TILES = CHUNK_SIZE * CHUNK_SIZE
+SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
 
-\ Return in A the tile at world (X, Y), y increasing downwards, as changed
-\ by the player. Preserves X and Y.
+\ Return the tile at world (X, Y), y increasing downwards, as changed by the
+\ player: the material in A and the shape in zp_world_shape. Preserves X
+\ and Y.
 .tile_at
 {
     STX zp_world_x
@@ -25,15 +28,23 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
 .changed
     JSR point_at_slot
     JSR offset_in_chunk
+    TYA
+    ORA #CHUNK_TILES
+    TAY
+    LDA (zp_world_pointer),Y
+    STA zp_world_shape
+    TYA
+    AND #CHUNK_TILES - 1
+    TAY
     LDA (zp_world_pointer),Y
     LDX zp_world_x
     LDY zp_world_y
     RTS
 }
 
-\ Change the tile at world (X, Y) to A. Return with carry clear, or carry
-\ set if the chunk is unchanged so far and there is no free slot for it.
-\ Preserves X and Y.
+\ Change the tile at world (X, Y) to material A and shape zp_world_new_shape.
+\ Return with carry clear, or carry set if the chunk is unchanged so far and
+\ there is no free slot for it. Preserves X and Y.
 .set_tile
 {
     STA zp_world_tile
@@ -59,6 +70,11 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
     JSR point_at_slot
     JSR offset_in_chunk
     LDA zp_world_tile
+    STA (zp_world_pointer),Y
+    TYA
+    ORA #CHUNK_TILES
+    TAY
+    LDA zp_world_new_shape
     STA (zp_world_pointer),Y
     CLC
 .done
@@ -105,9 +121,7 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
     SBC #1
     LDY #0
     STY zp_world_pointer
-    LSR A                       \ (slot - 1) * 64
-    ROR zp_world_pointer
-    LSR A
+    LSR A                       \ (slot - 1) * 128
     ROR zp_world_pointer
     CLC
     ADC #HI(world_slots)
@@ -131,11 +145,11 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
     RTS
 }
 
-\ Fill the slot just allocated, at zp_world_pointer, with the generated
-\ tiles of the chunk holding (zp_world_target_x, zp_world_target_y).
+\ Fill the slot just allocated, slot A, with the generated tiles of the
+\ chunk holding (zp_world_target_x, zp_world_target_y).
 .fill_slot
 {
-    JSR point_at_slot           \ A is the slot
+    JSR point_at_slot
     LDA #0
     STA zp_world_index
 .loop
@@ -155,22 +169,17 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
     LSR A
     ORA zp_world_y
     TAY
-    LDA zp_world_pointer        \ generate_tile uses zp_world_* but not
-    PHA                         \ zp_world_pointer; keep it safe anyway
-    LDA zp_world_pointer + 1
-    PHA
-    JSR generate_tile
-    TAX
-    PLA
-    STA zp_world_pointer + 1
-    PLA
-    STA zp_world_pointer
-    TXA
+    JSR generate_tile           \ Uses zp_world_* but not zp_world_pointer
     LDY zp_world_index
+    STA (zp_world_pointer),Y
+    TYA
+    ORA #CHUNK_TILES
+    TAY
+    LDA zp_world_shape
     STA (zp_world_pointer),Y
     INC zp_world_index
     LDA zp_world_index
-    CMP #SLOT_BYTES
+    CMP #CHUNK_TILES
     BNE loop
     RTS
 }
@@ -195,9 +204,126 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
     RTS
 }
 
-\ Return in A the generated tile at world (X, Y): the world before any
-\ changes. Preserves X and Y.
+\ Return the generated tile at world (X, Y), the world before any changes:
+\ the material in A and the shape in zp_world_shape. A diggable tile has its
+\ corner rounded off where it borders open space (see world.py), and every
+\ tile at or above its column's surface has BACKGROUND_SKY. Preserves X and
+\ Y.
 .generate_tile
+{
+    STX zp_generate_x
+    STY zp_generate_y
+    JSR generate_material
+    STA zp_generate_material
+    LDA #SHAPE_FULL
+    STA zp_world_shape
+    LDA zp_generate_material    \ Diggable: GRASS to GEM
+    SEC
+    SBC #TILE_GRASS
+    CMP #TILE_GEM - TILE_GRASS + 1
+    BCS background
+    LDX zp_generate_x
+    LDA world_heights,X
+    CMP zp_generate_y
+    BNE underground
+    \ On the surface: slope down towards one lower neighbouring column.
+    LDA zp_generate_y
+    CMP world_heights - 1,X     \ Carry clear if the left column is lower
+    ROL zp_generate_open        \ Bit 1: left not lower
+    CMP world_heights + 1,X
+    ROL zp_generate_open        \ Bit 0: right not lower
+    LDA zp_generate_open
+    AND #3
+    CMP #1                      \ Left lower, right not
+    BNE not_left_lower
+    LDA #SHAPE_RAMP_TOP_LEFT
+    BNE shaped
+.not_left_lower
+    CMP #2                      \ Right lower, left not
+    BNE background
+    LDA #SHAPE_RAMP_TOP_RIGHT
+    BNE shaped
+.underground
+    \ Round a corner with open space on one side and above or below.
+    DEX
+    JSR open_at_x
+    ROL zp_generate_open        \ Bit 1: left open
+    LDX zp_generate_x
+    INX
+    JSR open_at_x
+    ROL zp_generate_open        \ Bit 0: right open
+    LDA zp_generate_open
+    AND #3
+    BEQ background              \ Neither side open
+    CMP #3
+    BEQ background              \ Both sides open
+    LDX zp_generate_x
+    LDY zp_generate_y
+    DEY
+    JSR open_at
+    BCC not_above
+    LDA zp_generate_open
+    AND #2
+    BEQ ramp_top_right
+    LDA #SHAPE_RAMP_TOP_LEFT
+    BNE shaped
+.ramp_top_right
+    LDA #SHAPE_RAMP_TOP_RIGHT
+    BNE shaped
+.not_above
+    LDX zp_generate_x
+    LDY zp_generate_y
+    INY
+    JSR open_at
+    BCC background
+    LDA zp_generate_open
+    AND #2
+    BEQ ramp_bottom_right
+    LDA #SHAPE_RAMP_BOTTOM_LEFT
+    BNE shaped
+.ramp_bottom_right
+    LDA #SHAPE_RAMP_BOTTOM_RIGHT
+.shaped
+    STA zp_world_shape
+.background
+    LDX zp_generate_x           \ Sky behind tiles at or above the surface
+    LDA world_heights,X
+    CMP zp_generate_y
+    BCC done
+    LDA zp_world_shape
+    ORA #BACKGROUND_SKY
+    STA zp_world_shape
+.done
+    LDA zp_generate_material
+    LDX zp_generate_x
+    LDY zp_generate_y
+    RTS
+}
+
+\ Return carry set if the generated material at (X, zp_generate_y) is open
+\ (passable), clear if not.
+.open_at_x
+{
+    LDY zp_generate_y
+    \ Fall through
+}
+
+\ Return carry set if the generated material at (X, Y) is open (passable),
+\ clear if not: AIR, or WATER or SKY.
+.open_at
+{
+    JSR generate_material
+    CMP #TILE_AIR
+    BEQ open
+    CMP #TILE_WATER             \ WATER and SKY are the last materials
+    RTS
+.open
+    SEC
+    RTS
+}
+
+\ Return in A the generated material at world (X, Y). Preserves X and Y.
+.generate_material
 {
     STX zp_world_x
     STY zp_world_y
@@ -306,7 +432,13 @@ SLOT_BYTES = CHUNK_SIZE * CHUNK_SIZE
     STA zp_fill_pointer
     LDY #0
     PLA
-    STA (zp_fill_pointer),Y
+    STA (zp_fill_pointer),Y     \ The material
+    LDA zp_fill_pointer + 1
+    CLC
+    ADC #HI(tile_cache_shapes - tile_cache)
+    STA zp_fill_pointer + 1
+    LDA zp_world_shape
+    STA (zp_fill_pointer),Y     \ The shape
     LDA zp_fill_down
     BNE down
     INC zp_fill_x

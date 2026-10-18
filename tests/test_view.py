@@ -11,11 +11,10 @@ from stratagem.actions import Hands
 from stratagem.camera import Camera
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
-from stratagem.tiles import tile_graphics
+from stratagem.tiles import tile_bytes
 from stratagem.world import World, tile_at
 
 SCREENSHOT_DIRPATH_NAME = "screenshots"
-GRAPHICS = tile_graphics()
 FRAMES = sprites.sprite_frames()
 
 
@@ -53,7 +52,7 @@ def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, Player, in
 
 
 def expected_screen(state: Camera, hero: Player, screen_start: int, world_tile_at=tile_at) -> dict[int, int]:
-    image = render_view(screen_start, state.camera_x, state.camera_y, world_tile_at, GRAPHICS)
+    image = render_view(screen_start, state.camera_x, state.camera_y, world_tile_at, tile_bytes)
     frame = FRAMES[sprites.frame_for(hero)]
     column = (hero.px >> 1) - state.camera_x
     line = hero.py - state.camera_y * 8
@@ -69,11 +68,14 @@ TILE_CACHE_SIZE = 32       # asm/layout.asm
 
 
 def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Camera, world_tile_at=tile_at) -> None:
-    cache = bbc.memory.address.peek[labels["tile_cache"]:labels["tile_cache"] + TILE_CACHE_SIZE ** 2]
+    size = TILE_CACHE_SIZE ** 2
+    materials = bbc.memory.address.peek[labels["tile_cache"]:labels["tile_cache"] + size]
+    shapes = bbc.memory.address.peek[labels["tile_cache_shapes"]:labels["tile_cache_shapes"] + size]
     wrong = []
     for ty in range(state.camera_y >> 1, (state.camera_y + camera.VIEW_ROWS - 1 >> 1) + 1):
         for tx in range(state.camera_x >> 2, (state.camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1):
-            if cache[(ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE] != world_tile_at(tx, ty):
+            index = (ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE
+            if (materials[index], shapes[index]) != world_tile_at(tx, ty):
                 wrong.append((tx, ty))
     assert wrong[:8] == [], f"{len(wrong)} cached tiles are wrong"
 
@@ -152,7 +154,7 @@ def test_every_frame_matches_model_while_playing(game, machine, script):
             changes += action != actions.NONE
             state, hero = assert_screen_matches_model(bbc, machine, labels, world.tile_at)
             assert hero == expected_hero
-            assert (peek[labels["zp_inventory"]], peek[labels["zp_cooldown"]]) == (hands.inventory, hands.cooldown)
+            assert (peek[labels["inventory"]], peek[labels["cooldown"]]) == (hands.inventory, hands.cooldown)
             direction = (1 if inputs & camera.INPUT_RIGHT else 0) - (1 if inputs & camera.INPUT_LEFT else 0)
             focus_x, focus_y = player.focus(expected_hero)
             assert state == camera.plan_camera(replace(previous, focus_x=focus_x, focus_y=focus_y), direction)

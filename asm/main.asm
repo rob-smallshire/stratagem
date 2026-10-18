@@ -38,11 +38,11 @@ INKEY_SPACE = &100 - 99
     STA zp_player_vx
     STA zp_player_vy
     STA zp_player_on_ground
-    STA zp_inventory
-    STA zp_cooldown
+    STA inventory
+    STA cooldown
     STA zp_player_jump_held
     STA zp_player_air_jumps
-    STA zp_redraw_tile
+    STA redraw_tile
     LDA #STARTING_ABILITIES
     STA zp_abilities
     LDA #1
@@ -76,10 +76,26 @@ INKEY_SPACE = &100 - 99
     INC zp_frame
     LDA #19                     \ Wait for vertical sync
     JSR OSBYTE
-    JSR flip                    \ The time-critical part, first
-    JSR restore_sprite          \ The camera moves only while the player is
-    JSR redraw_queued_tile      \ well inside the view, clear of new columns
+    \ After vertical sync, staying ahead of the beam: the new start address;
+    \ the new columns' rows above the sprite, which the beam reaches first;
+    \ the sprite (well inside the view, so clear of the new columns), which
+    \ the beam reaches next; then the rest of the new columns.
+    JSR set_crtc_start
+    JSR sprite_split_row
+    LDA #0
+    LDX zp_split_row
+    JSR draw_column_rows
+    JSR restore_sprite
+    JSR redraw_queued_tile
     JSR draw_sprite
+    LDA #VIEW_ROWS
+    SEC
+    SBC zp_split_row
+    TAX
+    LDA zp_split_row
+    JSR draw_column_rows
+    LDA #0
+    STA zp_columns_width
 .frame_shown                    \ The screen now shows the camera's view
     JSR read_input
     JSR update_player
@@ -452,7 +468,7 @@ INKEY_SPACE = &100 - 99
     RTS
 }
 
-\ Set zp_view_left/right/top/bottom to the tiles the view at the camera
+\ Set view_left/right/top/bottom to the tiles the view at the camera
 \ shows.
 .view_tiles
 {
@@ -463,7 +479,7 @@ INKEY_SPACE = &100 - 99
     ROR A
     LSR zp_temp
     ROR A
-    STA zp_view_left
+    STA view_left
     CLC                         \ Right: (camera_x + VIEW_COLUMNS - 1) >> 2
     LDA zp_camera_x
     ADC #VIEW_COLUMNS - 1
@@ -475,12 +491,12 @@ INKEY_SPACE = &100 - 99
     LSR A
     ROR zp_temp
     LDA zp_temp
-    STA zp_view_right
+    STA view_right
     LDA zp_camera_y + 1         \ Top: camera_y >> 1
     LSR A
     LDA zp_camera_y
     ROR A
-    STA zp_view_top
+    STA view_top
     CLC                         \ Bottom: (camera_y + VIEW_ROWS - 1) >> 1
     LDA zp_camera_y
     ADC #VIEW_ROWS - 1
@@ -490,7 +506,7 @@ INKEY_SPACE = &100 - 99
     LSR A
     LDA zp_temp
     ROR A
-    STA zp_view_bottom
+    STA view_bottom
     RTS
 }
 
@@ -500,61 +516,61 @@ INKEY_SPACE = &100 - 99
 .update_tile_cache
 {
     JSR view_tiles
-    LDA zp_view_bottom          \ Columns are filled over the view's rows
+    LDA view_bottom          \ Columns are filled over the view's rows
     SEC
-    SBC zp_view_top
+    SBC view_top
     STA zp_temp + 1
     INC zp_temp + 1             \ Tiles in a column
 .right_loop
-    LDA zp_cached_right
-    CMP zp_view_right
+    LDA cached_right
+    CMP view_right
     BCS right_done              \ Only ever expand: cached_right >= view_right
-    INC zp_cached_right
-    LDA zp_cached_right
+    INC cached_right
+    LDA cached_right
     JSR fill_tile_column
     JMP right_loop
 .right_done
 .left_loop
-    LDA zp_view_left
-    CMP zp_cached_left
+    LDA view_left
+    CMP cached_left
     BCS left_done               \ view_left >= cached_left
-    DEC zp_cached_left
-    LDA zp_cached_left
+    DEC cached_left
+    LDA cached_left
     JSR fill_tile_column
     JMP left_loop
 .left_done
-    LDA zp_view_right           \ Rows are filled over the view's columns
+    LDA view_right           \ Rows are filled over the view's columns
     SEC
-    SBC zp_view_left
+    SBC view_left
     STA zp_temp + 1
     INC zp_temp + 1             \ Tiles in a row
 .down_loop
-    LDA zp_cached_bottom
-    CMP zp_view_bottom
+    LDA cached_bottom
+    CMP view_bottom
     BCS down_done               \ cached_bottom >= view_bottom
-    INC zp_cached_bottom
-    LDA zp_cached_bottom
+    INC cached_bottom
+    LDA cached_bottom
     JSR fill_tile_row
     JMP down_loop
 .down_done
 .up_loop
-    LDA zp_view_top
-    CMP zp_cached_top
+    LDA view_top
+    CMP cached_top
     BCS up_done                 \ view_top >= cached_top
-    DEC zp_cached_top
-    LDA zp_cached_top
+    DEC cached_top
+    LDA cached_top
     JSR fill_tile_row
     JMP up_loop
 .up_done
     \ The cache now holds exactly the view's tiles.
-    LDA zp_view_left
-    STA zp_cached_left
-    LDA zp_view_right
-    STA zp_cached_right
-    LDA zp_view_top
-    STA zp_cached_top
-    LDA zp_view_bottom
-    STA zp_cached_bottom
+    LDA view_left
+    STA cached_left
+    LDA view_right
+    STA cached_right
+    LDA view_top
+    STA cached_top
+    LDA view_bottom
+    STA cached_bottom
     RTS
 }
 
@@ -562,7 +578,7 @@ INKEY_SPACE = &100 - 99
 .fill_tile_column
 {
     STA zp_fill_x
-    LDA zp_view_top
+    LDA view_top
     STA zp_fill_y
     LDA #&FF
     BNE fill                    \ Always branches
@@ -572,7 +588,7 @@ INKEY_SPACE = &100 - 99
 .fill_tile_row
 {
     STA zp_fill_y
-    LDA zp_view_left
+    LDA view_left
     STA zp_fill_x
     LDA #0
 }
@@ -685,28 +701,72 @@ INKEY_SPACE = &100 - 99
     RTS
 }
 
-\ After vertical sync: point the CRTC at the new screen start, and draw the
-\ planned columns, a row at a time, ahead of the beam.
-.flip
+\ Draw X rows, from view row A, of the planned new columns, a row at a time,
+\ ahead of the beam.
+.draw_column_rows
 {
-    JSR set_crtc_start
-    LDA zp_columns_width
+    CPX #0
     BEQ done
-    STA zp_render_width
-    LDA zp_columns_u
-    STA zp_render_u
-    LDA zp_camera_y
+    LDY zp_columns_width
+    BEQ done
+    STY zp_render_width
+    STX zp_render_count
+    PHA
+    CLC
+    ADC zp_camera_y
     STA zp_render_v
-    LDA #VIEW_ROWS
-    STA zp_render_count
+    PLA                         \ Base = columns_base + row * ROW_BYTES
+    ASL A
+    CLC
+    ADC zp_columns_base + 1
+    JSR wrap_both_ways
+    STA zp_render_base + 1
     LDA zp_columns_base
     STA zp_render_base
-    LDA zp_columns_base + 1
-    STA zp_render_base + 1
-    JSR call_render_columns
-    LDA #0
-    STA zp_columns_width
+    LDA zp_columns_u
+    STA zp_render_u
+    JMP call_render_columns
 .done
+    RTS
+}
+
+\ Set zp_split_row to the view row two above the top of the sprite's new
+\ position (or 0): the sprite, where it was and where it will be, is below
+\ it, as the player moves at most 6 lines and the camera a row a frame.
+.sprite_split_row
+{
+    JSR sprite_view_line
+    LSR A
+    LSR A
+    LSR A
+    SEC
+    SBC #2
+    BCS set
+    LDA #0
+.set
+    STA zp_split_row
+    RTS
+}
+
+\ Return in A (and zp_temp + 1) the view line of the player's top, with
+\ zp_box_x/y set to its position in pixels and lines.
+.sprite_view_line
+{
+    JSR player_pixels
+    LDA zp_camera_y + 1         \ line = py - camera_y * 8
+    STA zp_ptr + 1
+    LDA zp_camera_y
+    ASL A
+    ROL zp_ptr + 1
+    ASL A
+    ROL zp_ptr + 1
+    ASL A
+    ROL zp_ptr + 1
+    STA zp_ptr
+    SEC
+    LDA zp_box_y
+    SBC zp_ptr
+    STA zp_temp + 1
     RTS
 }
 
@@ -718,28 +778,28 @@ INKEY_SPACE = &100 - 99
     STA zp_sprite_drawn         \ The sprite is drawn over
     STA zp_columns_width
     JSR view_tiles
-    LDA zp_view_right
+    LDA view_right
     SEC
-    SBC zp_view_left
+    SBC view_left
     STA zp_temp + 1
     INC zp_temp + 1             \ Tiles in a row
-    LDA zp_view_top
-    STA zp_cached_top
+    LDA view_top
+    STA cached_top
 .fill_loop
-    LDA zp_cached_top
+    LDA cached_top
     JSR fill_tile_row
-    LDA zp_cached_top
-    INC zp_cached_top
-    CMP zp_view_bottom
+    LDA cached_top
+    INC cached_top
+    CMP view_bottom
     BNE fill_loop
-    LDA zp_view_left
-    STA zp_cached_left
-    LDA zp_view_right
-    STA zp_cached_right
-    LDA zp_view_top
-    STA zp_cached_top
-    LDA zp_view_bottom
-    STA zp_cached_bottom
+    LDA view_left
+    STA cached_left
+    LDA view_right
+    STA cached_right
+    LDA view_top
+    STA cached_top
+    LDA view_bottom
+    STA cached_bottom
 
     LDA zp_screen_start
     STA zp_render_base
@@ -826,7 +886,7 @@ INKEY_SPACE = &100 - 99
 .draw_sprite
 {
     \ View column = (px >> 1) - camera_x, line = py - camera_y * 8
-    JSR player_pixels
+    JSR sprite_view_line        \ Line, in zp_temp + 1
     LDA zp_box_x + 1
     LSR A
     LDA zp_box_x
@@ -834,20 +894,6 @@ INKEY_SPACE = &100 - 99
     SEC
     SBC zp_camera_x
     STA zp_temp                 \ Column
-    LDA zp_camera_y + 1
-    STA zp_ptr + 1
-    LDA zp_camera_y
-    ASL A
-    ROL zp_ptr + 1
-    ASL A
-    ROL zp_ptr + 1
-    ASL A
-    ROL zp_ptr + 1
-    STA zp_ptr
-    SEC
-    LDA zp_box_y
-    SBC zp_ptr
-    STA zp_temp + 1             \ Line
     \ Address = screen_start + (line >> 3) * ROW_BYTES + column * 8 + (line AND 7)
     LDA #0
     STA zp_ptr + 1
