@@ -48,3 +48,6 @@ GUARD &0800
 .first_column    SKIP 1
 .last_column     SKIP 1
 .span_first      SKIP 1      \ region_mask: the first column or row
+.best_left       SKIP 1      \ The most solid left of the tiles found so far...
+.best_column     SKIP 1      \ ... and where
+.best_row        SKIP 1

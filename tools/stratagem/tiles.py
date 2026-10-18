@@ -130,6 +130,11 @@ def dig_shape(shape: int, quarters: int, side: int) -> int | None:
     return shape_of(s.side, tuple(depth + quarters for depth in s.depths))
 
 
+def solid_count(material: int, shape: int) -> int:
+    """How many quarter-cells of a tile are solid."""
+    return len(solid_quarter_cells(material, shape))
+
+
 def solid_quarter_cells(material: int, shape: int) -> list[tuple[int, int]]:
     """The solid quarter-cells, (row, column), of a tile."""
     if material in PASSABLE:

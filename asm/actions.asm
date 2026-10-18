@@ -228,7 +228,10 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     BEQ ahead
     LDA zp_box_y                \ The line just above the head, if any
     ORA zp_box_y + 1
-    BEQ none
+    BNE room_above
+    SEC
+    RTS
+.room_above
     JSR middle_column
     SEC
     LDA zp_box_y
@@ -263,14 +266,38 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     STA target_x
     JSR feet_row                \ From the feet up to the head
     STA target_y
+    LDA #&FF                    \ None found yet
+    STA best_row
+    LDA #0
+    STA best_left
 .row_loop
     JSR wanted_here
-    BCC found
+    BCS next_row
+    LDA want                    \ Placing: the lowest
+    BNE found
+    LDA target_shape            \ Digging: the one with the most left
+    AND #SHAPE_BITS
+    TAX
+    LDA shape_solid_count,X
+    CMP best_left
+    BCC next_row
+    BEQ next_row
+    STA best_left
+    LDA target_y
+    STA best_row
+.next_row
     JSR head_row
     CMP target_y
-    BEQ none
+    BEQ rows_done
     DEC target_y
     JMP row_loop
+.rows_done
+    LDA best_row
+    CMP #&FF
+    BEQ none
+    STA target_y
+    CLC
+    RTS
 .wanted
     JSR wanted_here
     BCC found
@@ -574,11 +601,12 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     RTS
 }
 
-\ Find the first diggable tile with solid parts in the rectangle rect_left
-\ to rect_right, rect_top to rect_bottom (pixels and lines, right and bottom
-\ exclusive): the lowest row first, and in a row, from the player's side, in
-\ the direction diagonal_dx. Skip tiles in keep_row from keep_first to
-\ keep_last. Return it in target_x/y with carry clear, or carry set if none.
+\ Find the diggable tile with solid parts in the rectangle rect_left to
+\ rect_right, rect_top to rect_bottom (pixels and lines, right and bottom
+\ exclusive) with the most solid left; of equals, the first met scanning the
+\ lowest row first, and in a row, from the player's side, in the direction
+\ diagonal_dx. Skip tiles in keep_row from keep_first to keep_last. Return it
+\ in target_x/y with carry clear, or carry set if none.
 .first_obstruction
 {
     \ Rows: from (bottom - 1) >> 4 up to top >> 4, within the world.
@@ -621,6 +649,8 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 .right_in_world
     JSR column_of
     STA last_column
+    LDA #0                      \ None found yet
+    STA best_left
 .row_loop
     LDA scan_row
     STA target_y
@@ -653,7 +683,16 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LDA zp_hit_bits + 1
     AND shape_mask_high,X
     ORA zp_hit_bits
-    BNE found
+    BEQ next_column
+    LDA shape_solid_count,X     \ In the way: keep it if it has the most left
+    CMP best_left
+    BCC next_column
+    BEQ next_column
+    STA best_left
+    LDA target_x
+    STA best_column
+    LDA target_y
+    STA best_row
 .next_column
     LDA diagonal_dx
     BMI leftwards
@@ -671,14 +710,20 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 .next_row
     LDA scan_row
     CMP first_row
-    BEQ none
+    BEQ rows_done
     DEC scan_row
     JMP row_loop
+.rows_done
+    LDA best_left
+    BEQ none
+    LDA best_column
+    STA target_x
+    LDA best_row
+    STA target_y
+    CLC
+    RTS
 .none
     SEC
-    RTS
-.found
-    CLC
     RTS
 }
 

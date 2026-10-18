@@ -6,8 +6,9 @@ down and nothing happens. Otherwise ACTION (L) digs and PLACE (SPACE)
 places, at a tile chosen by aiming: DOWN (M) aims at the tile holding the
 line just below the feet, UP (K) the line just above the head; otherwise
 the aim is the column holding the pixel just ahead, in the direction faced,
-where digging takes the lowest diggable tile and placing the lowest empty
-one, from the feet up to the head. (A partly dug tile may hold some of the
+where digging takes the diggable tile with the most left (the lowest, of
+equals), so that a wall as high as the player is cut back evenly, and
+placing takes the lowest empty one, from the feet up to the head. (A partly dug tile may hold some of the
 player, in its dug part; it can still be dug. A tile is only placed where
 it would not overlap the player.)
 
@@ -37,7 +38,7 @@ from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, 
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
                              QUARTER_LINES, QUARTER_PIXELS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE, background,
-                             dig_shape, solid_quarter_cells)
+                             dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
 QUARTERS_PER_DIG = {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1}
@@ -57,18 +58,24 @@ class Hands:
     cooldown: int = 0
 
 
-def _ahead(player: Player, wanted) -> tuple[int, int] | None:
-    """The lowest tile in the column ahead, from the feet up to the head,
-    that `wanted` accepts."""
+def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
+    """In the column ahead, from the feet up to the head, the tile `wanted`
+    accepts: with the most solid left, by tile_at most_left_of, if given (the
+    lowest, of equals), otherwise the lowest."""
     px, py = player.px, player.py
     column = (px + PLAYER_WIDTH) // TILE_WIDTH if player.facing > 0 else (px - 1) // TILE_WIDTH
+    best, best_left = None, -1
     for row in range((py + PLAYER_HEIGHT - 1) // TILE_HEIGHT, py // TILE_HEIGHT - 1, -1):
         if wanted(column, row):
-            return column, row
-    return None
+            if most_left_of is None:
+                return column, row
+            left = solid_count(*most_left_of(column, row))
+            if left > best_left:
+                best, best_left = (column, row), left
+    return best
 
 
-def aim(player: Player, inputs: int, wanted) -> tuple[int, int] | None:
+def aim(player: Player, inputs: int, wanted, most_left_of=None) -> tuple[int, int] | None:
     px, py = player.px, player.py
     middle = (px + PLAYER_WIDTH // 2) // TILE_WIDTH
     if inputs & INPUT_DOWN:
@@ -76,17 +83,19 @@ def aim(player: Player, inputs: int, wanted) -> tuple[int, int] | None:
     elif inputs & INPUT_UP:
         target = middle, (py - 1) // TILE_HEIGHT
     else:
-        return _ahead(player, wanted)
+        return _ahead(player, wanted, most_left_of)
     return target if wanted(*target) else None
 
 
 def _first_obstruction(tile_at, left: int, right: int, top: int, bottom: int, dx: int,
                        keep_row: int = -1, keep_columns: range = range(0)) -> tuple[int, int] | None:
-    """The first diggable tile with solid parts within a rectangle (in pixels
-    and lines, right and bottom exclusive): the lowest row first, and in a
-    row, the nearest column to the player first (columns in the direction
-    dx). Tiles in keep_row and keep_columns are skipped."""
+    """The diggable tile with solid parts within a rectangle (in pixels and
+    lines, right and bottom exclusive) with the most solid left; of equals,
+    the first met scanning the lowest row first, and in a row, the nearest
+    column to the player first (columns in the direction dx). Tiles in
+    keep_row and keep_columns are skipped."""
     columns = range(left // TILE_WIDTH, (right - 1) // TILE_WIDTH + 1)
+    best, best_left = None, -1
     for ty in range((bottom - 1) // TILE_HEIGHT, top // TILE_HEIGHT - 1, -1):
         for tx in columns if dx > 0 else reversed(columns):
             if (ty == keep_row and tx in keep_columns) or not _in_world(tx, ty):
@@ -97,8 +106,11 @@ def _first_obstruction(tile_at, left: int, right: int, top: int, bottom: int, dx
             for row, column in solid_quarter_cells(material, shape):
                 x0, y0 = tx * TILE_WIDTH + column * QUARTER_PIXELS, ty * TILE_HEIGHT + row * QUARTER_LINES
                 if x0 < right and x0 + QUARTER_PIXELS > left and y0 < bottom and y0 + QUARTER_LINES > top:
-                    return tx, ty
-    return None
+                    left_here = solid_count(material, shape)
+                    if left_here > best_left:
+                        best, best_left = (tx, ty), left_here
+                    break
+    return best
 
 
 def diagonal(player: Player, dx: int, dy: int, tile_at) -> tuple[tuple[int, int] | None, int | None]:
@@ -178,7 +190,8 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             target, ramp = diagonal(player, dx, dy, world.tile_at)
             side = FROM_LEFT if dx > 0 else FROM_RIGHT
         else:
-            target = aim(player, inputs, lambda x, y: in_world(x, y) and diggable(world.tile_at(x, y)))
+            target = aim(player, inputs, lambda x, y: in_world(x, y) and diggable(world.tile_at(x, y)),
+                         most_left_of=world.tile_at)
             ramp, side = None, dig_direction(player, inputs)
         if target is not None:
             material, shape = world.tile_at(*target)

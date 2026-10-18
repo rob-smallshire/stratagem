@@ -29,9 +29,10 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   from `&F4`; plain IRQs do not touch ROMSEL. **V**
 - A BRK (error) raised in ANDY code pages in the language ROM without bit 7
   and loses ANDY. Never raise errors from ANDY code. **V**
-- Beebium applies the PC rule using the live PC, which for an operand or
-  data access is already the next instruction's address. Real hardware
-  probably uses the opcode address. **U** So no instruction that touches
+- The hardware (B+ Service Manual, PAL IC36) latches the VDU-driver flag at
+  each opcode fetch, so the opcode's address decides, for the whole
+  instruction. Beebium used the live PC until #185 (fixed after 1.x
+  releases; check the version in use). **V** So no instruction that touches
   `&3000`-`&7FFF` may straddle `&9FFF`/`&A000`, `&AFFF`/`&B000` or
   `&DFFF`/`&E000`; keep the ANDY plotter a few bytes clear of each end. **V**
 - Shadow RAM and ANDY are ordinary 2 MHz accesses in Beebium (no clock

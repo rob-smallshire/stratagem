@@ -136,6 +136,8 @@ def shapes_source() -> str:
     lines += _bytes_lines([actions.QUARTERS_PER_DIG.get(m, 0) for m in materials])
     # Solid quarter-cells of each shape, bit row * 4 + column.
     lines += _words("shape_mask", [tiles.SHAPES[s].mask if s < tiles.SHAPE_COUNT else 0 for s in shapes])
+    lines.append(".shape_solid_count")    # quarter-cells solid in each shape
+    lines += _bytes_lines([bin(tiles.SHAPES[s].mask).count("1") if s < tiles.SHAPE_COUNT else 0 for s in shapes])
     # What a dig of 1 or 2 quarters leaves of each shape, eroding from its
     # own side (&FF: nothing); a whole tile is eroded from the dig's side,
     # given by the whole_dig tables. A dig of 4 quarters leaves nothing.

@@ -65,3 +65,6 @@ A running log of design decisions. Add to it whenever one is made.
   ahead aren't climbed, so a diagonal dig cuts down into a rising slope
   instead of walking up it. Digging straight ahead into a slope still walks
   up it: digging down a little first, to make a pit, is part of the game.
+- **Even digging:** when several tiles need digging (a wall as high as the
+  player, or the path of a diagonal step), dig the one with the most solid
+  left (the lowest, of equals), so they are cut back together.
