@@ -106,3 +106,24 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   allocate or free call. **V**
 - Write protection is by hardware switches on the V1 board; without the
   (discontinued) switch assembly the RAM is writable. **D**
+
+## Tube (second processor)
+
+- Beebium attaches a parasite with the server option `--tube-65c02` (3 MHz,
+  client ROM 1.10, about 2.9 MHz in effect) or `--tube-65c102` (4 MHz,
+  client 1.20), added to a preset's extensions. Tests reach it with
+  `bbc.connect_coprocessor()`; its debugger has `run_to`, `measure` and
+  breakpoints, but the parasite advances only while the host runs.
+  `bbc.tube.status` fills in only `enabled` (#205). **V**
+- The host side of the Tube comes from DFS 2.26 on both targets. **V**
+- B+128K: the Tube is on at boot (`Acorn TUBE 6502 64K`). **V**
+- Integra-B: IBOS keeps TUBE/NOTUBE in bit 0 of user register `&0F`, and
+  its default (`&2D`) leaves the Tube off, so the host runs BASIC. In
+  Beebium 0.11.0, `*CONFIGURE TUBE` then Ctrl-Break did not turn it on;
+  `*TUBE ON` did (#203). **V** (in Beebium)
+- Display: the B+ video reads main or shadow RAM according to `&FE34`
+  bit 7, at every character fetch, so the displayed screen can be swapped
+  between them. The Integra-B video always reads main RAM, so there it
+  cannot. CRTC R12/R13 take effect from the next frame. **V** (Beebium
+  source)
+- Sources: `docs/reference/tube/` and beebium-stratagem (2026-10-19).
