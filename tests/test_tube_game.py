@@ -1,0 +1,103 @@
+"""The Tube game (docs/tube-game.md): every frame, the host shows exactly
+what the models say it should, given the tiles it holds: each cell lit by
+the brighter of its tile's daylight and the parasite's smooth miner's light
+(lighting.smooth_miner_light, soft shadows), and the player's sprite."""
+
+import pytest
+
+from conftest import RUN_TIMEOUT_EMULATED_SECONDS
+from stratagem import camera, lighting, player, sprites
+from stratagem.player import Player
+from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
+from stratagem.tiles import tile_bytes
+
+TILE_CACHE_SIZE = 32       # asm/layout.asm
+FRAMES = sprites.sprite_frames()
+# Each digs deep first: near the surface, daylight outshines the miner's light.
+DIG_DEEP = [(300, ["M", "L"])]
+SCRIPTS = {
+    "tunnel-right-and-down": DIG_DEEP + [(80, ["X", "L"]), (60, ["X", "M", "L"]), (30, ["Z"]), (20, ["K"]),
+                                         (20, [])],
+    "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
+}
+
+
+def word(peek, address: int) -> int:
+    return peek[address] | peek[address + 1] << 8
+
+
+def _signed(byte: int) -> int:
+    return byte - 256 if byte & 0x80 else byte
+
+
+def host_tiles(bbc, labels):
+    """The tiles the host holds, by world position (wrapping)."""
+    size = TILE_CACHE_SIZE ** 2
+    peek = bbc.memory.address.peek
+    materials = peek[labels["tile_cache"]:labels["tile_cache"] + size]
+    shapes = peek[labels["tile_cache_shapes"]:labels["tile_cache_shapes"] + size]
+    lights = peek[labels["tile_cache_light"]:labels["tile_cache_light"] + size]
+
+    def at(x, y):
+        index = (y % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + x % TILE_CACHE_SIZE
+        return (materials[index], shapes[index]), lights[index] // lighting.LIGHT_SCALE
+    return at
+
+
+def expected_screen(bbc, labels):
+    peek = bbc.memory.address.peek
+    camera_x, camera_y = word(peek, labels["zp_camera_x"]), word(peek, labels["zp_camera_y"])
+    hero = Player(x=word(peek, labels["zp_player_x"]), y=word(peek, labels["zp_player_y"]))
+    screen_start = word(peek, labels["zp_screen_start"])
+    plan_dx = _signed(peek[labels["zp_plan_dx"]]) if not peek[labels["host_flags"]] else 0
+    tiles = host_tiles(bbc, labels)
+    left, right = camera_x >> 2, (camera_x + camera.VIEW_COLUMNS - 1) >> 2
+    top, bottom = camera_y >> 1, (camera_y + camera.VIEW_ROWS - 1) >> 1
+    miner = lighting.smooth_miner_light(lambda x, y: lighting.transparent(tiles(x, y)[0]), hero.px, hero.py,
+                                        lambda x, y: left <= x <= right and top <= y <= bottom, soft=True)
+    new_columns = (set(range(camera.VIEW_COLUMNS - plan_dx, camera.VIEW_COLUMNS)) if plan_dx > 0
+                   else set(range(0, -plan_dx)))
+
+    def level(u, v):
+        day = tiles(u // 4, v // 2)[1]
+        if u - camera_x in new_columns:         # drawn after the light's list, as daylight
+            return day
+        return max(day, miner.get((u, v), 0))
+
+    def mask_at(u, v, line):
+        return lighting.mask_byte(level(u, v), u % 2, line)
+
+    image = render_view(screen_start, camera_x, camera_y, lambda x, y: tiles(x, y)[0], tile_bytes, mask_at)
+    frame = FRAMES[peek[labels["zp_player_frame"]]]
+    column = (hero.px >> 1) - camera_x
+    line = hero.py - camera_y * 8
+    for l in range(player.PLAYER_HEIGHT):
+        for c in range(sprites.SPRITE_COLUMNS):
+            address = wrap(screen_start + ((line + l) >> 3) * 512 + (column + c) * CELL_BYTES) + ((line + l) & 7)
+            i = l * sprites.SPRITE_COLUMNS + c
+            image[address] = image[address] & frame[i] | frame[sprites.SPRITE_BYTES + i]
+    return image
+
+
+@pytest.mark.parametrize("script", SCRIPTS.values(), ids=SCRIPTS.keys())
+def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script):
+    bbc = tube_bbc
+    labels = game_build.labels["HOST"]
+    peek = bbc.memory.address.peek
+    bbc.disc.set_spin_up_delay(False)
+    bbc.boot_disc(str(game_build.tube_disc_filepath))
+    started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
+    assert started, "the game did not start"
+    frames = 0
+    for count, keys in script:
+        for key in keys:
+            bbc.keyboard.key_down(key)
+        for _ in range(count):
+            bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
+            expected = expected_screen(bbc, labels)
+            actual = bbc.memory.region(tube_machine.screen_region).peek[SCREEN_START:SCREEN_END]
+            differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
+            assert differences[:8] == [], f"frame {frames}: {len(differences)} screen bytes differ"
+            frames += 1
+        for key in keys:
+            bbc.keyboard.key_up(key)

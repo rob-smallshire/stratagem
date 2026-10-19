@@ -106,8 +106,13 @@ RUN_TIMEOUT_EMULATED_SECONDS = 20.0
 
 
 @pytest.fixture(params=MACHINES, ids=[m.name for m in MACHINES])
-def tube_bbc(request):
-    machine = request.param
+def tube_machine(request) -> Machine:
+    return request.param
+
+
+@pytest.fixture
+def tube_bbc(tube_machine):
+    machine = tube_machine
     with contextlib.ExitStack() as stack:
         try:
             bbc = stack.enter_context(Beebium.launch(variant=machine.variant, preset=machine.preset,

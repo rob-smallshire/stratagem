@@ -13,8 +13,9 @@
 \ level, through the cell's graphic) goes on the draw list, with its screen
 \ address, if it is in the view and not in a column drawn after the list.
 \
-\ Tiles outside the tile cache count as opaque: the cache holds the view's
-\ tiles, and light from beyond the view isn't seen.
+\ Tiles outside the tile cache are unlit and opaque (as miner_light's
+\ `inside`): the cache holds the view's tiles, and beyond the view light
+\ isn't seen.
 
 PLANE_COLUMNS = 64              \ Blocks, wrapping: 32 tiles
 PLANE_ROWS = 64                 \ Cell rows, wrapping: 32 tiles
@@ -759,7 +760,8 @@ NEXT
 
 \ The tile flood around the miner's tile, as lighting.miner_light, then each
 \ tile's excess, then each block's soft excess in the grid. First each window
-\ tile's clear flag: passable or partly dug, and in the tile cache.
+\ tile's clear flag (passable or partly dug), and whether it is outside the
+\ tile cache.
 .sl_flood
 {
     LDX #0                      \ The window, row by row: X its index
@@ -778,7 +780,10 @@ NEXT
     LDA #MINER_SPAN
     STA sl_count
 .column
-    LDA #0                      \ Outside the cache: opaque
+    LDY miner_index,X           \ Outside the cache: unlit, and opaque
+    LDA #&FF
+    STA sl_pool_outside,Y
+    LDA #0
     LDY sl_ty
     CPY cached_top
     BCC clear_set
@@ -793,6 +798,10 @@ NEXT
     BEQ across_inside
     BCS clear_set
 .across_inside
+    LDY miner_index,X
+    LDA #0
+    STA sl_pool_outside,Y
+    LDY sl_tx
     TYA
     AND #TILE_CACHE_SIZE - 1
     TAY
@@ -824,6 +833,8 @@ NEXT
 .entry                          \ nearer the miner (miner_light)
     LDA #0
     STA sl_best
+    LDA sl_pool_outside,X
+    BNE store
     LDA sl_pool_clear,X
     BNE open
     JMP wall

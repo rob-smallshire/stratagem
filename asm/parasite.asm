@@ -87,6 +87,7 @@ ALIGN &100
 .para_tmp           EQUW 0
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW
+.sl_pool_outside    SKIP MINER_WINDOW     \ Non-zero outside the tile cache
 .sl_tile_excess     SKIP GRID_SPAN * GRID_SPAN  \ Row-major, with the border
 .sl_corner          SKIP GRID_SPAN * GRID_SPAN  \ At each tile's top left
 .pgame_end
