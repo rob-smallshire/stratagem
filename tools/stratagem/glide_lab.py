@@ -4,9 +4,9 @@
 
 Walks the miner through the lighting lab's mine scene, under the real
 player physics, and draws each frame lit by daylight (no torches), plus the
-miner's light either a tile at a time (`lighting.miner_light`, as the game
-does now) or a cell at a time from the miner's exact position
-(`lighting.smooth_miner_light`). Writes a strip of frames and an animation
+miner's light a tile at a time (`lighting.miner_light`, as the game does
+now), or a block (two cells) at a time from the miner's exact position
+(`lighting.smooth_miner_light`), with hard or soft shadows. Writes a strip of frames and an animation
 of each, and prints how many cells' light changes each frame: what the host
 would have to redraw.
 """
@@ -118,7 +118,8 @@ def main() -> None:
     heroes = walk(scene)
     for name, light_for in [
         ("tile", lambda hero: tile_cells(lighting.miner_light(clear_at, *lighting.miner_tile(hero.px, hero.py)))),
-        ("cell", lambda hero: lighting.smooth_miner_light(clear_at, hero.px, hero.py)),
+        ("block", lambda hero: lighting.smooth_miner_light(clear_at, hero.px, hero.py)),
+        ("soft", lambda hero: lighting.smooth_miner_light(clear_at, hero.px, hero.py, soft=True)),
     ]:
         rows, columns = base.shape[0] * lighting.TILE_CELLS_DOWN, base.shape[1] * lighting.TILE_CELLS_ACROSS
         blank = ~(pixels != 0).reshape(rows, lighting.CELL_LINES, columns, lighting.CELL_PIXELS).any(axis=(1, 3))

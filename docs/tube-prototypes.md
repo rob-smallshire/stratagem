@@ -61,26 +61,46 @@ per Bayer threshold that falls on a coloured pixel, and a change shows only
 if a marked threshold lies between the old and new mask classes (checked
 against real pixel differences for every kind, cell and pair of levels).
 So smooth light asks the host to redraw about 27 cells a frame, at most 92:
-fewer than the tile-at-a-time light's bursts of 164.
+fewer than the tile-at-a-time light's bursts of 164. (These counts are for
+the first model, whose walls' faces copied the open ground beside them; with
+faces lit at their own distance, it is 21 a frame.)
 
 `asm/smooth_light.asm` (`SMOOTH`) is the parasite pass, checked against the
-model cell for cell and queue for queue by `tests/test_smooth_light.py`,
-which times it in py65's 65C02 (run with `-s`). It keeps a plane of cell
-levels (8K) and reads a 16K radial table, a tile map standing in for the
-parasite's world, and per-kind visibility pages. A pass covers only the
-tiles within reach of the miner's centre now or at the last pass.
+model block for block and queue for queue by `tests/test_smooth_light.py`,
+which times it in py65's 65C02 (run with `-s`). It reads a 16K radial table,
+a tile map standing in for the parasite's world, per-kind visibility pages
+and a grid of each block's excess (filled by the flood); it keeps a plane of
+block levels (4K).
+
+Light per cell first cost 55,000 cycles a pass while walking. Light per block
+of two cells (4 pixels by 8 lines: square, and as wide as the Bayer pattern)
+halves the work and looks the same (`glide-block.gif`); what the host
+redraws is unchanged (19.9 cells a frame against 21.1). A pass now covers
+only the tiles within reach of the miner now or at the last pass, does
+nothing if nothing has changed, and sets up each row with a few bytes.
 
 65C02 cycles a pass (a 3 MHz frame is 60,000; 4 MHz, 80,000):
 
-| | mean | max |
+| | per cell | per block |
 |---|---|---|
-| Walking the mine scene | 34,311 | 76,464 |
-| Random ground, walking and falling speeds | 37,500-43,700 | 67,000-87,000 |
-| First pass (the whole pool from nothing) | 66,700-87,500 | |
+| Walking the mine scene, mean | 34,311 | 24,648 |
+| Walking, max | 76,464 | 69,884 |
+| Random ground (walking and falling speeds), mean | 37,500-43,700 | 29,300-36,300 |
+| First pass (clears the grid; lights the pool from nothing) | 66,700-87,500 | 91,800-112,700 |
 
-About 40% of a pass is the cells themselves (16 cycles each, unrolled
-four to a tile), a third handling changed cells, and the rest rows and the
-flood (only when the miner changes tile or tiles change).
+Per block, while walking: the blocks themselves 7,700 (107 tiles, 2
+blocks each, 17 cycles a block); changed blocks 8,200 (about 55 a pass,
+each cell's visibility tested); the flood 4,000 on average, but about 25,000
+when the miner enters a tile, which sets the maximum; rows 4,700.
+
+### Soft shadows
+
+`smooth_miner_light(..., soft=True)` gives each block the excess
+interpolated between the centres of the four tiles around it, a tile the
+pool doesn't reach counting as MINER_LEVEL: shadows fade over a tile, as
+the pool does, instead of stopping at tile edges. The host redraws about
+the same (19.7 cells a frame). On the parasite only the flood's filling of
+the grid would change. Compare `glide-soft.gif` with `glide-block.gif`.
 
 ## 3. Host drawing from the Tube
 

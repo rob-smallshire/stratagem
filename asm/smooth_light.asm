@@ -2,12 +2,14 @@
 \ lighting.smooth_miner_light; timed by tests/test_smooth_light.py in a
 \ 65C02 emulation).
 \
-\ Light is a level per character cell, from the middle of the miner's box:
-\ a radial table gives the level on open ground, and each tile's cells lose
-\ the excess cost of the path the tile flood (as lighting.asm) found. A
-\ plane holds each cell's level; a pass updates the cells around the miner
-\ now and at the last pass, and queues each cell whose change shows (a
-\ coloured pixel's threshold lies between the old and new mask classes).
+\ Light is a level per block of two character cells (4 pixels by 8 lines),
+\ from the middle of the miner's box: a radial table gives the level on open
+\ ground, and each block loses its excess, from a grid filled by the tile
+\ flood (as lighting.asm's). A plane holds each block's level; a pass updates
+\ the blocks within reach of the miner now or at the last pass, and queues
+\ each cell whose change shows (a coloured pixel's threshold lies between
+\ the old and new mask classes). A pass does nothing if neither the miner
+\ nor the tiles have changed.
 \
 \ The parasite holds the world, so here a 32 x 32 tile map (wrapping) stands
 \ in for it, holding a kind per tile; kind_clear and kind_visibility say
@@ -17,15 +19,21 @@
 INCLUDE "build/generated/light.asm"
 INCLUDE "build/generated/player.asm"
 
-PLANE_COLUMNS = 128             \ cells, wrapping: 32 tiles
-PLANE_ROWS = 64
-MAP_SIZE = 32                   \ tiles, wrapping
-RADIAL_CENTRE = 64              \ the radial table's column for dx = 0
-FAR = &FF                       \ excess for a tile beyond the pool: dark
+PLANE_COLUMNS = 64              \ Blocks, wrapping: 32 tiles
+PLANE_ROWS = 64                 \ Cell rows, wrapping: 32 tiles
+MAP_SIZE = 32                   \ Tiles, wrapping
+RADIAL_CENTRE = 64              \ The radial table's column for dx = 0
+FAR = &FF                       \ The excess of a block beyond the pool: dark
 QUEUE_SIZE = 255
 GRID_RADIUS = MINER_RADIUS + 1  \ The pool's tiles, and a dark border
 GRID_SPAN = 2 * GRID_RADIUS + 1
 CELL_LINES = 8
+BLOCK_PIXELS = 4
+\ The grid: a page per tile row (oy + GRID_RADIUS), its cell rows
+\ GRID_ROW_BYTES apart; a block's excess at column 8 (ox + GRID_RADIUS) +
+\ 4 b, so that its offset from a block's radial column is fixed in a pass.
+GRID_ROW_BYTES = 128
+GRID_COLUMN = 8 * GRID_RADIUS - (BLOCK_PIXELS DIV 2 + RADIAL_CENTRE)
 
 ORG &70
 .sl_px              SKIP 2      \ In: the player's box, left pixel
@@ -53,12 +61,14 @@ ORG &70
 .sl_ty              SKIP 1
 .sl_j               SKIP 1      \ The cell row within the tile row
 .sl_v               SKIP 1      \ The cell row (low byte)
-.sl_oy              SKIP 1      \ The tile row's offset from the miner, + MINER_RADIUS
-.sl_ex              SKIP 1      \ The tile's excess
+.sl_oy              SKIP 1      \ The tile row's offset from the miner (signed)
+.sl_grid_offset     SKIP 2      \ From a grid row to the first block's excess, less Y
 .sl_plane_ptr       SKIP 2
 .sl_map_ptr         SKIP 2
 .sl_ptr             SKIP 2
+.sl_ptr2            SKIP 2
 .sl_diff            SKIP 1
+.sl_pair            SKIP 1      \ old * 16 + new
 .sl_c               SKIP 1
 .sl_save_x          SKIP 1
 .sl_save_y          SKIP 1
@@ -66,7 +76,7 @@ ORG &70
 .sl_index           SKIP 1      \ Flood: the window entry
 .sl_best            SKIP 1
 .sl_clear_here      SKIP 1
-.sl_tiles           SKIP 1      \ Tiles across the tiles to cover
+.sl_tiles           SKIP 1      \ Tiles across, in a tile row
 .sl_count           SKIP 1
 .sl_vis_row         SKIP 1
 .sl_vis_ptr         SKIP 2      \ Low byte always 0
@@ -92,7 +102,36 @@ ORG &1000
     LDA sl_py + 1
     ADC #0
     STA sl_my + 1
-    LDA sl_mx                   \ Its tile
+
+    LDA sl_valid                \ Nothing to do if nothing has changed
+    BEQ first
+    LDA sl_dirty
+    BNE changed
+    LDA sl_mx
+    CMP sl_pmx
+    BNE changed
+    LDA sl_mx + 1
+    CMP sl_pmx + 1
+    BNE changed
+    LDA sl_my
+    CMP sl_pmy
+    BNE changed
+    LDA sl_my + 1
+    CMP sl_pmy + 1
+    BNE changed
+    RTS
+.first
+    JSR sl_clear_grid
+    LDA sl_mx                   \ As if the miner had been here already
+    STA sl_pmx
+    LDA sl_mx + 1
+    STA sl_pmx + 1
+    LDA sl_my
+    STA sl_pmy
+    LDA sl_my + 1
+    STA sl_pmy + 1
+.changed
+    LDA sl_mx                   \ The miner's tile
     STA sl_tmp
     LDA sl_mx + 1
     LSR A
@@ -117,42 +156,25 @@ ORG &1000
     LDA sl_tmp
     STA sl_cy
 
-    LDA sl_valid                \ The tiles to cover: around the miner now,
-    BEQ alone                   \ and at the last pass
+    LDA sl_valid                \ The flood, if the miner has changed tile
+    BEQ flood                   \ or the tiles have changed
+    LDA sl_dirty
+    BNE flood
     LDA sl_cx
     CMP sl_pcx
     BNE flood
     LDA sl_cy
     CMP sl_pcy
-    BNE flood
-    LDA sl_dirty
-    BEQ bounds
+    BEQ flooded
 .flood
     JSR sl_flood
-    JMP bounds
-.alone
-    JSR sl_flood
-    LDA sl_cx
-    STA sl_pcx
-    LDA sl_cy
-    STA sl_pcy
-.bounds
+.flooded
     LDA #0
     STA sl_dirty
     STA sl_vis_ptr
-    LDA sl_valid                \ The centre at the last pass, or now
-    BNE relative
-    LDA sl_mx
-    STA sl_pmx
-    LDA sl_mx + 1
-    STA sl_pmx + 1
-    LDA sl_my
-    STA sl_pmy
-    LDA sl_my + 1
-    STA sl_pmy + 1
-.relative
-    LDA sl_mx                   \ Both, relative to the miner's tile (signed)
-    AND #7
+
+    LDA sl_mx                   \ The centres now and at the last pass,
+    AND #7                      \ relative to the miner's tile (signed)
     STA sl_mxr
     LDA sl_pmx
     SEC
@@ -182,6 +204,22 @@ ORG &1000
     TXA
     EOR #&80
     STA sl_hi_y
+
+    LDA sl_myr                  \ |dy|'s parity is my's, for every row: so
+    LSR A                       \ the radial table's low byte is fixed
+    LDA #0
+    ROR A
+    STA sl_radial0 + 1
+    ORA #BLOCK_PIXELS
+    STA sl_radial1 + 1
+    LDA sl_mxr                  \ The grid column of a block is its radial
+    CLC                         \ column plus this
+    ADC #LO(GRID_COLUMN)
+    STA sl_grid_offset
+    LDA #0
+    ADC #HI(GRID_COLUMN)
+    STA sl_grid_offset + 1
+
     JSR sl_rows
     LDA #&FF
     STA sl_valid
@@ -197,6 +235,26 @@ ORG &1000
     STA sl_pmy
     LDA sl_my + 1
     STA sl_pmy + 1
+    RTS
+}
+
+\ Fill the grid with FAR: the border, beyond the pool, is never written.
+.sl_clear_grid
+{
+    LDA #HI(sl_grid)
+    STA sl_ptr + 1
+    LDA #0
+    STA sl_ptr
+    LDX #GRID_SPAN
+    LDA #FAR
+    LDY #0
+.loop
+    STA (sl_ptr),Y
+    INY
+    BNE loop
+    INC sl_ptr + 1
+    DEX
+    BNE loop
     RTS
 }
 
@@ -220,7 +278,7 @@ ORG &1000
 }
 
 \ Each tile row within reach of the miner's centre now or at the last pass
-\ (beyond, cells are dark and were dark), and each tile across within reach.
+\ (beyond, blocks are dark and were dark), and each tile across within reach.
 .sl_rows
 {
     LDA #&100 - GRID_RADIUS     \ The row's offset from the miner's tile
@@ -232,7 +290,7 @@ ORG &1000
     ASL A
     ASL A
     CLC
-    ADC #4
+    ADC #CELL_LINES DIV 2
     EOR #&80                    \ Biased
     STA sl_tmp
     CLC                         \ The distance down to the nearer centre
@@ -323,100 +381,75 @@ ORG &1000
     RTS
 }
 
-\ One cell row, v = 2 * sl_ty + sl_j, across the tiles to cover.
+\ One cell row, v = 2 * sl_ty + sl_j, across the tiles within reach.
 .sl_row
 {
     LDA sl_ty                   \ v
     ASL A
     ORA sl_j
     STA sl_v
-    LDA sl_ty                   \ dy = 16 ty + 8 j + 4 - my, then |dy|
-    STA sl_tmp
-    LDA #0
-    STA sl_tmp + 1
-    ASL sl_tmp
-    ROL sl_tmp + 1
-    ASL sl_tmp
-    ROL sl_tmp + 1
-    ASL sl_tmp
-    ROL sl_tmp + 1
-    ASL sl_tmp
-    ROL sl_tmp + 1
-    LDA sl_j
+    LDA sl_oy                   \ dy = 16 oy + 8 j + 4 - myr, then |dy|
     ASL A
     ASL A
     ASL A
-    ORA #4
-    ORA sl_tmp
+    ASL A
+    ORA #CELL_LINES DIV 2
+    LDX sl_j
+    BEQ upper
+    ORA #CELL_LINES
+.upper
     SEC
-    SBC sl_my
-    TAX
-    LDA sl_tmp + 1
-    SBC sl_my + 1
+    SBC sl_myr
     BPL positive
-    TXA
     EOR #&FF
     CLC
     ADC #1
-    TAX
 .positive
-    TXA                         \ The radial row: |dy| * RADIAL_COLUMNS
-    LSR A
+    LSR A                       \ The radial row (its low byte is fixed)
     CLC
     ADC #HI(sl_radial)
     STA sl_radial0 + 2
     STA sl_radial1 + 2
-    STA sl_radial2 + 2
-    STA sl_radial3 + 2
-    TXA
-    AND #1
+
+    LDA sl_oy                   \ The grid row: page oy + GRID_RADIUS, then
+    CLC                         \ the cell row's half
+    ADC #HI(sl_grid) + GRID_RADIUS
+    TAX
+    LDA sl_j
     LSR A
     ROR A
-    STA sl_radial0 + 1
-    ORA #2
-    STA sl_radial1 + 1
-    EOR #2 OR 4
-    STA sl_radial2 + 1
-    ORA #2
-    STA sl_radial3 + 1
+    CLC
+    ADC sl_grid_offset
+    STA sl_excess0 + 1
+    TXA
+    ADC sl_grid_offset + 1
+    STA sl_excess0 + 2
+    LDA sl_excess0 + 1
+    CLC
+    ADC #BLOCK_PIXELS
+    STA sl_excess1 + 1
+    LDA sl_excess0 + 2
+    ADC #0
+    STA sl_excess1 + 2
 
     LDA sl_v                    \ The plane row: (v MOD PLANE_ROWS) * PLANE_COLUMNS
     AND #PLANE_ROWS - 1
+    LSR A
     LSR A
     CLC
     ADC #HI(sl_plane)
     STA sl_plane0 + 2
     STA sl_plane1 + 2
-    STA sl_plane2 + 2
-    STA sl_plane3 + 2
-    STA sl_old0 + 2
-    STA sl_old1 + 2
-    STA sl_old2 + 2
-    STA sl_old3 + 2
-    STA sl_new0 + 2
-    STA sl_new1 + 2
-    STA sl_new2 + 2
-    STA sl_new3 + 2
     STA sl_plane_ptr + 1
-    LDA sl_j
+    LDA sl_v
+    AND #3
     LSR A
     ROR A
+    ROR A
     STA sl_plane0 + 1
-    STA sl_old0 + 1
-    STA sl_new0 + 1
     STA sl_plane_ptr
     ORA #1
     STA sl_plane1 + 1
-    STA sl_old1 + 1
-    STA sl_new1 + 1
-    EOR #1 OR 2
-    STA sl_plane2 + 1
-    STA sl_old2 + 1
-    STA sl_new2 + 1
-    ORA #1
-    STA sl_plane3 + 1
-    STA sl_old3 + 1
-    STA sl_new3 + 1
 
     LDA sl_j                    \ The visibility pages for this cell row
     ASL A
@@ -424,46 +457,31 @@ ORG &1000
     CLC
     ADC #HI(sl_kind_visibility)
     STA sl_vis_row
-    LDA sl_oy                   \ The first tile's excess, in the grid
-    CLC
-    ADC #GRID_RADIUS
-    TAX
-    LDA sl_times_grid,X
-    CLC
-    ADC #LO(sl_grid) + GRID_RADIUS
-    CLC
-    ADC sl_tlo
-    STA sl_excess_load + 1
     LDA sl_tiles
     STA sl_count
 
-    LDA sl_cx                   \ Its plane column
+    LDA sl_cx                   \ The first tile's plane column
     CLC
     ADC sl_tlo
     ASL A
-    ASL A
     AND #PLANE_COLUMNS - 1
     TAX
-    LDA sl_tlo                  \ And its radial column:
-    ASL A                       \ 8 tlo + 1 - mxr + RADIAL_CENTRE
+    LDA sl_tlo                  \ And its first block's radial column:
+    ASL A                       \ 8 tlo + 2 - mxr + RADIAL_CENTRE
     ASL A
     ASL A
-    SEC
-    ADC #RADIAL_CENTRE          \ With the carry: + 1
+    CLC
+    ADC #BLOCK_PIXELS DIV 2 + RADIAL_CENTRE
     SEC
     SBC sl_mxr
     TAY
-
-.tile
-.*sl_excess_load
-    LDA sl_grid
-    STA sl_ex
-    INC sl_excess_load + 1
     SEC
 
+.tile
 .*sl_radial0
     LDA sl_radial,Y
-    SBC sl_ex
+.*sl_excess0
+    SBC sl_grid,Y
     BCS lit0
     LDA #0
     SEC
@@ -473,8 +491,9 @@ ORG &1000
     BNE changed0
 .back0
 .*sl_radial1
-    LDA sl_radial + 2,Y
-    SBC sl_ex
+    LDA sl_radial + BLOCK_PIXELS,Y
+.*sl_excess1
+    SBC sl_grid + BLOCK_PIXELS,Y
     BCS lit1
     LDA #0
     SEC
@@ -483,128 +502,75 @@ ORG &1000
     EOR sl_plane + 1,X
     BNE changed1
 .back1
-.*sl_radial2
-    LDA sl_radial + 4,Y
-    SBC sl_ex
-    BCS lit2
-    LDA #0
-    SEC
-.lit2
-.*sl_plane2
-    EOR sl_plane + 2,X
-    BNE changed2
-.back2
-.*sl_radial3
-    LDA sl_radial + 6,Y
-    SBC sl_ex
-    BCS lit3
-    LDA #0
-    SEC
-.lit3
-.*sl_plane3
-    EOR sl_plane + 3,X
-    BNE changed3
-.back3
 
     TYA                         \ The next tile
     ADC #8 - 1                  \ Carry set
     TAY
     TXA
-    ADC #4                      \ Carry clear
+    ADC #2                      \ Carry clear
     AND #PLANE_COLUMNS - 1
     TAX
+    SEC
     DEC sl_count
     BNE tile
     RTS
 
 .changed0
     STY sl_save_y
-    STA sl_diff
-.*sl_old0
-    LDA sl_plane + 0,X
-    TAY
-    EOR sl_diff
-.*sl_new0
-    STA sl_plane + 0,X
-    ORA sl_times16,Y            \ old * 16 + new
-    TAY
-    LDA smooth_between_even,Y
-    BEQ quiet0
     LDY #0
-    JSR sl_visible
-.quiet0
+    JSR sl_block_change
     LDY sl_save_y
     SEC
     JMP back0
 .changed1
     STY sl_save_y
-    STA sl_diff
-.*sl_old1
-    LDA sl_plane + 1,X
-    TAY
-    EOR sl_diff
-.*sl_new1
-    STA sl_plane + 1,X
-    ORA sl_times16,Y            \ old * 16 + new
-    TAY
-    LDA smooth_between_odd,Y
-    BEQ quiet1
     LDY #1
-    JSR sl_visible
-.quiet1
+    JSR sl_block_change
     LDY sl_save_y
     SEC
     JMP back1
-.changed2
-    STY sl_save_y
-    STA sl_diff
-.*sl_old2
-    LDA sl_plane + 2,X
-    TAY
-    EOR sl_diff
-.*sl_new2
-    STA sl_plane + 2,X
-    ORA sl_times16,Y            \ old * 16 + new
-    TAY
-    LDA smooth_between_even,Y
-    BEQ quiet2
-    LDY #2
-    JSR sl_visible
-.quiet2
-    LDY sl_save_y
-    SEC
-    JMP back2
-.changed3
-    STY sl_save_y
-    STA sl_diff
-.*sl_old3
-    LDA sl_plane + 3,X
-    TAY
-    EOR sl_diff
-.*sl_new3
-    STA sl_plane + 3,X
-    ORA sl_times16,Y            \ old * 16 + new
-    TAY
-    LDA smooth_between_odd,Y
-    BEQ quiet3
-    LDY #3
-    JSR sl_visible
-.quiet3
-    LDY sl_save_y
-    SEC
-    JMP back3
 }
 
-\ Cell Y of the tile whose plane column is X has a new level, whose change
-\ moves the mask past the thresholds in A: queue the cell if any of them
-\ falls on colour. Preserves X.
+\ Block Y of the tile whose first block is in plane column X has a new
+\ level: its old level EOR A. Record it, and test each of its cells.
+\ Preserves X.
+.sl_block_change
+{
+    STA sl_diff
+    TXA
+    STY sl_c
+    ORA sl_c
+    TAY
+    LDA (sl_plane_ptr),Y        \ old
+    STA sl_tmp
+    EOR sl_diff
+    STA (sl_plane_ptr),Y        \ new
+    LDY sl_tmp
+    ORA sl_times16,Y            \ old * 16 + new
+    STA sl_pair
+    ASL sl_c                    \ The block's first cell
+    TAY
+    LDA smooth_between_even,Y
+    BEQ second
+    JSR sl_visible
+.second
+    INC sl_c
+    LDY sl_pair
+    LDA smooth_between_odd,Y
+    BEQ done
+    JMP sl_visible
+.done
+    RTS
+}
+
+\ Cell sl_c of the tile whose first block is in plane column X has a new
+\ level, whose change moves its mask past the thresholds in A: queue the
+\ cell if any of them falls on colour. Preserves X.
 .sl_visible
 {
     STA sl_tmp
-    STY sl_c
     STX sl_save_x
     TXA                         \ The tile's kind, from the map
-    LSR A
     LSR A
     TAY
     LDA (sl_map_ptr),Y
@@ -619,9 +585,13 @@ ORG &1000
     LDX sl_queue_count
     CPX #QUEUE_SIZE
     BEQ done
-    LDA sl_save_x
+    LDA sl_save_x               \ u: 4 tx + c
+    ASL A
     ORA sl_c
     STA sl_queue_u,X
+    LDA sl_c                    \ The block's level
+    LSR A
+    ORA sl_save_x
     TAY
     LDA (sl_plane_ptr),Y
     STA sl_queue_level,X
@@ -640,7 +610,8 @@ NEXT
 
 \ The tile flood around the miner's tile, as lighting.asm's compute_pool but
 \ from the map, then each tile's excess: the open-ground level less the
-\ pool's (at least 0), or FAR where the pool doesn't reach.
+\ pool's (at least 0), or FAR where the pool doesn't reach; and each block's,
+\ in the grid (hard shadows: a tile's blocks alike).
 .sl_flood
 {
     LDX #0
@@ -740,35 +711,37 @@ NEXT
     DEX
     BPL excess
 
-    LDA #FAR                    \ The grid, dark beyond the pool
-    LDX #GRID_SPAN * GRID_SPAN - 1
-.clear_grid
-    STA sl_grid,X
-    DEX
-    BPL clear_grid
-    LDY #MINER_WINDOW - 1
+    LDA #0                      \ Each tile's blocks in the grid
+    STA sl_ptr
+    LDA #GRID_ROW_BYTES
+    STA sl_ptr2
+    LDX #MINER_WINDOW - 1
 .grid
+    CLC                         \ Its page: the tile row
+    LDA miner_dy,X
+    ADC #HI(sl_grid) + GRID_RADIUS
+    STA sl_ptr + 1
+    STA sl_ptr2 + 1
+    LDA miner_dx,X              \ Its column: 8 per tile
     CLC
-    LDA miner_dy,Y
     ADC #GRID_RADIUS
-    TAX
-    LDA sl_times_grid,X
-    CLC
-    ADC #GRID_RADIUS
-    CLC
-    ADC miner_dx,Y
-    TAX
-    LDA sl_excess,Y
-    STA sl_grid,X
-    DEY
+    ASL A
+    ASL A
+    ASL A
+    TAY
+    LDA sl_excess,X
+    STA (sl_ptr),Y
+    STA (sl_ptr2),Y
+    INY
+    INY
+    INY
+    INY
+    STA (sl_ptr),Y
+    STA (sl_ptr2),Y
+    DEX
     BPL grid
     RTS
 }
-
-.sl_times_grid
-FOR n, 0, GRID_SPAN - 1
-    EQUB n * GRID_SPAN
-NEXT
 
 \ As from_orthogonal in lighting.asm.
 .sl_from_orthogonal
@@ -814,11 +787,6 @@ INCLUDE "build/generated/smooth.asm"
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW
 .sl_excess          SKIP MINER_WINDOW
-IF HI(P%) <> HI(P% + GRID_SPAN * GRID_SPAN - 1)
-    ALIGN &100
-ENDIF
-.sl_grid            SKIP GRID_SPAN * GRID_SPAN
-ASSERT HI(sl_grid) = HI(P% - 1)     \ Stepped through by its low byte
 
 ALIGN &100
 .sl_radial
@@ -827,6 +795,7 @@ INCBIN "build/generated/radial.bin"
 
 ORG &8000
 .sl_plane           SKIP PLANE_COLUMNS * PLANE_ROWS
+.sl_grid            SKIP GRID_SPAN * 256    \ Page per tile row: see GRID_ROW_BYTES
 .sl_map             SKIP MAP_SIZE * MAP_SIZE
 .sl_kind_visibility SKIP 256 * 8  \ Page j * 4 + c: cell (c, j) of each kind
 .sl_kind_clear      SKIP 256

@@ -1,5 +1,5 @@
 """The parasite's smooth miner's light (asm/smooth_light.asm) matches the
-model: after every pass each cell holds lighting.smooth_miner_light's level,
+model: after every pass each block holds lighting.smooth_miner_light's level,
 and exactly the cells whose change shows are queued. Run with -s to see what
 a pass costs the 65C02."""
 
@@ -15,7 +15,8 @@ from stratagem.glide_lab import walk
 from stratagem.lighting_lab import mine_scene, open_up
 from stratagem.tiles import tile_pixels
 
-PLANE_COLUMNS, PLANE_ROWS, MAP_SIZE = 128, 64, 32       # asm/smooth_light.asm
+PLANE_COLUMNS, PLANE_ROWS, MAP_SIZE = 64, 64, 32        # asm/smooth_light.asm: blocks, cell rows, tiles
+QUEUE_COLUMNS = 128         # the queue holds u MOD 128
 CHECK_RADIUS = 7        # tiles around the miner whose cells are checked
 
 
@@ -56,7 +57,7 @@ class Parasite:
         return self.machine.mpu.processorCycles - before
 
     def level(self, u: int, v: int) -> int:
-        return self.memory[self.labels["sl_plane"] + (v % PLANE_ROWS) * PLANE_COLUMNS + u % PLANE_COLUMNS]
+        return self.memory[self.labels["sl_plane"] + (v % PLANE_ROWS) * PLANE_COLUMNS + (u // 2) % PLANE_COLUMNS]
 
     def take_queue(self) -> list[tuple[int, int, int]]:
         count = self.memory[self.labels["sl_queue_count"]]
@@ -87,7 +88,7 @@ def check_moves(parasite: Parasite, moves: list[tuple[int, int]]) -> list[int]:
             before, after = shown.get((u, v), 0), light.get((u, v), 0)
             visibility = lighting.cell_visibility(tile_pixels(*world.tile_at(u // 4, v // 2)))[(v % 2) * 4 + u % 4]
             if lighting.shows(visibility, before, after, u % 2):
-                expected.add((u % PLANE_COLUMNS, v & 0xFF, after))
+                expected.add((u % QUEUE_COLUMNS, v & 0xFF, after))
             shown[(u, v)] = after
         queue = parasite.take_queue()
         assert len(queue) == len(set(queue)), f"move {n}: a cell queued twice"

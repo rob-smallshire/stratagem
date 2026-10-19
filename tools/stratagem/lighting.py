@@ -294,20 +294,29 @@ def lit_level(x: int, y: int, pool: dict[tuple[int, int], int]) -> int:
     return max(fixed_light(x, y), pool.get((x, y), 0))
 
 
-# The smooth miner's light: a level per character cell (2 pixels by 8
-# lines), from the miner's exact position rather than its tile. In the open
-# a cell's level falls off with its distance from the middle of the miner's
-# box, OPEN_STEP a tile's width (a tile looks square), so the pool glides
-# with the miner. Walls and corners still shape it: each tile's pool level
-# from `miner_light` falls short of what open ground would give by the extra
-# cost of the path light took, and the tile's cells lose that excess (never
-# less than nothing: a wall's face is lit as the open ground would be at its
-# distance). A tile the pool doesn't reach stays dark.
+# The smooth miner's light: a level per block of two character cells (4
+# pixels by 8 lines: square on the screen, and as wide as the Bayer pattern),
+# from the miner's exact position rather than its tile. In the open a block's
+# level falls off with the distance of its centre from the middle of the
+# miner's box, OPEN_STEP a tile's width (a tile looks square), so the pool
+# glides with the miner. Walls and corners still shape it: each tile's pool
+# level from `miner_light` falls short of what open ground would give by the
+# extra cost of the path light took, and the tile's blocks lose that excess
+# (never less than nothing: a wall's face is lit as the open ground would be
+# at its distance). A tile the pool doesn't reach stays dark.
+#
+# With soft shadows, a block instead loses the excess interpolated between
+# the centres of the four tiles around it, a tile the pool doesn't reach
+# counting as MINER_LEVEL, so shadows fade over a tile as the pool does.
 
 CELL_PIXELS = 2
 CELL_LINES = 8
 TILE_CELLS_ACROSS = 4
 TILE_CELLS_DOWN = 2
+BLOCK_CELLS = 2
+BLOCK_PIXELS = BLOCK_CELLS * CELL_PIXELS
+TILE_PIXELS = 8
+TILE_LINES = 16
 
 
 def miner_centre(px: int, py: int) -> tuple[float, float]:
@@ -318,25 +327,45 @@ def miner_centre(px: int, py: int) -> tuple[float, float]:
 
 def radial_level(dx_pixels: float, dy_lines: float) -> float:
     """The open-ground level at an offset from the miner's centre."""
-    return MINER_LEVEL - OPEN_STEP * math.hypot(dx_pixels / 8, dy_lines / 16)
+    return MINER_LEVEL - OPEN_STEP * math.hypot(dx_pixels / TILE_PIXELS, dy_lines / TILE_LINES)
 
 
-def smooth_miner_light(clear_at, px: int, py: int, inside=lambda x, y: True) -> dict[tuple[int, int], int]:
-    """The miner's light at (px, py): world cell (u, v) -> level."""
+def tile_excess(clear_at, px: int, py: int, inside=lambda x, y: True) -> dict[tuple[int, int], int | None]:
+    """Each tile of the pool's window: the excess cost of the path light took
+    to it, or None where the pool doesn't reach."""
     cx, cy = miner_tile(px, py)
     pool = miner_light(clear_at, cx, cy, inside)
     open_pool = miner_light(lambda x, y: True, cx, cy, inside)
+    return {tile: None if level == 0 else max(0, open_pool[tile] - level) for tile, level in pool.items()}
+
+
+def smooth_miner_light(clear_at, px: int, py: int, inside=lambda x, y: True,
+                       soft: bool = False) -> dict[tuple[int, int], int]:
+    """The miner's light at (px, py): world cell (u, v) -> level (both cells
+    of a block alike)."""
+    excess = tile_excess(clear_at, px, py, inside)
     mx, my = miner_centre(px, py)
+
+    def dark_as(tile):
+        e = excess.get(tile)
+        return MINER_LEVEL if e is None else e
+
     cells = {}
-    for (x, y), level in pool.items():
-        excess = max(0, open_pool[(x, y)] - level)
+    for (x, y), e in excess.items():
         for v in range(y * TILE_CELLS_DOWN, (y + 1) * TILE_CELLS_DOWN):
-            for u in range(x * TILE_CELLS_ACROSS, (x + 1) * TILE_CELLS_ACROSS):
-                if level == 0:
-                    cells[(u, v)] = 0
-                    continue
-                r = radial_level(u * CELL_PIXELS + CELL_PIXELS / 2 - mx, v * CELL_LINES + CELL_LINES / 2 - my)
-                cells[(u, v)] = max(0, rounded(r) - excess)
+            for u in range(x * TILE_CELLS_ACROSS, (x + 1) * TILE_CELLS_ACROSS, BLOCK_CELLS):
+                bx, by = u * CELL_PIXELS + BLOCK_PIXELS / 2, v * CELL_LINES + CELL_LINES / 2
+                r = radial_level(bx - mx, by - my)
+                if soft:
+                    fx, fy = (bx - TILE_PIXELS / 2) / TILE_PIXELS, (by - TILE_LINES / 2) / TILE_LINES
+                    x0, y0 = math.floor(fx), math.floor(fy)
+                    tx, ty = fx - x0, fy - y0
+                    blend = ((1 - tx) * (1 - ty) * dark_as((x0, y0)) + tx * (1 - ty) * dark_as((x0 + 1, y0)) +
+                             (1 - tx) * ty * dark_as((x0, y0 + 1)) + tx * ty * dark_as((x0 + 1, y0 + 1)))
+                    level = rounded(r - blend)
+                else:
+                    level = 0 if e is None else max(0, rounded(r) - e)
+                cells[(u, v)] = cells[(u + 1, v)] = level
     return cells
 
 
