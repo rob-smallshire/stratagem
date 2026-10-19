@@ -8,7 +8,8 @@ miner's light a tile at a time (`lighting.miner_light`, as the game does
 now), or a block (two cells) at a time from the miner's exact position
 (`lighting.smooth_miner_light`), with hard or soft shadows. Writes a strip of frames and an animation
 of each, and prints how many cells' light changes each frame: what the host
-would have to redraw.
+would have to redraw. Also writes stills of hard and soft shadows at the
+scene's corners (shadows.png).
 """
 
 from __future__ import annotations
@@ -102,6 +103,22 @@ def frame_image(scene, pixels: np.ndarray, cells: np.ndarray, hero: player.Playe
     return image.resize((image.width * 2 * SCALE, image.height * SCALE), Image.NEAREST)
 
 
+SHADOW_SPOTS = [("shaft foot", 7, 59), ("tunnel bend", 11, 62), ("cave mouth", 15, 65), ("up the slope", 23, 61)]
+
+
+def shadows(scene, base, pixels, clear_at) -> Image.Image:
+    """Hard and soft shadows side by side, at the scene's corners."""
+    panels = []
+    for label, x, y in SHADOW_SPOTS:
+        tx = scene.x0 + x
+        hero = player.Player(x=(tx * TILE_PIXEL_WIDTH + 1) << 4,
+                             y=((y + 1) * TILE_LINE_HEIGHT - player.PLAYER_HEIGHT) << 4)
+        for name, soft in (("hard", False), ("soft", True)):
+            cells = cell_levels(scene, base, lighting.smooth_miner_light(clear_at, hero.px, hero.py, soft=soft))
+            panels.append((f"{label}, {name}", frame_image(scene, pixels, cells, hero)))
+    return sheet(panels, 2)
+
+
 def main() -> None:
     output_dirpath = Path(sys.argv[1] if len(sys.argv) > 1 else "build/lighting")
     output_dirpath.mkdir(parents=True, exist_ok=True)
@@ -146,6 +163,7 @@ def main() -> None:
             moving = [c for c in counts if c]
             print(f"  {what:15} {np.mean(counts):6.1f} {max(counts):4}   "
                   f"{len(moving)} of {len(counts)} frames, mean {np.mean(moving):.1f} when any")
+    shadows(scene, base, pixels, clear_at).save(output_dirpath / "shadows.png")
     print(f"Wrote {output_dirpath}")
 
 
