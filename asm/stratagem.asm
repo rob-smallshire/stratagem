@@ -21,4 +21,6 @@ INCLUDE "asm/main.asm"
 
 \ The render region and the world bank occupy the same addresses.
 INCLUDE "asm/render.asm"
+SAVE "RENDER", render_start, render_end
 INCLUDE "asm/world.asm"
+SAVE "WORLD", world_start, world_end

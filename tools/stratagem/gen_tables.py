@@ -247,7 +247,7 @@ def _tile_index(dx: int, dy: int) -> int:
     return (dy + SMOOTH_GRID_RADIUS) * SMOOTH_GRID_SPAN + dx + SMOOTH_GRID_RADIUS
 
 
-SMOOTH_RADIAL_ROWS = 128       # |dy| in lines
+SMOOTH_RADIAL_ROWS = 96        # |dy| in lines: a pass never looks further (92)
 SMOOTH_RADIAL_COLUMNS = 128    # dx + 64 in pixels
 
 
@@ -268,6 +268,29 @@ def _reach(dy: int) -> int:
     return max(dx for dx in range(64) if lighting.radial_level(dx, dy) >= 0)
 
 
+GRAPHICS_SLOTS = 32            # cell graphics in a material's page
+
+
+def _graphics_visibility(parity: int) -> list[int]:
+    """For each cell graphic in the material pages (page material * 2 +
+    background, then slot: offset / 8), drawn in a cell of `parity`: a bit
+    per Bayer threshold (in order) that falls on a pixel of colour."""
+    order = lighting.parity_thresholds(parity)
+    visibility = []
+    for material in range(tiles.MATERIAL_COUNT):
+        graphics = tiles.material_pages(material)
+        for slot in range(len(graphics) // 8):
+            bits = 0
+            for line in range(lighting.CELL_LINES):
+                byte = graphics[slot * 8 + line]
+                for x, colour_bits in ((0, 0b00101010), (1, 0b00010101)):     # left, right: colour bits 0-2
+                    if byte & colour_bits:
+                        bits |= 1 << order.index(int(lighting.BAYER[line % 4][2 * parity + x]))
+            visibility.append(bits)
+    assert len(visibility) == tiles.MATERIAL_COUNT * 2 * GRAPHICS_SLOTS
+    return visibility
+
+
 def _between(old: int, new: int, parity: int) -> int:
     low, high = sorted((lighting.mask_class(old, parity), lighting.mask_class(new, parity)))
     return (1 << high) - (1 << low)
@@ -285,6 +308,8 @@ def smooth_source() -> str:
         ("smooth_open_pool", [open_pool[offset] for offset in lighting.MINER_ORDER]),
         ("smooth_reach", [_reach(dy) for dy in range(SMOOTH_REACH_ROWS)]),
         ("smooth_tile_index", [_tile_index(dx, dy) for dx, dy in lighting.MINER_ORDER]),
+        ("smooth_graphics_even", _graphics_visibility(0)),
+        ("smooth_graphics_odd", _graphics_visibility(1)),
         ("smooth_between_even", [_between(old, new, 0) for old in range(16) for new in range(16)]),
         ("smooth_between_odd", [_between(old, new, 1) for old in range(16) for new in range(16)]),
     ]:

@@ -504,4 +504,3 @@ ALIGN &100
 .world_directory    SKIP (256 / CHUNK_SIZE) * (256 / CHUNK_SIZE)
 .world_slots        SKIP WORLD_SLOT_COUNT * SLOT_BYTES
 
-SAVE "WORLD", world_start, world_end

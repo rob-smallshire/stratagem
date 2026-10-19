@@ -171,35 +171,6 @@
     RTS
 }
 
-\ Set zp_box_x/y to the player's position in pixels and lines.
-.player_pixels
-{
-    LDA zp_player_x + 1
-    STA zp_box_x + 1
-    LDA zp_player_x
-    LSR zp_box_x + 1
-    ROR A
-    LSR zp_box_x + 1
-    ROR A
-    LSR zp_box_x + 1
-    ROR A
-    LSR zp_box_x + 1
-    ROR A
-    STA zp_box_x
-    LDA zp_player_y + 1
-    STA zp_box_y + 1
-    LDA zp_player_y
-    LSR zp_box_y + 1
-    ROR A
-    LSR zp_box_y + 1
-    ROR A
-    LSR zp_box_y + 1
-    ROR A
-    LSR zp_box_y + 1
-    ROR A
-    STA zp_box_y
-    RTS
-}
 
 \ Shift the 16-bit value at zero page X left four places: pixels or lines
 \ to sixteenths.

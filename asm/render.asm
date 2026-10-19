@@ -509,5 +509,3 @@ ENDMACRO
 }
 
 .render_end
-
-SAVE "RENDER", render_start, render_end

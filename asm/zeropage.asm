@@ -7,7 +7,7 @@
 BOOT_READY = &FF                \ zp_boot_status once initialisation is done
 
 ORG &00
-GUARD &90
+GUARD &8E                       \ The Tube game's parasite has the mailbox at &8E, then the light
 
 \ Machine and paging
 .zp_boot_status     SKIP 1      \ Zero while starting, BOOT_READY when ready

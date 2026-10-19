@@ -46,11 +46,20 @@ SOURCES = {
 }
 BOOT_FILE = "STRAT"
 
+# The Tube game (docs/tube-game.md): a disc of its own, booting the host's
+# loader, which loads the parasite's files into the parasite.
+TUBE_DISC_FILEPATH = BUILD_DIRPATH / "stratagem-tube.ssd"
+TUBE_SOURCES = {
+    "HOST": ASM_DIRPATH / "host.asm",             # STRAT, MAIN, RENDER (host)
+    "PARASITE": ASM_DIRPATH / "parasite.asm",     # PGAME, PWORLD, PLIGHT (parasite)
+}
+
 
 @dataclass(frozen=True)
 class BuildResult:
     disc_filepath: Path
     labels: dict[str, dict[str, int]]   # source name -> label -> address
+    tube_disc_filepath: Path | None = None
 
 
 def find_beebasm() -> str:
@@ -85,27 +94,33 @@ def _assemble(source_filepath: Path, labels_filepath: Path, disc_args: list[str]
         raise RuntimeError(f"beebasm failed on {source_filepath.name}:\n{result.stdout}\n{result.stderr}")
 
 
-def build() -> BuildResult:
-    generate_all(GENERATED_DIRPATH)
-    LABELS_DIRPATH.mkdir(parents=True, exist_ok=True)
-    disc = str(DISC_FILEPATH.relative_to(PROJECT_DIRPATH))
-    staging = str(DISC_FILEPATH.with_suffix(".staging.ssd").relative_to(PROJECT_DIRPATH))
-
+def _build_disc(disc_filepath: Path, sources: dict[str, Path], boot_file: str) -> dict[str, dict[str, int]]:
+    """Assemble the sources onto a fresh disc whose !BOOT runs boot_file;
+    return each source's labels."""
+    disc = str(disc_filepath.relative_to(PROJECT_DIRPATH))
+    staging = str(disc_filepath.with_suffix(".staging.ssd").relative_to(PROJECT_DIRPATH))
     labels = {}
-    for index, (name, source_filepath) in enumerate(SOURCES.items()):
+    for index, (name, source_filepath) in enumerate(sources.items()):
         labels_filepath = LABELS_DIRPATH / f"{name}.txt"
         if index == 0:
             # Create a fresh disc with a !BOOT that runs the boot file.
             _assemble(source_filepath, labels_filepath,
-                      ["-do", disc, "-boot", BOOT_FILE, "-title", DISC_TITLE])
+                      ["-do", disc, "-boot", boot_file, "-title", DISC_TITLE])
         else:
             # Add to the existing disc via a staging copy.
             _assemble(source_filepath, labels_filepath, ["-di", disc, "-do", staging])
-            (PROJECT_DIRPATH / staging).replace(DISC_FILEPATH)
+            (PROJECT_DIRPATH / staging).replace(disc_filepath)
         labels[name] = parse_labels(labels_filepath.read_text())
+    expand_disc(disc_filepath)
+    return labels
 
-    expand_disc(DISC_FILEPATH)
-    return BuildResult(DISC_FILEPATH, labels)
+
+def build() -> BuildResult:
+    generate_all(GENERATED_DIRPATH)
+    LABELS_DIRPATH.mkdir(parents=True, exist_ok=True)
+    labels = _build_disc(DISC_FILEPATH, SOURCES, BOOT_FILE)
+    labels.update(_build_disc(TUBE_DISC_FILEPATH, TUBE_SOURCES, BOOT_FILE))
+    return BuildResult(DISC_FILEPATH, labels, TUBE_DISC_FILEPATH)
 
 
 def read_disc_file(disc_filepath: Path, name: str) -> tuple[int, bytes]:
@@ -131,8 +146,8 @@ def main() -> None:
     except (RuntimeError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
         sys.exit(1)
-    print(f"Built {result.disc_filepath.relative_to(PROJECT_DIRPATH)} "
-          f"with {', '.join(result.labels)}")
+    print(f"Built {result.disc_filepath.relative_to(PROJECT_DIRPATH)} and "
+          f"{result.tube_disc_filepath.relative_to(PROJECT_DIRPATH)} with {', '.join(result.labels)}")
 
 
 if __name__ == "__main__":
