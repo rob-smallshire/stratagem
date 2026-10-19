@@ -828,6 +828,7 @@ NEXT
     STA sl_pool_clear
     LDA #MINER_LEVEL
     STA sl_pool
+.*sl_flood_entries              \ (Labels like this are for timing)
 
     LDX #1                      \ Each entry from its neighbours one step
 .entry                          \ nearer the miner (miner_light)
@@ -914,6 +915,7 @@ NEXT
     RTS
 
 .excess
+.*sl_flood_excess
     LDX #MINER_WINDOW - 1       \ Each tile's excess: MINER_LEVEL where the
 .tile_excess                    \ pool doesn't reach
     LDA sl_pool,X
@@ -932,6 +934,7 @@ NEXT
     DEX
     BPL tile_excess
 
+.*sl_flood_corners
     LDX #GRID_SPAN * GRID_SPAN - 1      \ Each tile's top left corner: the
 .corner                                 \ four tiles' average (only those of
     LDA sl_tile_excess - GRID_SPAN - 1,X    \ the window's tiles are used)
@@ -947,6 +950,7 @@ NEXT
     CPX #GRID_SPAN + 1
     BCS corner
 
+.*sl_flood_blocks
     LDA #&100 - MINER_RADIUS    \ Each block's soft excess: lighting.soft_blend,
     STA sl_oy                   \ half its tile's, half its nearest corner's
     LDX #GRID_SPAN + 1          \ The window's first tile

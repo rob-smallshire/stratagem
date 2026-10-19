@@ -60,6 +60,7 @@
     BNE wait
     LDA MAILBOX_INPUT
     STA zp_input
+.*para_input                    \ (Labels like this are for timing)
     INC zp_frame
     JSR update_player
     JSR player_action
@@ -112,7 +113,20 @@
     JMP planned
 .move                           \ Or the screen start, the tile cache, and
     JSR move_screen_start       \ the new row, which the host draws as
-    JSR update_tile_cache       \ daylight alone
+    LDA light_dirty             \ daylight alone. New tiles in the cache
+    PHA                         \ matter to the light only if they move the
+    JSR pool_in_cache           \ cache's edge within the pool's window
+    STA para_inside
+    JSR update_tile_cache
+    JSR pool_in_cache
+    AND para_inside
+    TAX
+    PLA
+    CPX #0
+    BNE dirty_set
+    LDA #&FF
+.dirty_set
+    STA light_dirty
     LDA zp_plan_dy
     BEQ planned
     BMI top
@@ -187,7 +201,9 @@
     STA sl_list_ptr + 1
     LDA #0
     STA sl_list_count
+.*para_light
     JSR sl_update
+.*para_lit
     LDY #0
     LDA sl_list_count
     STA (para_list),Y
@@ -245,6 +261,7 @@
     CPX #header_sources_end - header_sources
     BNE header_loop
 
+.*para_send
     LDA #COMMAND_FRAME          \ Send it
     JSR OSWRCH
     LDA para_sent
@@ -262,6 +279,47 @@
 .header_sources_end
 ASSERT PACKET_PLAYER_FRAME + 1 = PACKET_STRIPS
 ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
+
+\ &FF if the window of the last flood (the tiles within MINER_RADIUS of its
+\ centre) is inside the tile cache, otherwise 0.
+.pool_in_cache
+{
+    LDA sl_valid
+    BEQ outside
+    LDA sl_pcx
+    SEC
+    SBC #MINER_RADIUS
+    BCC outside
+    CMP cached_left
+    BCC outside
+    LDA sl_pcx
+    CLC
+    ADC #MINER_RADIUS
+    BCS outside
+    CMP cached_right
+    BEQ across
+    BCS outside
+.across
+    LDA sl_pcy
+    SEC
+    SBC #MINER_RADIUS
+    BCC outside
+    CMP cached_top
+    BCC outside
+    LDA sl_pcy
+    CLC
+    ADC #MINER_RADIUS
+    BCS outside
+    CMP cached_bottom
+    BEQ inside
+    BCS outside
+.inside
+    LDA #&FF
+    RTS
+.outside
+    LDA #0
+    RTS
+}
 
 \ Fill the tile cache from the world (as the host-only game pages it in to
 \ do), and record what was filled in the packet: a strip.

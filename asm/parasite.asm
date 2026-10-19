@@ -84,6 +84,7 @@ ALIGN &100
 .para_strip_y       EQUB 0
 .para_strip_down    EQUB 0
 .para_y             EQUB 0
+.para_inside        EQUB 0      \ The pool's window was inside the cache
 .para_tmp           EQUW 0
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW

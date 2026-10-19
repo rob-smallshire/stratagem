@@ -147,8 +147,10 @@ INKEY_SPACE = &100 - 99
     JSR plan_new_columns
 
 .flip
+.*host_before_vsync             \ (For timing)
     LDA #19                     \ Wait for vertical sync
     JSR OSBYTE
+.*host_after_vsync
     \ After vertical sync, staying ahead of the beam: the new start address;
     \ the new columns' rows above the sprite, which the beam reaches first;
     \ the changed tile and the light's list, with the sprite off; the
