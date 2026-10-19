@@ -81,3 +81,32 @@ tiles within reach of the miner's centre now or at the last pass.
 About 40% of a pass is the cells themselves (16 cycles each, unrolled
 four to a tile), a third handling changed cells, and the rest rows and the
 flood (only when the miner changes tile or tiles change).
+
+## 3. Host drawing from the Tube
+
+`asm/tube_draw.asm` (`TDRAWH`, `TDRAWP`), checked and timed by
+`tests/test_tube_draw.py` (run with `-s`). The parasite lists, per cell to
+redraw, everything the host needs: the mask's low byte, the cell graphics'
+address and the screen address (5 bytes). The host reads the list a byte at
+a time (transfer type 0: each read raises an NMI in the parasite, which
+puts the next byte in R3) and only copies, through the masks or straight
+at full light. It reads each entry while drawing the cell before, a byte
+every two lines: long enough for the parasite to refill R3 (about 25 host
+cycles at 3 MHz), so those reads need not poll. A list ends with an entry's
+worth of padding, read ahead and ignored.
+
+Host cycles (2 MHz), 3 MHz 65C02 parasite:
+
+| | B+128K | Integra-B |
+|---|---|---|
+| A list (claim, set-up, count, first entry, release) | 1,053 | 1,046 |
+| Each further cell, dimmed | 214 | 205 |
+| Each further cell, full light | 178 | 181 |
+
+Reading each entry before drawing (a subroutine per byte, polling) cost
+315 and 280 a cell: the host waited for the parasite. The renderer's own
+redraw of a tile costs about 350 a cell, finding each cell's graphics,
+light and screen address itself.
+
+So the smooth light's redraws (prototype 2: 27 cells a frame on average,
+92 at most) cost the host about 6,700 cycles a frame, 20,400 at most.

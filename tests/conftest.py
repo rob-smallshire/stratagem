@@ -97,3 +97,53 @@ def boot_until_ready(bbc: Beebium, game_build: BuildResult, source: str, command
     assert ready, f"{source} did not become ready within {BOOT_TIMEOUT_EMULATED_SECONDS} emulated seconds"
     bbc.run_for_emulated_seconds(SETTLE_EMULATED_SECONDS)
     return labels
+
+
+# Machines with a second processor (a 3 MHz 65C02)
+
+TUBE_EXTENSION = "--tube-65c02"
+RUN_TIMEOUT_EMULATED_SECONDS = 20.0
+
+
+@pytest.fixture(params=MACHINES, ids=[m.name for m in MACHINES])
+def tube_bbc(request):
+    machine = request.param
+    with contextlib.ExitStack() as stack:
+        try:
+            bbc = stack.enter_context(Beebium.launch(variant=machine.variant, preset=machine.preset,
+                                                     extra_args=[TUBE_EXTENSION]))
+        except ServerNotFoundError as e:
+            pytest.skip(str(e))
+        bbc.system.set_speed_multiplier(0.0)
+        wait_for_prompt(bbc)
+        if machine.name == "integra-b":
+            # IBOS leaves the Tube off by default (beebium #203).
+            type_line(bbc, "*CONFIGURE TUBE")
+            bbc.keyboard.ctrl_break()
+            wait_for_prompt(bbc)
+        yield bbc
+
+
+def type_line(bbc: Beebium, line: str) -> None:
+    # Type with the machine running, and wait for it (beebium #206).
+    bbc.debugger.ensure_running()
+    bbc.keyboard.type(line + "\r")
+    bbc.keyboard.wait_until_typing_complete()
+
+
+def run_on_tube(bbc: Beebium, game_build: BuildResult, host_file: str, parasite_file: str) -> None:
+    """Insert the game disc, install the host file, then run the parasite's."""
+    bbc.disc.set_spin_up_delay(False)
+    bbc.disc.drive(0).insert(str(game_build.disc_filepath))
+    type_line(bbc, f"*RUN {host_file}")
+    bbc.keyboard.type(f"*RUN {parasite_file}\r")
+
+
+def collect_marks(bbc: Beebium, hit_address: int, id_address: int, count: int) -> dict[int, int]:
+    """Run to each of `count` marks the host notes: mark -> host cycle count."""
+    marks = {}
+    for _ in range(count):
+        bbc.debugger.run_to(hit_address, skip_current=True)
+        marks[bbc.memory.address.peek[id_address]] = bbc.debugger.cycle_count
+    assert list(marks) == list(range(1, count + 1))
+    return marks
