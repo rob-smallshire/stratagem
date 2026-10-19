@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from py65.devices.mpu6502 import MPU
+from py65.devices.mpu65c02 import MPU as MPU65C02
 
 RETURN_SENTINEL = 0xFFF0
 
 
 class Machine6502:
-    def __init__(self) -> None:
-        self.mpu = MPU()
+    def __init__(self, cmos: bool = False) -> None:
+        """A 6502, or with `cmos` a 65C02 (as in a second processor)."""
+        self.mpu = MPU65C02() if cmos else MPU()
 
     def load(self, address: int, data: bytes) -> None:
         self.mpu.memory[address:address + len(data)] = list(data)

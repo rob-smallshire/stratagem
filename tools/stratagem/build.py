@@ -41,6 +41,7 @@ SOURCES = {
     "STRATAGEM": ASM_DIRPATH / "stratagem.asm",   # STRAT, RENDER, WORLD, MAIN
     "PROBE": ASM_DIRPATH / "probe.asm",           # PROBE
     "TUBE": ASM_DIRPATH / "tube_proto.asm",       # TUBEH (host), TUBEP (parasite)
+    "SMOOTH": ASM_DIRPATH / "smooth_light.asm",   # SMOOTH (parasite)
 }
 BOOT_FILE = "STRAT"
 

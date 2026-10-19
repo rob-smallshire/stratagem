@@ -300,8 +300,9 @@ def lit_level(x: int, y: int, pool: dict[tuple[int, int], int]) -> int:
 # box, OPEN_STEP a tile's width (a tile looks square), so the pool glides
 # with the miner. Walls and corners still shape it: each tile's pool level
 # from `miner_light` falls short of what open ground would give by the extra
-# cost of the path light took, and the tile's cells lose that excess. A tile
-# the pool doesn't reach stays dark.
+# cost of the path light took, and the tile's cells lose that excess (never
+# less than nothing: a wall's face is lit as the open ground would be at its
+# distance). A tile the pool doesn't reach stays dark.
 
 CELL_PIXELS = 2
 CELL_LINES = 8
@@ -328,12 +329,57 @@ def smooth_miner_light(clear_at, px: int, py: int, inside=lambda x, y: True) -> 
     mx, my = miner_centre(px, py)
     cells = {}
     for (x, y), level in pool.items():
-        excess = open_pool[(x, y)] - level
+        excess = max(0, open_pool[(x, y)] - level)
         for v in range(y * TILE_CELLS_DOWN, (y + 1) * TILE_CELLS_DOWN):
             for u in range(x * TILE_CELLS_ACROSS, (x + 1) * TILE_CELLS_ACROSS):
                 if level == 0:
                     cells[(u, v)] = 0
                     continue
                 r = radial_level(u * CELL_PIXELS + CELL_PIXELS / 2 - mx, v * CELL_LINES + CELL_LINES / 2 - my)
-                cells[(u, v)] = min(MINER_LEVEL, max(0, math.floor(r - excess + 0.5)))
+                cells[(u, v)] = max(0, rounded(r) - excess)
     return cells
+
+
+def rounded(level: float) -> int:
+    """A level rounded to the nearest whole level, and no less than 0."""
+    return max(0, math.floor(level + 0.5))
+
+
+# Which cells a change of light shows in. A cell's two pixels sit in two of
+# the Bayer pattern's four columns (its parity), which hold 8 of the 16
+# thresholds; a cell drawn at a level keeps the pixels whose threshold is
+# below the level's coverage, so a level's mask class is how many of those 8
+# are below it. A change of light shows only if a pixel that isn't black has
+# a threshold between the two classes: `cell_visibility` gives each cell of
+# a tile a bit per threshold (in order) that falls on a pixel of colour.
+
+def parity_thresholds(parity: int) -> list[int]:
+    return sorted(int(t) for t in BAYER[:, 2 * parity:2 * parity + 2].ravel())
+
+
+def mask_class(level: int, parity: int) -> int:
+    return sum(t < coverage(level) for t in parity_thresholds(parity))
+
+
+def cell_visibility(pixels) -> list[int]:
+    """For a tile's pixels (16 lines of 8), a byte per cell (row * 4 +
+    column): bit i set if the cell has a coloured pixel at its parity's i-th
+    threshold."""
+    bits = []
+    for row in range(TILE_CELLS_DOWN):
+        for column in range(TILE_CELLS_ACROSS):
+            parity = column % 2
+            order = parity_thresholds(parity)
+            byte = 0
+            for line in range(CELL_LINES):
+                for x in range(CELL_PIXELS):
+                    if pixels[row * CELL_LINES + line][column * CELL_PIXELS + x] & 7:
+                        byte |= 1 << order.index(int(BAYER[line % 4][2 * parity + x]))
+            bits.append(byte)
+    return bits
+
+
+def shows(visibility: int, before: int, after: int, parity: int) -> bool:
+    """Whether a cell with `visibility` looks different at level `after`."""
+    low, high = sorted((mask_class(before, parity), mask_class(after, parity)))
+    return visibility & ((1 << high) - (1 << low)) != 0
