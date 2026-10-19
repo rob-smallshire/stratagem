@@ -1,9 +1,9 @@
 # Tube prototypes
 
 Prototypes for deciding how Stratagem uses a 65C02 second processor
-alongside the expanded host (see `docs/hardware-requirements-and-capabilities.md`
-and the 2026-10-19 entries in `docs/decisions.md`). Each answers one
-question by measurement, on both targets in Beebium.
+alongside the expanded host (see
+`docs/hardware-requirements-and-capabilities.md`). Each answers one question
+by measurement, on both targets in Beebium.
 
 1. Tube plumbing: what each way of moving data costs the host.
 2. Light on the parasite: per-cell light centred on the miner's exact
