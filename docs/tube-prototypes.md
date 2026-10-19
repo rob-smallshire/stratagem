@@ -95,32 +95,39 @@ when the miner enters a tile, which sets the maximum; rows 4,700.
 
 ### Soft shadows
 
-`smooth_miner_light(..., soft=True)`, now the parasite's light, gives each
-block the excess interpolated between the centres of the four tiles around
-it, 9:3:3:1 (`lighting.soft_blend`, rounded to a whole level so the
-parasite can subtract it), a tile the pool doesn't reach counting as
-MINER_LEVEL: shadows fade over a tile, as the pool does, instead of
-stopping at tile edges. The host redraws about the same (19.7 cells a
-frame). `build/lighting/shadows.png` sets hard and soft side by side.
+`smooth_miner_light(..., soft=True)`, now the parasite's light, blends each
+block's excess with the tiles around it (`lighting.soft_blend`): half its
+own tile's, half that at its tile's nearest corner (the four tiles' average,
+rounded), so 5:1:1:1, a tile the pool doesn't reach counting as
+MINER_LEVEL. Shadows fade over a tile, as the pool does, instead of
+stopping at tile edges. Interpolating (9:3:3:1) looked the same and cost
+half as much again; the four blocks around a corner share its average. The
+host redraws about the same as with hard shadows (18.7 cells a frame).
+`build/lighting/shadows.png` sets hard and soft side by side.
 
 ### The flood
 
-The flood is now generated from the model, unrolled (an entry's neighbours
-at fixed addresses), after reading each window tile's clear flag from the
-map a row at a time. It costs 5,300 cycles instead of about 20,000, but
-its code is about 10K. The soft blend that follows costs about 21,000:
-excess 2,500, the 3:1 sums across 4,600, the blocks 12,400, and reading
-the map 4,100.
+The flood is generated from the model, unrolled (an entry's neighbours at
+fixed addresses), after reading each window tile's clear flag from the map
+a row at a time: 5,300 cycles instead of about 20,000, but about 10K of
+code. When the miner enters a tile, the flood and the soft blend together
+cost about 22,000: reading the map 4,000, the flood 5,300, the excess 2,500,
+the corners 3,300 and the blocks 7,500.
 
-| 65C02 cycles a pass | hard, looped flood | soft, unrolled flood |
-|---|---|---|
-| Walking, mean | 24,648 | 24,255 |
-| Walking, max | 69,884 | 72,642 |
-| Random ground, mean | 29,300-36,300 | 28,100-34,800 |
+Blending only tiles the light can reach would save almost nothing: 77 of
+the window's 81 can be lit.
+
+| 65C02 cycles a pass | hard, looped flood | soft (9:3:3:1), unrolled | soft (corners), unrolled |
+|---|---|---|---|
+| Walking, mean | 24,648 | 24,255 | 23,323 |
+| Walking, max | 69,884 | 72,642 | 66,404 |
+| Random ground, mean | 29,300-36,300 | 28,100-34,800 | 26,900-32,500 |
+| Random ground, max | 61,400-79,300 | 60,400-77,100 | 53,600-72,100 |
 
 The maximum is a pass where the miner enters a tile: the flood and blend
-(about 29,000), and many changed blocks (up to 147, about 26,000 to test
-and queue), as the soft excess shifts with the miner's tile.
+(about 22,000), and many changed blocks (up to 144, about 25,000 to test
+and queue: each is about 177 cycles, little of it avoidable), as the
+excess shifts with the miner's tile.
 
 ## 3. Host drawing from the Tube
 

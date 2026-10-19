@@ -690,122 +690,75 @@ INCLUDE "build/generated/smooth_flood.asm"
     DEX
     BPL excess
 
-.*sl_flood_across
-    LDX #GRID_SPAN * GRID_SPAN - 2      \ Each 3:1 with its neighbour across
-.across                                 \ (the border's are not used)
-    LDA sl_tile_excess,X
-    ASL A
-    ADC sl_tile_excess,X
-    STA sl_tmp
+.*sl_flood_corners
+    LDX #GRID_SPAN * GRID_SPAN - 1      \ Each tile's top left corner: the
+.corner                                 \ four tiles' average (only those of
+    LDA sl_tile_excess - GRID_SPAN - 1,X    \ the window's tiles are used)
+    CLC
+    ADC sl_tile_excess - GRID_SPAN,X
     ADC sl_tile_excess - 1,X
-    STA sl_across_left,X
-    LDA sl_tmp
-    ADC sl_tile_excess + 1,X
-    STA sl_across_right,X
+    ADC sl_tile_excess,X
+    ADC #2
+    LSR A
+    LSR A
+    STA sl_corner,X
     DEX
-    BNE across
+    CPX #GRID_SPAN + 1
+    BCS corner
 
 .*sl_flood_blocks
-    LDA #0                      \ Each block's soft excess: lighting.soft_blend,
-    STA sl_ptr                  \ as 3:1 of those with the row up or down
-    LDA #GRID_ROW_BYTES
-    STA sl_ptr2
-    LDA #&100 - MINER_RADIUS
-    STA sl_oy
+    LDA #&100 - MINER_RADIUS    \ Each block's soft excess: lighting.soft_blend,
+    STA sl_oy                   \ half its tile's, half its nearest corner's
     LDX #GRID_SPAN + 1          \ The window's first tile
 .block_row
-    CLC
+    CLC                         \ The grid row: a page per tile row
     LDA sl_oy
     ADC #HI(sl_grid) + GRID_RADIUS
-    STA sl_ptr + 1
-    STA sl_ptr2 + 1
+    STA up_left + 2
+    STA up_right + 2
+    STA down_left + 2
+    STA down_right + 2
     LDY #8 * (GRID_RADIUS - MINER_RADIUS)
     LDA #MINER_SPAN
     STA sl_count
 .block
-    LDA sl_across_left,X        \ If the tile and its neighbours are alike,
-    CMP sl_across_right,X       \ so are its blocks
-    BNE blend
-    CMP sl_across_left - GRID_SPAN,X
-    BNE blend
-    CMP sl_across_right - GRID_SPAN,X
-    BNE blend
-    CMP sl_across_left + GRID_SPAN,X
-    BNE blend
-    CMP sl_across_right + GRID_SPAN,X
-    BNE blend
     LDA sl_tile_excess,X
-    STA (sl_ptr),Y
-    STA (sl_ptr2),Y
-    INY
-    INY
-    INY
-    INY
-    STA (sl_ptr),Y
-    STA (sl_ptr2),Y
-    JMP next_block
-.blend
-    LDA sl_across_left,X        \ Left, up and down
-    ASL A
-    ADC sl_across_left,X
-    ADC sl_across_left - GRID_SPAN,X
+    SEC
+    ADC sl_corner,X
+    LSR A
+.up_left
+    STA sl_grid,Y
+    LDA sl_tile_excess,X
+    SEC
+    ADC sl_corner + 1,X
+    LSR A
+.up_right
+    STA sl_grid + BLOCK_PIXELS,Y
+    LDA sl_tile_excess,X
+    SEC
+    ADC sl_corner + GRID_SPAN,X
+    LSR A
+.down_left
+    STA sl_grid + GRID_ROW_BYTES,Y
+    LDA sl_tile_excess,X
+    SEC
+    ADC sl_corner + GRID_SPAN + 1,X
+    LSR A
+.down_right
+    STA sl_grid + GRID_ROW_BYTES + BLOCK_PIXELS,Y
+    TYA                         \ The next tile
+    CLC
     ADC #8
-    LSR A
-    LSR A
-    LSR A
-    LSR A
-    STA (sl_ptr),Y
-    LDA sl_across_left,X
-    ASL A
-    ADC sl_across_left,X
-    ADC sl_across_left + GRID_SPAN,X
-    ADC #8
-    LSR A
-    LSR A
-    LSR A
-    LSR A
-    STA (sl_ptr2),Y
-    INY                         \ Right, up and down
-    INY
-    INY
-    INY
-    LDA sl_across_right,X
-    ASL A
-    ADC sl_across_right,X
-    ADC sl_across_right - GRID_SPAN,X
-    ADC #8
-    LSR A
-    LSR A
-    LSR A
-    LSR A
-    STA (sl_ptr),Y
-    LDA sl_across_right,X
-    ASL A
-    ADC sl_across_right,X
-    ADC sl_across_right + GRID_SPAN,X
-    ADC #8
-    LSR A
-    LSR A
-    LSR A
-    LSR A
-    STA (sl_ptr2),Y
-.next_block
-    INY                         \ The next tile
-    INY
-    INY
-    INY
+    TAY
     INX
     DEC sl_count
-    BEQ row_done
-    JMP block
-.row_done
+    BNE block
     INX                         \ Past the border, to the next row
     INX
     INC sl_oy
     LDA sl_oy
     CMP #MINER_RADIUS + 1
-    BEQ done
-    JMP block_row
+    BNE block_row
 .done
     RTS
 }
@@ -816,8 +769,7 @@ INCLUDE "build/generated/smooth.asm"
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW
 .sl_tile_excess     SKIP GRID_SPAN * GRID_SPAN  \ Row-major, with the border
-.sl_across_left     SKIP GRID_SPAN * GRID_SPAN  \ 3:1 with the tile to the left
-.sl_across_right    SKIP GRID_SPAN * GRID_SPAN  \ And to the right
+.sl_corner          SKIP GRID_SPAN * GRID_SPAN  \ At each tile's top left
 
 ALIGN &100
 .sl_radial

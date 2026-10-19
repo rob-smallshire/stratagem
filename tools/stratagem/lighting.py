@@ -373,8 +373,12 @@ def smooth_miner_light(clear_at, px: int, py: int, inside=lambda x, y: True,
 
 def soft_blend(own: int, across: int, down: int, diagonal: int) -> int:
     """The excess at a block a quarter of a tile from its tile's centre each
-    way: interpolated, 9:3:3:1, and rounded to a whole level."""
-    return (9 * own + 3 * across + 3 * down + diagonal + 8) // 16
+    way: half its tile's, half that at the tile's nearest corner (the four
+    tiles' average), each rounded to a whole level. So 5:1:1:1, near enough
+    the 9:3:3:1 of interpolating, and cheaper: the four blocks around a corner
+    share its average."""
+    corner = (own + across + down + diagonal + 2) // 4
+    return (own + corner + 1) // 2
 
 
 def rounded(level: float) -> int:
