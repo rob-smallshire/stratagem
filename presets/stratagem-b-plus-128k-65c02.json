@@ -1,0 +1,12 @@
+{
+  "model": "model-b-plus-128k",
+  "name": "Model B+ 128K, 65C02 Copro (3 MHz)",
+  "release_date": "1985-06",
+  "description": "128K B+, 65C02 second processor (3 MHz), for the Tube Stratagem",
+  "machine_description": "Model B+ 128K, {coprocessor-cpu} Copro ({coprocessor-clock})",
+  "extensions": [
+    {
+      "name": "acorn-65c02-coprocessor"
+    }
+  ]
+}

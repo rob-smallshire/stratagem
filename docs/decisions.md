@@ -88,3 +88,15 @@ A running log of design decisions. Add to it whenever one is made.
   renderer chooses a mask per cell anyway. Open space below the surface gets
   a dark backdrop, so light shows in it. First step: render with fixed
   levels, to measure the cost.
+
+## 2026-10-20
+
+- **A second processor:** the game moves to a 65C02 second processor (3 MHz
+  or faster), the host drawing what it sends (`docs/tube-game.md`). The
+  host-only game is kept, on its own disc, as the reference and for
+  comparison.
+- **Light:** the miner's light is the smooth per-block light with soft
+  shadows (corner-averaged, 5:1:1:1), brightened by daylight; the host draws
+  only the cells whose pixels change, from a list the parasite sends.
+- **No double buffering:** the Integra-B can't show shadow RAM, so the game
+  must work with one screen; drawing stays ahead of the beam.
