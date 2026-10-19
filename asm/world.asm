@@ -478,7 +478,7 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
     JMP scale
 .floor
     LDA #LIGHT_FIXED_FLOOR
-    BNE scale                   \ Always branches
+    JMP scale
 .full
     LDA #LIGHT_FULL
 .scale

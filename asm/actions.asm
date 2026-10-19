@@ -1168,6 +1168,7 @@ SCAN_HIGHEST = 2                \ The highest in the way
     STA redraw_tile_y
     LDA #&FF
     STA redraw_tile
+    STA light_dirty             \ Light may pass differently now
     CLC
 .done
     RTS

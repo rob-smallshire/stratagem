@@ -82,5 +82,5 @@ def test_masks_dither_as_the_pixel_model_does():
 def test_fixed_light_fades_below_the_surface():
     from stratagem.world import HEIGHTS
     h = HEIGHTS[60]
-    assert [lighting.fixed_light(60, y) for y in range(h - 1, h + 15)] == \
-        [15, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 3, 3]
+    assert [lighting.fixed_light(60, y) for y in range(h - 1, h + 18)] == \
+        [15, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0]

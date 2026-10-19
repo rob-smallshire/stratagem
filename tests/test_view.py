@@ -51,9 +51,20 @@ def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, Player, in
     return state, hero, peek[labels["zp_input"]], word("zp_screen_start")
 
 
+def expected_light(state: Camera, hero: Player, world_tile_at=tile_at):
+    """Each tile's light: daylight, and the miner's light within the view
+    (which is what the tile cache holds)."""
+    left, right = state.camera_x >> 2, (state.camera_x + camera.VIEW_COLUMNS - 1) >> 2
+    top, bottom = state.camera_y >> 1, (state.camera_y + camera.VIEW_ROWS - 1) >> 1
+    pool = lighting.miner_light(lambda x, y: lighting.transparent(world_tile_at(x, y)),
+                                *lighting.miner_tile(hero.px, hero.py),
+                                lambda x, y: left <= x <= right and top <= y <= bottom)
+    return lambda x, y: lighting.lit_level(x, y, pool)
+
+
 def expected_screen(state: Camera, hero: Player, screen_start: int, world_tile_at=tile_at) -> dict[int, int]:
     image = render_view(screen_start, state.camera_x, state.camera_y, world_tile_at, tile_bytes,
-                        lighting.cell_masks(lighting.fixed_light))
+                        lighting.cell_masks(expected_light(state, hero, world_tile_at)))
     frame = FRAMES[sprites.frame_for(hero)]
     column = (hero.px >> 1) - state.camera_x
     line = hero.py - state.camera_y * 8
@@ -68,7 +79,9 @@ def expected_screen(state: Camera, hero: Player, screen_start: int, world_tile_a
 TILE_CACHE_SIZE = 32       # asm/layout.asm
 
 
-def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Camera, world_tile_at=tile_at) -> None:
+def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Camera, hero: Player,
+                                 world_tile_at=tile_at) -> None:
+    light_at = expected_light(state, hero, world_tile_at)
     size = TILE_CACHE_SIZE ** 2
     materials = bbc.memory.address.peek[labels["tile_cache"]:labels["tile_cache"] + size]
     shapes = bbc.memory.address.peek[labels["tile_cache_shapes"]:labels["tile_cache_shapes"] + size]
@@ -78,7 +91,7 @@ def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Ca
         for tx in range(state.camera_x >> 2, (state.camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1):
             index = (ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE
             if (materials[index], shapes[index]) != world_tile_at(tx, ty) or \
-                    lights[index] != lighting.fixed_light(tx, ty) * lighting.LIGHT_SCALE:
+                    lights[index] != light_at(tx, ty) * lighting.LIGHT_SCALE:
                 wrong.append((tx, ty))
     assert wrong[:8] == [], f"{len(wrong)} cached tiles are wrong"
 
@@ -86,7 +99,7 @@ def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Ca
 def assert_screen_matches_model(bbc: Beebium, machine, labels: dict[str, int],
                                 world_tile_at=tile_at) -> tuple[Camera, Player]:
     state, hero, _, screen_start = read_state(bbc, labels)
-    assert_tile_cache_holds_view(bbc, labels, state, world_tile_at)
+    assert_tile_cache_holds_view(bbc, labels, state, hero, world_tile_at)
     expected = expected_screen(state, hero, screen_start, world_tile_at)
     actual = bbc.memory.region(machine.screen_region).peek[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]

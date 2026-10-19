@@ -8,13 +8,13 @@
 
 INCLUDE "asm/os.asm"
 INCLUDE "asm/layout.asm"
+INCLUDE "build/generated/light.asm"
 INCLUDE "asm/zeropage.asm"
 INCLUDE "asm/variables.asm"
 INCLUDE "build/generated/tiles.asm"
 INCLUDE "build/generated/world.asm"
 INCLUDE "build/generated/camera.asm"
 INCLUDE "build/generated/player.asm"
-INCLUDE "build/generated/light.asm"
 
 INCLUDE "asm/low.asm"
 INCLUDE "asm/main.asm"

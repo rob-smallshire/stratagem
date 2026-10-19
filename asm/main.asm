@@ -43,6 +43,8 @@ INKEY_SPACE = &100 - 99
     STA zp_player_jump_held
     STA zp_player_air_jumps
     STA redraw_tile
+    STA light_valid
+    STA light_queue_count
     LDA #STARTING_ABILITIES
     STA zp_abilities
     LDA #1
@@ -87,6 +89,7 @@ INKEY_SPACE = &100 - 99
     JSR draw_column_rows
     JSR restore_sprite
     JSR redraw_queued_tile
+    JSR redraw_light_queue
     JSR draw_sprite
     LDA #VIEW_ROWS
     SEC
@@ -441,6 +444,7 @@ INKEY_SPACE = &100 - 99
     JSR wrap_both_ways
     STA zp_screen_start + 1
     JSR update_tile_cache
+    JSR update_light            \ Before drawing the new row
     LDA zp_plan_dy
     BEQ no_row
     JSR draw_new_row
@@ -598,6 +602,8 @@ INKEY_SPACE = &100 - 99
     STA zp_fill_down
     LDA zp_temp + 1
     STA zp_fill_count
+    LDA #&FF                    \ New tiles: the light needs working out
+    STA light_dirty
     JMP call_fill_cache
 }
 
@@ -800,6 +806,7 @@ INKEY_SPACE = &100 - 99
     STA cached_top
     LDA view_bottom
     STA cached_bottom
+    JSR update_light
 
     LDA zp_screen_start
     STA zp_render_base
@@ -827,6 +834,8 @@ INKEY_SPACE = &100 - 99
     STA zp_temp
     DEC zp_rows_left
     BNE row_loop
+    LDA #0                      \ Every tile is drawn with its light
+    STA light_queue_count
     RTS
 }
 
@@ -946,6 +955,7 @@ INKEY_SPACE = &100 - 99
 
 INCLUDE "asm/player.asm"
 INCLUDE "asm/actions.asm"
+INCLUDE "asm/lighting.asm"
 
 .main_end
 

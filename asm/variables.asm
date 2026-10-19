@@ -65,3 +65,24 @@ GUARD &0800
 .best_left       SKIP 1      \ The most solid left of the tiles found so far...
 .best_column     SKIP 1      \ ... and where
 .best_row        SKIP 1
+
+\ Light (modelled by tools/stratagem/lighting.py: miner_light)
+.light_dirty     SKIP 1      \ Non-zero if tiles changed since the last pass
+.light_valid     SKIP 1      \ Non-zero once light_x/y hold a pass's centre
+.light_x         SKIP 1      \ The miner's tile at the last pass
+.light_y         SKIP 1
+.miner_x         SKIP 1      \ The miner's tile now
+.miner_y         SKIP 1
+.window_x        SKIP 1      \ The centre of the window being applied
+.window_y        SKIP 1
+.pool_index      SKIP 1      \ The window entry being worked
+.pool_clear_here SKIP 1      \ Non-zero if its tile lets light through
+.pool_best       SKIP 1      \ The brightest light reaching it so far
+.light_tile_x    SKIP 1      \ Its tile
+.light_tile_y    SKIP 1
+.pool            SKIP MINER_WINDOW     \ The miner's light, by window entry
+.pool_clear      SKIP MINER_WINDOW     \ Non-zero where light passes
+.light_queue_count SKIP 1    \ Tiles whose light changed, to redraw
+.light_queue_index SKIP 1
+.light_queue_x   SKIP 2 * MINER_WINDOW
+.light_queue_y   SKIP 2 * MINER_WINDOW

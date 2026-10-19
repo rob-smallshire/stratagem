@@ -44,7 +44,7 @@ from stratagem.world import HEIGHTS
 
 FULL = 15
 LIGHT_SCALE = 16        # light plane value per level: 16 mask bytes per level
-FIXED_FLOOR = 3         # fixed_light never goes below this
+FIXED_FLOOR = 0         # fixed_light never goes below this
 
 BAYER = np.array([
     [0, 8, 2, 10],
@@ -207,7 +207,88 @@ def cell_masks(light_at):
 
 def fixed_light(x: int, y: int) -> int:
     """A stand-in for daylight: full down to the surface, then a level less
-    each tile deeper, down to FIXED_FLOOR, so that underground stays
-    playable."""
+    each tile deeper, down to FIXED_FLOOR: darkness."""
     depth = y - HEIGHTS[x]
     return FULL if depth <= 0 else max(FIXED_FLOOR, FULL - depth)
+
+
+# The miner's light: a pool around the miner's tile, computed in one pass
+# over a window, each tile from its neighbours one step nearer the miner
+# (MINER_ORDER is nearest first, by Manhattan distance). Into an open tile,
+# light loses OPEN_STEP orthogonally, or OPEN_DIAGONAL_STEP diagonally past
+# an open corner; a wall's face is as bright as the open tile beside it, and
+# light loses WALL_STEP a tile further into the wall. Light leaves only open
+# tiles (and the miner's own). Unlike `spread`, light never turns back
+# towards the miner, which a pool this small doesn't need.
+
+MINER_LEVEL = 12
+MINER_RADIUS = 4            # the window is 2 * MINER_RADIUS + 1 tiles square
+OPEN_STEP = 3
+OPEN_DIAGONAL_STEP = 4
+WALL_STEP = 4
+NO_TILE = 0xFF
+
+
+def _sign(n: int) -> int:
+    return (n > 0) - (n < 0)
+
+
+MINER_ORDER = sorted(
+    ((dx, dy) for dy in range(-MINER_RADIUS, MINER_RADIUS + 1) for dx in range(-MINER_RADIUS, MINER_RADIUS + 1)),
+    key=lambda d: (abs(d[0]) + abs(d[1]), d[1], d[0]))
+MINER_INDEX = {offset: k for k, offset in enumerate(MINER_ORDER)}
+
+
+def miner_predecessors(k: int) -> tuple[int, int, int]:
+    """Window entry k's neighbours one step nearer the miner: across, down
+    (or up) and diagonal, each an index into MINER_ORDER or NO_TILE."""
+    dx, dy = MINER_ORDER[k]
+    sx, sy = _sign(dx), _sign(dy)
+    across = MINER_INDEX[(dx - sx, dy)] if sx else NO_TILE
+    vertical = MINER_INDEX[(dx, dy - sy)] if sy else NO_TILE
+    diagonal = MINER_INDEX[(dx - sx, dy - sy)] if sx and sy else NO_TILE
+    return across, vertical, diagonal
+
+
+def miner_tile(px: int, py: int) -> tuple[int, int]:
+    """The tile at the middle of the player's box, at (px, py)."""
+    from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH
+    return (px + PLAYER_WIDTH // 2) // 8, (py + PLAYER_HEIGHT // 2) // 16
+
+
+def miner_light(clear_at, cx: int, cy: int, inside=lambda x, y: True) -> dict[tuple[int, int], int]:
+    """The pool of light around the miner's tile (cx, cy): tile -> level.
+    clear_at(x, y) says whether a tile lets light through; tiles where
+    inside(x, y) is false (outside the tile cache) are dark and stop light."""
+    pool, clear = [], []
+    for k, (dx, dy) in enumerate(MINER_ORDER):
+        x, y = cx + dx, cy + dy
+        if not inside(x, y):
+            pool.append(0)
+            clear.append(False)
+            continue
+        if k == 0:
+            pool.append(MINER_LEVEL)
+            clear.append(True)
+            continue
+        is_clear = clear_at(x, y)
+        across, vertical, diagonal = miner_predecessors(k)
+        best = 0
+        for p in (across, vertical):
+            if p == NO_TILE:
+                continue
+            if clear[p]:
+                best = max(best, pool[p] - (OPEN_STEP if is_clear else 0))
+            elif not is_clear:
+                best = max(best, pool[p] - WALL_STEP)
+        if is_clear and diagonal != NO_TILE and clear[diagonal] and \
+                any(p != NO_TILE and clear[p] for p in (across, vertical)):
+            best = max(best, pool[diagonal] - OPEN_DIAGONAL_STEP)
+        pool.append(best)
+        clear.append(is_clear)
+    return {(cx + dx, cy + dy): level for (dx, dy), level in zip(MINER_ORDER, pool)}
+
+
+def lit_level(x: int, y: int, pool: dict[tuple[int, int], int]) -> int:
+    """A tile's light: the brighter of daylight and the miner's light."""
+    return max(fixed_light(x, y), pool.get((x, y), 0))
