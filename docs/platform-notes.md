@@ -118,9 +118,10 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
 - The host side of the Tube comes from DFS 2.26 on both targets. **V**
 - B+128K: the Tube is on at boot (`Acorn TUBE 6502 64K`). **V**
 - Integra-B: IBOS keeps TUBE/NOTUBE in bit 0 of user register `&0F`, and
-  its default (`&2D`) leaves the Tube off, so the host runs BASIC. In
-  Beebium 0.11.0, `*CONFIGURE TUBE` then Ctrl-Break did not turn it on;
-  `*TUBE ON` did (#203). **V** (in Beebium)
+  its default (`&2D`) leaves the Tube off, so the host runs BASIC.
+  `*CONFIGURE TUBE` (checked with `*STATUS TUBE`) then Ctrl-Break
+  (`keyboard.ctrl_break()`) or power-on turns it on, as does `*TUBE ON`
+  at once (#203). **V** (in Beebium)
 - Display: the B+ video reads main or shadow RAM according to `&FE34`
   bit 7, at every character fetch, so the displayed screen can be swapped
   between them. The Integra-B video always reads main RAM, so there it
