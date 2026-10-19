@@ -55,6 +55,7 @@ above. The view is 16 x 15.5 tiles; the camera follows the player.
 | `tools/stratagem/` | Python: the models, the table generator, the build |
 | `tests/` | pytest: py65 tests of routines, Beebium tests of whole frames |
 | `docs/reference/exile/` | Indexes into the Level 7 Exile disassemblies (themselves in `docs/local/`) |
+| `docs/reference/tube/` | An index into acornaeology's Tube client and host disassemblies (in `~/Code/acornaeology/`) |
 
 The Python models are the specification: `world.py` (generation and the
 changed-chunk store), `tiles.py` (materials, shapes, graphics), `screen.py`
@@ -304,7 +305,9 @@ Working with Beebium (see `CLAUDE.md` and `platform-notes.md`):
 - References: Level 7's Exile disassemblies (`docs/local/`, indexed in
   `docs/reference/exile/`), OS 1.20 (`~/Code/os120`), MOS disassemblies
   (`~/Code/acorn_mos_disassembly`), MMFS source (`~/Code/MMFS`), the IBOS
-  source (github.com/kgl2001/IntegraB-OS).
+  source (github.com/kgl2001/IntegraB-OS), and acornaeology's Tube client,
+  NFS and ADFS disassemblies (`~/Code/acornaeology/`, indexed in
+  `docs/reference/tube/`); `beebium-stratagem` also knows the Tube well.
 
 ## Known limitations
 
