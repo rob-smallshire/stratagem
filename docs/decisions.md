@@ -50,7 +50,7 @@ A running log of design decisions. Add to it whenever one is made.
 - **Two-byte tiles:** material + shape (+ background bit), for flexibility.
   Shapes are erosions of a 4 x 4 quarter-cell grid from any side: flat,
   45 and 22.5 degree ramps (61 shapes); digging erodes from a shape's own
-  side. Changed chunks are 128 bytes (104 fit in the world bank);
+  side (superseded: see "No cavities" below). Changed chunks are 128 bytes (104 fit in the world bank);
   compression or disc spill can follow. Walking follows slopes up (ledge
   climbing) and down (ground snapping).
 - **Language workspace:** `&0400`-`&07FF` holds non-pointer variables now

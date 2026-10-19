@@ -5,6 +5,8 @@ digging and building game using Exile-like technology. It targets the B+128K
 and the Model B with Integra-B (the Master 128 later), keeps the OS and
 filing system resident, and is tested in the Beebium emulator.
 
+- `docs/implementation-record.md`: the game as built so far: start here.
+- `docs/next-steps.md`: the agreed plan ahead.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).
 - `docs/architecture.md`: memory model, memory map, screen, world, frame.
