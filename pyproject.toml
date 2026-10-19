@@ -11,6 +11,7 @@ dependencies = [
 
 [project.scripts]
 strat-build = "stratagem.build:main"
+strat-lighting-lab = "stratagem.lighting_lab:main"
 
 [dependency-groups]
 test = [
