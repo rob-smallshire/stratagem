@@ -120,6 +120,10 @@ Measured while digging and tunnelling (529 frames):
   12,000); with a new tile row from the world (generating it, up to 29,000)
   or many changed blocks, a frame can take up to about 97,000.
 
+Dropping a torch floods twice (the torch's pool, then the miner's, as the
+tile changed) and relights its surroundings: about 118,000 cycles, so the
+host can miss a frame then.
+
 ## Not yet
 
 - Picking torches up; torches that flicker; more than 24.
