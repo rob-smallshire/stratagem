@@ -292,3 +292,48 @@ def miner_light(clear_at, cx: int, cy: int, inside=lambda x, y: True) -> dict[tu
 def lit_level(x: int, y: int, pool: dict[tuple[int, int], int]) -> int:
     """A tile's light: the brighter of daylight and the miner's light."""
     return max(fixed_light(x, y), pool.get((x, y), 0))
+
+
+# The smooth miner's light: a level per character cell (2 pixels by 8
+# lines), from the miner's exact position rather than its tile. In the open
+# a cell's level falls off with its distance from the middle of the miner's
+# box, OPEN_STEP a tile's width (a tile looks square), so the pool glides
+# with the miner. Walls and corners still shape it: each tile's pool level
+# from `miner_light` falls short of what open ground would give by the extra
+# cost of the path light took, and the tile's cells lose that excess. A tile
+# the pool doesn't reach stays dark.
+
+CELL_PIXELS = 2
+CELL_LINES = 8
+TILE_CELLS_ACROSS = 4
+TILE_CELLS_DOWN = 2
+
+
+def miner_centre(px: int, py: int) -> tuple[float, float]:
+    """The middle of the player's box at (px, py), in pixels and lines."""
+    from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH
+    return px + PLAYER_WIDTH / 2, py + PLAYER_HEIGHT / 2
+
+
+def radial_level(dx_pixels: float, dy_lines: float) -> float:
+    """The open-ground level at an offset from the miner's centre."""
+    return MINER_LEVEL - OPEN_STEP * math.hypot(dx_pixels / 8, dy_lines / 16)
+
+
+def smooth_miner_light(clear_at, px: int, py: int, inside=lambda x, y: True) -> dict[tuple[int, int], int]:
+    """The miner's light at (px, py): world cell (u, v) -> level."""
+    cx, cy = miner_tile(px, py)
+    pool = miner_light(clear_at, cx, cy, inside)
+    open_pool = miner_light(lambda x, y: True, cx, cy, inside)
+    mx, my = miner_centre(px, py)
+    cells = {}
+    for (x, y), level in pool.items():
+        excess = open_pool[(x, y)] - level
+        for v in range(y * TILE_CELLS_DOWN, (y + 1) * TILE_CELLS_DOWN):
+            for u in range(x * TILE_CELLS_ACROSS, (x + 1) * TILE_CELLS_ACROSS):
+                if level == 0:
+                    cells[(u, v)] = 0
+                    continue
+                r = radial_level(u * CELL_PIXELS + CELL_PIXELS / 2 - mx, v * CELL_LINES + CELL_LINES / 2 - my)
+                cells[(u, v)] = min(MINER_LEVEL, max(0, math.floor(r - excess + 0.5)))
+    return cells
