@@ -7,6 +7,8 @@ filing system resident, and is tested in the Beebium emulator.
 
 - `docs/implementation-record.md`: the game as built so far: start here.
 - `docs/next-steps.md`: the agreed plan ahead.
+- `docs/tube-game.md`: the game on a 6502 second processor (its own disc,
+  `build/stratagem-tube.ssd`); `docs/tube-prototypes.md`, how we got there.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).
 - `docs/architecture.md`: memory model, memory map, screen, world, frame.
@@ -18,7 +20,7 @@ filing system resident, and is tested in the Beebium emulator.
 ## Commands
 
 ```bash
-uv run strat-build        # assemble -> build/stratagem.ssd, labels in build/labels/
+uv run strat-build        # assemble -> build/stratagem.ssd and build/stratagem-tube.ssd, labels in build/labels/
 uv run pytest             # builds first; emulator tests run on each machine
 uv run python -m stratagem.index_disassembly SRC INDEX   # index a Level 7 disassembly
 ```

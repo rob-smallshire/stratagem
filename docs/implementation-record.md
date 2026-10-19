@@ -7,6 +7,11 @@ why things are as they are, `decisions.md`; for the hardware facts relied on,
 `concept.md`. `architecture.md` describes the memory model and scrolling in
 more depth, though where it and this record disagree, this record is newer.
 
+Since 2026-10-20 the game also runs on a 6502 second processor, with
+smooth light and torches: see `tube-game.md`. Its code is shared with what
+is described here (`main.asm` is now split into `camera.asm`, `cache.asm`,
+`view.asm`, `scroll.asm` and `pixels.asm`).
+
 ## What it is
 
 Stratagem is a Terraria-inspired digging and building game for the BBC Micro,

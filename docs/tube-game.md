@@ -16,10 +16,17 @@ processor (a 3 MHz 65C02, or the 4 MHz 65C102).
   Beebium starts it so, type `*CONFIGURE TUBE` and press Ctrl-Break first.
 - Insert `build/stratagem-tube.ssd` and Shift-Break.
 
-The keys are the host-only game's (`implementation-record.md`): Z and X
-walk, K jumps (again in the air), L digs (with M down, K up, or diagonally),
-SPACE places a block. Dig down a few tiles to leave the daylight: the
-miner's light shows below.
+The keys are the host-only game's (`implementation-record.md`), and T:
+
+| Keys | Action |
+|---|---|
+| Z, X | Walk left, right |
+| K | Jump; in the air, a fresh press jumps again |
+| L | Dig, ahead; with M, down; with K, up; with both, diagonally |
+| SPACE | Place a soil block |
+| T | Drop a torch where the miner stands (in air: up to 24) |
+
+Dig down a few tiles to leave the daylight: the miner's light shows below.
 
 ## How it works
 
@@ -63,6 +70,20 @@ unchanged, with the same zero page and variables; the host runs `view.asm`
 and `render.asm` unchanged, with its own zero page at `&57`-`&8F` (the Tube
 host's code and variables have `&00`-`&56`).
 
+### Torches
+
+A torch is a material (`tiles.TORCH`), passable, dropped into the empty
+tile the miner stands in (`asm/torches.asm`). Its light is the miner's flood
+from its tile, but fixed and per tile, kept with daylight in the tile
+cache's light plane: the host draws it with the tiles, and the miner's
+light shows only where brighter. Each torch's pool is kept (24 at most), so
+tiles entering the cache are lit by it. When a tile changes within a
+torch's reach, the torch is flooded again and the tiles whose light changes
+are queued, with their new light, and sent as changed tiles, three a frame
+(so a torch's light spreads in over a few frames). The parasite's tile cache
+takes a tile's new light only when it is sent, so the miner's light always
+compares against what the host shows. Torches can't yet be picked up.
+
 ### The light
 
 `lighting.smooth_miner_light(..., soft=True)`, brightened by each tile's
@@ -80,8 +101,9 @@ Cells in new columns are drawn after the list, so they are lit a frame late.
 `tests/test_tube_game.py` plays on both machines (digging deep first, as
 near the surface daylight outshines the miner's light), and checks the
 displayed screen byte for byte every frame against the models: the host's
-tiles, lit by the brighter of daylight and the model's light, with the
-sprite.
+tiles, lit by the brighter of daylight (and torchlight) and the model's
+light, with the sprite. One script drops torches, and checks they are in
+view and light tiles beyond daylight.
 
 ## Costs
 
@@ -100,7 +122,7 @@ Measured while digging and tunnelling (529 frames):
 
 ## Not yet
 
-- Torches, and any other light but the miner's and daylight.
+- Picking torches up; torches that flicker; more than 24.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.
