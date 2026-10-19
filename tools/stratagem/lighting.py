@@ -306,8 +306,9 @@ def lit_level(x: int, y: int, pool: dict[tuple[int, int], int]) -> int:
 # at its distance). A tile the pool doesn't reach stays dark.
 #
 # With soft shadows, a block instead loses the excess interpolated between
-# the centres of the four tiles around it, a tile the pool doesn't reach
-# counting as MINER_LEVEL, so shadows fade over a tile as the pool does.
+# the centres of the four tiles around it (rounded to a whole level), a tile
+# the pool doesn't reach counting as MINER_LEVEL, so shadows fade over a tile
+# as the pool does.
 
 CELL_PIXELS = 2
 CELL_LINES = 8
@@ -357,16 +358,23 @@ def smooth_miner_light(clear_at, px: int, py: int, inside=lambda x, y: True,
                 bx, by = u * CELL_PIXELS + BLOCK_PIXELS / 2, v * CELL_LINES + CELL_LINES / 2
                 r = radial_level(bx - mx, by - my)
                 if soft:
-                    fx, fy = (bx - TILE_PIXELS / 2) / TILE_PIXELS, (by - TILE_LINES / 2) / TILE_LINES
-                    x0, y0 = math.floor(fx), math.floor(fy)
-                    tx, ty = fx - x0, fy - y0
-                    blend = ((1 - tx) * (1 - ty) * dark_as((x0, y0)) + tx * (1 - ty) * dark_as((x0 + 1, y0)) +
-                             (1 - tx) * ty * dark_as((x0, y0 + 1)) + tx * ty * dark_as((x0 + 1, y0 + 1)))
-                    level = rounded(r - blend)
+                    # The block is a quarter of a tile from its tile's centre
+                    # each way, towards one neighbour across and one down.
+                    sx = -1 if u % TILE_CELLS_ACROSS < BLOCK_CELLS else 1
+                    sy = -1 if v % TILE_CELLS_DOWN == 0 else 1
+                    blend = soft_blend(dark_as((x, y)), dark_as((x + sx, y)), dark_as((x, y + sy)),
+                                       dark_as((x + sx, y + sy)))
+                    level = max(0, rounded(r) - blend)
                 else:
                     level = 0 if e is None else max(0, rounded(r) - e)
                 cells[(u, v)] = cells[(u + 1, v)] = level
     return cells
+
+
+def soft_blend(own: int, across: int, down: int, diagonal: int) -> int:
+    """The excess at a block a quarter of a tile from its tile's centre each
+    way: interpolated, 9:3:3:1, and rounded to a whole level."""
+    return (9 * own + 3 * across + 3 * down + diagonal + 8) // 16
 
 
 def rounded(level: float) -> int:

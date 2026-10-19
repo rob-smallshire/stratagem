@@ -5,7 +5,7 @@
 \ Light is a level per block of two character cells (4 pixels by 8 lines),
 \ from the middle of the miner's box: a radial table gives the level on open
 \ ground, and each block loses its excess, from a grid filled by the tile
-\ flood (as lighting.asm's). A plane holds each block's level; a pass updates
+\ flood (as lighting.asm's), interpolated between tiles: soft shadows. A plane holds each block's level; a pass updates
 \ the blocks within reach of the miner now or at the last pass, and queues
 \ each cell whose change shows (a coloured pixel's threshold lies between
 \ the old and new mask classes). A pass does nothing if neither the miner
@@ -29,6 +29,7 @@ GRID_RADIUS = MINER_RADIUS + 1  \ The pool's tiles, and a dark border
 GRID_SPAN = 2 * GRID_RADIUS + 1
 CELL_LINES = 8
 BLOCK_PIXELS = 4
+DATA_START = &B000              \ The plane, grid, map and queues: above the code
 \ The grid: a page per tile row (oy + GRID_RADIUS), its cell rows
 \ GRID_ROW_BYTES apart; a block's excess at column 8 (ox + GRID_RADIUS) +
 \ 4 b, so that its offset from a block's radial column is fixed in a pass.
@@ -73,7 +74,6 @@ ORG &70
 .sl_save_x          SKIP 1
 .sl_save_y          SKIP 1
 .sl_tmp             SKIP 2
-.sl_index           SKIP 1      \ Flood: the window entry
 .sl_best            SKIP 1
 .sl_clear_here      SKIP 1
 .sl_tiles           SKIP 1      \ Tiles across, in a tile row
@@ -81,7 +81,7 @@ ORG &70
 .sl_vis_row         SKIP 1
 .sl_vis_ptr         SKIP 2      \ Low byte always 0
 
-CLEAR &1000, &C000
+CLEAR &1000, &F800
 ORG &1000
 .sl_begin
 
@@ -238,7 +238,8 @@ ORG &1000
     RTS
 }
 
-\ Fill the grid with FAR: the border, beyond the pool, is never written.
+\ Fill the grid with FAR, and the tiles' excess with MINER_LEVEL: the
+\ border, beyond the pool, is never written.
 .sl_clear_grid
 {
     LDA #HI(sl_grid)
@@ -255,6 +256,12 @@ ORG &1000
     INC sl_ptr + 1
     DEX
     BNE loop
+    LDA #MINER_LEVEL            \ And every tile beyond the pool dark
+    LDX #GRID_SPAN * GRID_SPAN - 1
+.tiles
+    STA sl_tile_excess,X
+    DEX
+    BPL tiles
     RTS
 }
 
@@ -608,128 +615,126 @@ FOR n, 0, 15
     EQUB n * 16
 NEXT
 
-\ The tile flood around the miner's tile, as lighting.asm's compute_pool but
-\ from the map, then each tile's excess: the open-ground level less the
-\ pool's (at least 0), or FAR where the pool doesn't reach; and each block's,
-\ in the grid (hard shadows: a tile's blocks alike).
+\ The tile flood around the miner's tile, as lighting.miner_light, then each
+\ tile's excess and each block's soft excess in the grid: unrolled, by
+\ stratagem.gen_tables. First each window tile's clear flag, from the map.
 .sl_flood
 {
-    LDX #0
-.loop
-    STX sl_index
-    CPX #0
-    BNE not_centre
-    LDA #MINER_LEVEL
-    STA sl_pool
-    LDA #&FF
-    STA sl_pool_clear
-    JMP next
-.not_centre
-    CLC                         \ The tile's kind, from the map
+    LDX #0                      \ The window, row by row: X its index
+    LDA #&100 - MINER_RADIUS
+    STA sl_oy
+.row
+    CLC                         \ The map row
     LDA sl_cy
-    ADC miner_dy,X
+    ADC sl_oy
+    STA sl_ty
     AND #MAP_SIZE - 1
     LSR A
     LSR A
     LSR A
     CLC
     ADC #HI(sl_map)
-    STA sl_ptr + 1
-    CLC
-    LDA sl_cy
-    ADC miner_dy,X
+    STA sl_map_ptr + 1
+    LDA sl_ty
     ASL A
     ASL A
     ASL A
     ASL A
     ASL A
-    STA sl_ptr
-    CLC
+    STA sl_map_ptr
     LDA sl_cx
-    ADC miner_dx,X
+    SEC
+    SBC #MINER_RADIUS
+    STA sl_tmp
+    LDA #MINER_SPAN
+    STA sl_count
+.column
+    LDA sl_tmp
     AND #MAP_SIZE - 1
     TAY
-    LDA (sl_ptr),Y
+    LDA (sl_map_ptr),Y
     TAY
     LDA sl_kind_clear,Y
-    STA sl_clear_here
-    LDA #0
-    STA sl_best
-    LDA miner_across,X
-    JSR sl_from_orthogonal
-    LDX sl_index
-    LDA miner_vertical,X
-    JSR sl_from_orthogonal
-    LDA sl_clear_here           \ Diagonally only into an open tile, from an
-    BEQ store                   \ open one, past an open corner
-    LDX sl_index
-    LDY miner_diagonal,X
-    CPY #LIGHT_NO_TILE
-    BEQ store
-    LDA sl_pool_clear,Y
-    BEQ store
-    LDY miner_across,X
-    LDA sl_pool_clear,Y
-    BNE corner_open
-    LDY miner_vertical,X
-    LDA sl_pool_clear,Y
-    BEQ store
-.corner_open
-    LDY miner_diagonal,X
-    LDA sl_pool,Y
-    SEC
-    SBC #LIGHT_OPEN_DIAGONAL_STEP
-    JSR sl_consider
-.store
-    LDX sl_index
-    LDA sl_best
-    STA sl_pool,X
-    LDA sl_clear_here
-    STA sl_pool_clear,X
-.next
-    LDX sl_index
+    LDY miner_index,X           \ In the flood's order
+    STA sl_pool_clear,Y
     INX
-    CPX #MINER_WINDOW
-    BEQ pooled
-    JMP loop
-
-.pooled
-    LDX #MINER_WINDOW - 1       \ The excess of each tile
+    INC sl_tmp
+    DEC sl_count
+    BNE column
+    INC sl_oy
+    LDA sl_oy
+    CMP #MINER_RADIUS + 1
+    BNE row
+    LDA #&FF                    \ The miner's own tile lets light out
+    STA sl_pool_clear
+}                               \ On into the generated flood
+.sl_flood_entries
+INCLUDE "build/generated/smooth_flood.asm"
+.sl_flood_excess
+{                               \ And on into each tile's excess (by row)
+    LDX #MINER_WINDOW - 1
 .excess
     LDA sl_pool,X
-    BEQ far
+    BEQ dark
     LDA smooth_open_pool,X
     SEC
     SBC sl_pool,X
-    BCS store_excess
+    BCS store
     LDA #0
-    BEQ store_excess
-.far
-    LDA #FAR
-.store_excess
-    STA sl_excess,X
+    BEQ store
+.dark
+    LDA #MINER_LEVEL
+.store
+    LDY smooth_tile_index,X
+    STA sl_tile_excess,Y
     DEX
     BPL excess
 
-    LDA #0                      \ Each tile's blocks in the grid
-    STA sl_ptr
+.*sl_flood_across
+    LDX #GRID_SPAN * GRID_SPAN - 2      \ Each 3:1 with its neighbour across
+.across                                 \ (the border's are not used)
+    LDA sl_tile_excess,X
+    ASL A
+    ADC sl_tile_excess,X
+    STA sl_tmp
+    ADC sl_tile_excess - 1,X
+    STA sl_across_left,X
+    LDA sl_tmp
+    ADC sl_tile_excess + 1,X
+    STA sl_across_right,X
+    DEX
+    BNE across
+
+.*sl_flood_blocks
+    LDA #0                      \ Each block's soft excess: lighting.soft_blend,
+    STA sl_ptr                  \ as 3:1 of those with the row up or down
     LDA #GRID_ROW_BYTES
     STA sl_ptr2
-    LDX #MINER_WINDOW - 1
-.grid
-    CLC                         \ Its page: the tile row
-    LDA miner_dy,X
+    LDA #&100 - MINER_RADIUS
+    STA sl_oy
+    LDX #GRID_SPAN + 1          \ The window's first tile
+.block_row
+    CLC
+    LDA sl_oy
     ADC #HI(sl_grid) + GRID_RADIUS
     STA sl_ptr + 1
     STA sl_ptr2 + 1
-    LDA miner_dx,X              \ Its column: 8 per tile
-    CLC
-    ADC #GRID_RADIUS
-    ASL A
-    ASL A
-    ASL A
-    TAY
-    LDA sl_excess,X
+    LDY #8 * (GRID_RADIUS - MINER_RADIUS)
+    LDA #MINER_SPAN
+    STA sl_count
+.block
+    LDA sl_across_left,X        \ If the tile and its neighbours are alike,
+    CMP sl_across_right,X       \ so are its blocks
+    BNE blend
+    CMP sl_across_left - GRID_SPAN,X
+    BNE blend
+    CMP sl_across_right - GRID_SPAN,X
+    BNE blend
+    CMP sl_across_left + GRID_SPAN,X
+    BNE blend
+    CMP sl_across_right + GRID_SPAN,X
+    BNE blend
+    LDA sl_tile_excess,X
     STA (sl_ptr),Y
     STA (sl_ptr2),Y
     INY
@@ -738,45 +743,69 @@ NEXT
     INY
     STA (sl_ptr),Y
     STA (sl_ptr2),Y
-    DEX
-    BPL grid
-    RTS
-}
-
-\ As from_orthogonal in lighting.asm.
-.sl_from_orthogonal
-{
-    CMP #LIGHT_NO_TILE
+    JMP next_block
+.blend
+    LDA sl_across_left,X        \ Left, up and down
+    ASL A
+    ADC sl_across_left,X
+    ADC sl_across_left - GRID_SPAN,X
+    ADC #8
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA (sl_ptr),Y
+    LDA sl_across_left,X
+    ASL A
+    ADC sl_across_left,X
+    ADC sl_across_left + GRID_SPAN,X
+    ADC #8
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA (sl_ptr2),Y
+    INY                         \ Right, up and down
+    INY
+    INY
+    INY
+    LDA sl_across_right,X
+    ASL A
+    ADC sl_across_right,X
+    ADC sl_across_right - GRID_SPAN,X
+    ADC #8
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA (sl_ptr),Y
+    LDA sl_across_right,X
+    ASL A
+    ADC sl_across_right,X
+    ADC sl_across_right + GRID_SPAN,X
+    ADC #8
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA (sl_ptr2),Y
+.next_block
+    INY                         \ The next tile
+    INY
+    INY
+    INY
+    INX
+    DEC sl_count
+    BEQ row_done
+    JMP block
+.row_done
+    INX                         \ Past the border, to the next row
+    INX
+    INC sl_oy
+    LDA sl_oy
+    CMP #MINER_RADIUS + 1
     BEQ done
-    TAY
-    LDA sl_pool_clear,Y
-    BEQ from_wall
-    LDA sl_pool,Y
-    LDX sl_clear_here
-    BEQ into_wall
-    SEC
-    SBC #LIGHT_OPEN_STEP
-    JMP sl_consider
-.into_wall
-    SEC
-    JMP sl_consider
-.from_wall
-    LDA sl_clear_here
-    BNE done
-    LDA sl_pool,Y
-    SEC
-    SBC #LIGHT_WALL_STEP
-    JMP sl_consider
-.done
-    RTS
-}
-
-.sl_consider
-{
-    BCC done
-    CMP sl_best
-    BCC done
-    STA sl_best
+    JMP block_row
 .done
     RTS
 }
@@ -786,14 +815,17 @@ INCLUDE "build/generated/smooth.asm"
 
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW
-.sl_excess          SKIP MINER_WINDOW
+.sl_tile_excess     SKIP GRID_SPAN * GRID_SPAN  \ Row-major, with the border
+.sl_across_left     SKIP GRID_SPAN * GRID_SPAN  \ 3:1 with the tile to the left
+.sl_across_right    SKIP GRID_SPAN * GRID_SPAN  \ And to the right
 
 ALIGN &100
 .sl_radial
 INCBIN "build/generated/radial.bin"
 .sl_end
 
-ORG &8000
+ASSERT P% <= DATA_START
+ORG DATA_START
 .sl_plane           SKIP PLANE_COLUMNS * PLANE_ROWS
 .sl_grid            SKIP GRID_SPAN * 256    \ Page per tile row: see GRID_ROW_BYTES
 .sl_map             SKIP MAP_SIZE * MAP_SIZE
@@ -803,4 +835,5 @@ ORG &8000
 .sl_queue_v         SKIP 256
 .sl_queue_level     SKIP 256
 
+ASSERT P% <= &F800             \ Below the parasite's OS
 SAVE "SMOOTH", sl_begin, sl_end, sl_update, sl_begin

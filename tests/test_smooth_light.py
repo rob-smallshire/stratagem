@@ -77,7 +77,7 @@ def check_moves(parasite: Parasite, moves: list[tuple[int, int]]) -> list[int]:
     cycles = []
     for n, (px, py) in enumerate(moves):
         cycles.append(parasite.update(px, py))
-        light = lighting.smooth_miner_light(clear_at, px, py)
+        light = lighting.smooth_miner_light(clear_at, px, py, soft=True)
         cx, cy = lighting.miner_tile(px, py)
         cells = [(u, v) for v in range((cy - CHECK_RADIUS) * 2, (cy + CHECK_RADIUS + 1) * 2)
                  for u in range((cx - CHECK_RADIUS) * 4, (cx + CHECK_RADIUS + 1) * 4)]
