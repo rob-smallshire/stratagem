@@ -36,13 +36,13 @@ BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
 TILE_COLOUR_BASE = 8
 
-AIR, GRASS, SOIL, STONE, ORE, GEM, BEDROCK, WATER, SKY = range(9)
-MATERIAL_NAMES = ["air", "grass", "soil", "stone", "ore", "gem", "bedrock", "water", "sky"]
+AIR, GRASS, SOIL, STONE, ORE, GEM, BEDROCK, WATER, SKY, TORCH = range(10)
+MATERIAL_NAMES = ["air", "grass", "soil", "stone", "ore", "gem", "bedrock", "water", "sky", "torch"]
 MATERIAL_COUNT = len(MATERIAL_NAMES)
 
 # Materials a body can pass through, whatever their shape; the rest are
 # solid in their shape's solid quarter-cells.
-PASSABLE = frozenset({AIR, WATER, SKY})
+PASSABLE = frozenset({AIR, WATER, SKY, TORCH})
 # Materials that can be dug, and so take shapes other than SHAPE_FULL.
 DIGGABLE = [GRASS, SOIL, STONE, ORE, GEM]
 
@@ -225,6 +225,32 @@ def _stone(x: int, y: int) -> int:
     return WHITE if (x + 2 * y) % 5 == 0 or _speckle(x, y, 2) < 24 else BLACK
 
 
+# A torch, dropped by the player into an empty tile: a flame on a stick,
+# against the dark (see asm/torches.asm).
+TORCH_ART = """
+..Y.
+.YY.
+YRY.
+YRRY
+.YY.
+.WR.
+..R.
+..R.
+..R.
+..R.
+"""
+_TORCH_COLOURS = {".": BLACK, "R": RED, "Y": YELLOW, "W": WHITE}
+_TORCH_ROWS = TORCH_ART.split()
+TORCH_LEFT, TORCH_TOP = 2, 4
+
+
+def _torch(x: int, y: int) -> int:
+    row, column = y - TORCH_TOP, x - TORCH_LEFT
+    if 0 <= row < len(_TORCH_ROWS) and 0 <= column < len(_TORCH_ROWS[row]):
+        return _TORCH_COLOURS[_TORCH_ROWS[row][column]]
+    return BLACK
+
+
 MATERIAL_PIXELS = {
     AIR: _pixels(lambda x, y: BLACK),
     GRASS: _pixels(lambda x, y: GREEN if y < 3 or (y < 5 and _speckle(x, y, 3) < 128) else _soil(x, y)),
@@ -235,6 +261,7 @@ MATERIAL_PIXELS = {
     BEDROCK: _pixels(lambda x, y: BLACK if y % 8 == 7 or (x == (0 if y // 8 % 2 else 4)) else MAGENTA),
     WATER: _pixels(lambda x, y: CYAN if y == (x // 2) % 2 else BLUE),
     SKY: _pixels(lambda x, y: BLUE),
+    TORCH: _pixels(lambda x, y: _torch(x, y)),
 }
 
 

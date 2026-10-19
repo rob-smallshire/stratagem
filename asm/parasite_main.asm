@@ -64,6 +64,10 @@
     INC zp_frame
     JSR update_player
     JSR player_action
+    LDA redraw_tile             \ A torch, unless a tile has changed already
+    BNE no_torch
+    JSR torch_input
+.no_torch
     JSR plan_camera
 }
 .first_frame
@@ -140,33 +144,67 @@
     JSR sl_reset_row
 .planned
 
-    LDY #0                      \ The changed tile, if any
+    LDA #1                      \ Changed tiles: a dug or placed one, its
+    STA para_change_y           \ torches flooded again, then those queued
+    LDA #0
+    STA para_changes
     LDA redraw_tile
-    BEQ changes_counted
+    BEQ queued
     LDA #0
     STA redraw_tile
-    LDA #1
-    STA (para_write),Y
-    INY
-    LDX redraw_tile_x
-    TXA
-    STA (para_write),Y
-    INY
-    LDA redraw_tile_y
-    STA (para_write),Y
-    STA zp_fill_y
-    STX zp_fill_x
-    JSR para_cache_pointer
-    LDY #3
-    JSR para_copy_tile
     LDX redraw_tile_x
     LDY redraw_tile_y
-    JSR sl_reset_tile
-    JMP changes_done
-.changes_counted
-    LDA #0
-    STA (para_write),Y
+    JSR torch_tile_changed
+    LDA redraw_tile_x
+    STA zp_fill_x
+    LDA redraw_tile_y
+    STA zp_fill_y
+    JSR para_emit_change
+.queued
+    LDA para_changes
+    CMP #CHANGES_PER_FRAME
+    BCS changes_done
+    LDX torch_queue_head
+    CPX torch_queue_tail
+    BEQ changes_done
+    LDA torch_queue_light,X
+    STA para_new_light
+    LDA torch_queue_x,X
+    STA zp_fill_x
+    LDA torch_queue_y,X
+    STA zp_fill_y
+    INX
+    TXA
+    AND #TORCH_QUEUE - 1
+    STA torch_queue_head
+    LDA zp_fill_y               \ Still in the tile cache?
+    CMP cached_top
+    BCC queued
+    CMP cached_bottom
+    BEQ down_inside
+    BCS queued
+.down_inside
+    LDA zp_fill_x
+    CMP cached_left
+    BCC queued
+    CMP cached_right
+    BEQ inside
+    BCS queued
+.inside
+    JSR para_cache_pointer      \ Its new light, now the host will draw it
+    LDA para_cache + 1
+    CLC
+    ADC #HI(tile_cache_light - tile_cache)
+    STA para_cache + 1
+    LDY #0
+    LDA para_new_light
+    STA (para_cache),Y
+    JSR para_emit_change
+    JMP queued
 .changes_done
+    LDY #0
+    LDA para_changes
+    STA (para_write),Y
     LDY #PACKET_STRIPS
     LDA para_strips
     STA (para_packet),Y
@@ -321,6 +359,27 @@ ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
     RTS
 }
 
+\ Add tile (zp_fill_x, zp_fill_y) to the packet's changed tiles, from the
+\ tile cache, and reset its light: the host draws it as daylight alone.
+.para_emit_change
+{
+    LDY para_change_y
+    LDA zp_fill_x
+    STA (para_write),Y
+    INY
+    LDA zp_fill_y
+    STA (para_write),Y
+    INY
+    JSR para_cache_pointer
+    JSR para_copy_tile          \ (Too few to move para_write on)
+    STY para_change_y
+    INC para_changes
+    LDX zp_fill_x
+    LDY zp_fill_y
+    JMP sl_reset_tile
+}
+ASSERT 1 + CHANGES_PER_FRAME * (2 + TILE_BYTES_SENT) < &100 - TILE_BYTES_SENT
+
 \ Fill the tile cache from the world (as the host-only game pages it in to
 \ do), and record what was filled in the packet: a strip.
 .call_fill_cache
@@ -334,6 +393,7 @@ ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
     LDA zp_fill_down
     STA para_strip_down
     JSR fill_cache
+    JSR torch_light_strip
     LDY #0
     LDA para_strip_down
     STA (para_write),Y

@@ -62,6 +62,7 @@ INCLUDE "asm/cache.asm"
 INCLUDE "asm/player.asm"
 INCLUDE "asm/actions.asm"
 INCLUDE "asm/miner_light.asm"
+INCLUDE "asm/torches.asm"
 INCLUDE "build/generated/miner.asm"
 INCLUDE "build/generated/smooth.asm"
 
@@ -85,6 +86,36 @@ ALIGN &100
 .para_strip_down    EQUB 0
 .para_y             EQUB 0
 .para_inside        EQUB 0      \ The pool's window was inside the cache
+.para_changes       EQUB 0      \ Changed tiles in this packet
+.para_change_y      EQUB 0      \ ... and where the next goes
+.torch_count        EQUB 0      \ Torches (torches.asm)
+.torch_held         EQUB 0      \ T was down last frame
+.torch_index        EQUB 0
+.torch_change_x     EQUB 0
+.torch_change_y     EQUB 0
+.torch_near_count   EQUB 0
+.torch_best         EQUB 0
+.torch_dx           EQUB 0
+.torch_save_y       EQUB 0
+.torch_new          EQUB 0
+.torch_row          EQUB 0
+.torch_rows         EQUB 0
+.torch_column       EQUB 0
+.torch_columns      EQUB 0
+.torch_queue_head   EQUB 0
+.torch_queue_tail   EQUB 0
+.gather_left        EQUB 0
+.gather_right       EQUB 0
+.gather_top         EQUB 0
+.gather_bottom      EQUB 0
+.torch_x            SKIP TORCH_MAX
+.torch_y            SKIP TORCH_MAX
+.torch_near         SKIP TORCH_MAX
+.torch_queue_x      SKIP TORCH_QUEUE
+.torch_queue_y      SKIP TORCH_QUEUE
+.torch_queue_light  SKIP TORCH_QUEUE
+.para_new_light     EQUB 0
+.torch_pools        SKIP TORCH_MAX * MINER_WINDOW
 .para_tmp           EQUW 0
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW

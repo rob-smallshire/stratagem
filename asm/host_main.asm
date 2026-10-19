@@ -19,6 +19,7 @@ INKEY_K = &100 - 71
 INKEY_M = &100 - 102
 INKEY_L = &100 - 87
 INKEY_SPACE = &100 - 99
+INKEY_T = &100 - 36
 
 \ The host's start: a clear, narrowed screen.
 .host_init
@@ -27,6 +28,7 @@ INKEY_SPACE = &100 - 99
     STA zp_sprite_drawn
     STA zp_columns_width
     STA redraw_tile
+    STA host_changes
     STA host_frames
     STA host_expect_buffer
     STA host_frame_count
@@ -101,17 +103,23 @@ INKEY_SPACE = &100 - 99
     DEC host_strips
     BNE strip
 .strips_done
-    READ_BYTE                   \ A changed tile, to redraw at the flip
+    READ_BYTE                   \ Changed tiles, to redraw at the flip
+    STA host_changes
     BEQ changes_done
+    LDX #0
+.change
+    STX host_change
     READ_BYTE
     STA host_tile_x
-    STA redraw_tile_x
+    STA host_change_x,X
     READ_BYTE
     STA host_tile_y
-    STA redraw_tile_y
+    STA host_change_y,X
     JSR host_read_tile
-    LDA #&FF
-    STA redraw_tile
+    LDX host_change
+    INX
+    CPX host_changes
+    BNE change
 .changes_done
     JSR host_release
 
@@ -161,7 +169,7 @@ INKEY_SPACE = &100 - 99
     LDX zp_split_row
     JSR draw_column_rows
     JSR restore_sprite
-    JSR redraw_queued_tile
+    JSR host_redraw_changes
     JSR host_light
     JSR draw_sprite
     LDA #VIEW_ROWS
@@ -174,6 +182,26 @@ INKEY_SPACE = &100 - 99
     STA zp_columns_width
     INC host_frame_count
 .*host_frame_shown              \ Tests stop here
+    RTS
+}
+
+\ Redraw the changed tiles.
+.host_redraw_changes
+{
+    LDX #0
+.loop
+    CPX host_changes
+    BEQ done
+    STX host_change
+    LDA host_change_x,X
+    STA target_x
+    LDA host_change_y,X
+    STA target_y
+    JSR redraw_target
+    LDX host_change
+    INX
+    BNE loop
+.done
     RTS
 }
 
@@ -280,6 +308,9 @@ INKEY_SPACE = &100 - 99
     JSR read_key
     LDX #INKEY_SPACE
     LDA #INPUT_PLACE
+    JSR read_key
+    LDX #INKEY_T
+    LDA #INPUT_TORCH
     \ Fall through
 }
 

@@ -37,10 +37,12 @@ PACKET_PLAYER_FRAME = 11
 PACKET_STRIPS = 12              \ Then that many strips of new tiles: down
                                 \ (non-zero: a column), x, y, count, then
                                 \ count tiles of material, shape and light;
-                                \ then a count of changed tiles, and each:
-                                \ x, y, material, shape, light
+                                \ then a count of changed tiles (up to
+                                \ CHANGES_PER_FRAME), and each: x, y,
+                                \ material, shape, light
 PACKET_REDRAW = &80
 TILE_BYTES_SENT = 3
+CHANGES_PER_FRAME = 3           \ Changed tiles in a packet, at most
 
 \ The draw list: a count, then per cell its masks' low byte, its graphics'
 \ address and its screen address, then an entry's worth of padding (the
@@ -50,7 +52,7 @@ LIST_MAX = 255
 
 \ Host addresses the parasite puts into draw lists (asserted in render.asm)
 HOST_MATERIAL_PAGES = &8100
-HOST_LIGHT_MASKS = &9500
+HOST_LIGHT_MASKS = &9700
 
 \ The Tube itself
 TUBE_ENTRY = &0406              \ Host: claim, release, or start a transfer

@@ -112,6 +112,10 @@ ENDMACRO
 .host_tile_y        EQUB 0
 .host_transfer      EQUD 0      \ A parasite address, for a transfer
 .host_frame_count   EQUB 0      \ Frames drawn (for tests)
+.host_changes       EQUB 0      \ Changed tiles to redraw at the flip...
+.host_change        EQUB 0
+.host_change_x      SKIP CHANGES_PER_FRAME  \ ... and where
+.host_change_y      SKIP CHANGES_PER_FRAME
 
 \ ---------------------------------------------------------------------------
 \ Loader

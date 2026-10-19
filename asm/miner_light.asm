@@ -758,11 +758,10 @@ NEXT
 \ ---------------------------------------------------------------------------
 \ The flood
 
-\ The tile flood around the miner's tile, as lighting.miner_light, then each
-\ tile's excess, then each block's soft excess in the grid. First each window
-\ tile's clear flag (passable or partly dug), and whether it is outside the
-\ tile cache.
-.sl_flood
+\ The tile flood around tile (sl_cx, sl_cy), as lighting.miner_light, into
+\ sl_pool (window order). First each window tile's clear flag (passable or
+\ partly dug), and whether it is outside the tile cache.
+.sl_flood_pool
 {
     LDX #0                      \ The window, row by row: X its index
     LDA #&100 - MINER_RADIUS
@@ -888,7 +887,7 @@ NEXT
     INX
     CPX #MINER_WINDOW
     BNE entry
-    JMP excess
+    RTS
 .wall
     LDY miner_across,X          \ Into a wall: its face from open ground,
     JSR wall_from               \ undimmed; soaked in from a wall, less
@@ -914,7 +913,13 @@ NEXT
 .wall_done
     RTS
 
-.excess
+}
+
+\ The flood around the miner's tile, then each tile's excess, then each
+\ block's soft excess in the grid.
+.sl_flood
+{
+    JSR sl_flood_pool
 .*sl_flood_excess
     LDX #MINER_WINDOW - 1       \ Each tile's excess: MINER_LEVEL where the
 .tile_excess                    \ pool doesn't reach

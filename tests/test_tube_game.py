@@ -9,7 +9,7 @@ from conftest import RUN_TIMEOUT_EMULATED_SECONDS
 from stratagem import camera, lighting, player, sprites
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
-from stratagem.tiles import tile_bytes
+from stratagem.tiles import TORCH, tile_bytes
 
 TILE_CACHE_SIZE = 32       # asm/layout.asm
 FRAMES = sprites.sprite_frames()
@@ -19,6 +19,8 @@ SCRIPTS = {
     "tunnel-right-and-down": DIG_DEEP + [(80, ["X", "L"]), (60, ["X", "M", "L"]), (30, ["Z"]), (20, ["K"]),
                                          (20, [])],
     "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
+    "drop-torches": DIG_DEEP + [(60, ["X", "L"]), (3, ["T"]), (20, []), (80, ["X", "L"]), (3, ["T"]), (20, []),
+                                (60, ["Z"]), (30, ["M", "L"]), (20, [])],
 }
 
 
@@ -101,3 +103,11 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
             frames += 1
         for key in keys:
             bbc.keyboard.key_up(key)
+    if any("T" in keys for _, keys in script):
+        # Torches were dropped, and they light the tiles around them.
+        camera_x, camera_y = word(peek, labels["zp_camera_x"]), word(peek, labels["zp_camera_y"])
+        tiles = host_tiles(bbc, labels)
+        view = [(x, y) for y in range(camera_y >> 1, (camera_y + camera.VIEW_ROWS - 1 >> 1) + 1)
+                for x in range(camera_x >> 2, (camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1)]
+        assert any(tiles(x, y)[0][0] == TORCH for x, y in view), "no torch in view"
+        assert any(tiles(x, y)[1] > lighting.fixed_light(x, y) for x, y in view), "nothing lit by a torch"
