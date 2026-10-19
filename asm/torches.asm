@@ -82,8 +82,12 @@ TORCH_QUEUE = 128               \ Tiles awaiting redrawing (a power of 2)
     LDA target_shape            \ Whole, against the same background
     AND #BACKGROUND_SKY
     STA zp_world_new_shape
+    LDA light_dirty             \ Light passes a torch as it passed the
+    PHA                         \ empty tile: the miner's flood stands
     LDA #TILE_TORCH
     JSR change_target
+    PLA
+    STA light_dirty
     BCS done                    \ The world is full
     LDX torch_count
     LDA target_x
