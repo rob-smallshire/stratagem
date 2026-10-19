@@ -75,3 +75,16 @@ A running log of design decisions. Add to it whenever one is made.
   then the step (cut back to a ramp even if partly dug), then down; going up,
   the step, then up. "Most left" applies only across, at the player's
   height. tests/test_digging_model.py checks it in every direction.
+
+## 2026-10-19
+
+- **Lighting direction** (from the lighting lab, `uv run strat-lighting-lab`,
+  modelled in `tools/stratagem/lighting.py`; ideas in `lighting-tactics.md`):
+  a light level per tile, 0-15, drawn by a world-aligned 4 x 4 Bayer black
+  dither. Daylight falls straight down each column and spreads a little;
+  torches and the miner's light spread through open tiles, never through
+  walls. Light soaks into walls at a higher cost, so their faces are lit and
+  they darken inwards. Light is interpolated per character cell, since the
+  renderer chooses a mask per cell anyway. Open space below the surface gets
+  a dark backdrop, so light shows in it. First step: render with fixed
+  levels, to measure the cost.
