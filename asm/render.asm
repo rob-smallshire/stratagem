@@ -23,6 +23,11 @@ ALIGN &100
 .cell_offsets
     CELL_OFFSETS
 
+\ The dither masks for each light level: see lighting.light_masks.
+ALIGN &100
+.light_masks
+    LIGHT_MASKS
+
 .quarter_offsets                \ Each column's MAX_SHAPES-byte row of a page
     EQUB 0, MAX_SHAPES, 2 * MAX_SHAPES, 3 * MAX_SHAPES
 
@@ -66,8 +71,42 @@ MACRO COPY_CELL pointer
     STA (pointer),Y
 ENDMACRO
 
-\ Point zp_row_pointer and zp_shape_row_pointer at the tile cache rows
-\ holding world cell row zp_render_v, and zp_offsets_pointer at the
+\ Copy the cell at zp_tile to the screen at pointer through the dither masks
+\ at zp_mask, unless they are the full light's, which keep everything.
+MACRO DRAW_CELL pointer
+    LDA zp_mask
+    CMP #LIGHT_FULL * LIGHT_SCALE
+    BCC dim
+    COPY_CELL pointer
+    JMP done
+.dim
+    LDY #7
+    FOR line, 7, 1, -1
+        LDA (zp_tile),Y
+        AND (zp_mask),Y
+        STA (pointer),Y
+        DEY
+    NEXT
+    LDA (zp_tile),Y
+    AND (zp_mask),Y
+    STA (pointer),Y
+.done
+ENDMACRO
+
+\ Point zp_mask at the masks for the light zp_render_light in world cell
+\ column zp_render_u: the odd columns' follow the even columns'.
+MACRO SET_MASK
+    LDA zp_render_u
+    LSR A
+    LDA zp_render_light
+    BCC even
+    ORA #8
+.even
+    STA zp_mask
+ENDMACRO
+
+\ Point zp_row_pointer, zp_shape_row_pointer and zp_light_row_pointer at the
+\ tile cache rows holding world cell row zp_render_v, and zp_offsets_pointer at the
 \ CELL_OFFSETS page for its half of a tile.
 .set_row_pointer
 {
@@ -83,6 +122,8 @@ ENDMACRO
     STA zp_row_pointer + 1
     ADC #HI(tile_cache_shapes - tile_cache)
     STA zp_shape_row_pointer + 1
+    ADC #HI(tile_cache_light - tile_cache_shapes)
+    STA zp_light_row_pointer + 1
     TYA
     AND #7
     ASL A
@@ -92,6 +133,7 @@ ENDMACRO
     ASL A
     STA zp_row_pointer
     STA zp_shape_row_pointer
+    STA zp_light_row_pointer
     LDA zp_render_v
     AND #1
     CLC
@@ -103,13 +145,16 @@ ENDMACRO
 \ Set zp_tile to the graphics of the cell in world cell column A of the cache
 \ rows at zp_row_pointer and zp_shape_row_pointer: the material's page for
 \ the background, at the offset CELL_OFFSETS gives for the shape. Leaves the
-\ shape number in zp_render_shape and zp_offsets_pointer at the cell's row.
+\ shape number in zp_render_shape, zp_offsets_pointer at the cell's row, and
+\ the tile's light in zp_render_light.
 MACRO SET_CELL_GRAPHICS
     TAX
     LSR A
     LSR A
     AND #TILE_CACHE_SIZE - 1
     TAY
+    LDA (zp_light_row_pointer),Y
+    STA zp_render_light
     LDA (zp_shape_row_pointer),Y
     STA zp_render_shape
     LDA (zp_row_pointer),Y      \ The material: two pages each
@@ -143,12 +188,15 @@ ENDMACRO
     STA zp_screen
     LDA zp_render_base + 1
     STA zp_screen + 1
+    LDA #HI(light_masks)
+    STA zp_mask + 1
     JSR set_row_pointer
 .tile_loop
     LDA zp_render_u
     SET_CELL_GRAPHICS
 .cell_loop
-    COPY_CELL zp_screen
+    SET_MASK
+    DRAW_CELL zp_screen
     CLC
     LDA zp_screen
     ADC #CELL_BYTES
@@ -166,7 +214,9 @@ ENDMACRO
     INC zp_render_u
     LDA zp_render_u
     AND #3
-    BEQ tile_loop               \ Into the next tile
+    BNE same_tile
+    JMP tile_loop               \ Into the next tile
+.same_tile
     LDA zp_offsets_pointer      \ The next cell of the same tile: the next
     CLC                         \ CELL_OFFSETS row, in the same page
     ADC #MAX_SHAPES
@@ -200,6 +250,12 @@ ENDMACRO
     TAY
     LDA quarter_offsets,Y
     STA column_offset,X
+    AND #MAX_SHAPES             \ Odd columns' masks follow the even's
+    ASSERT MAX_SHAPES = 64
+    LSR A
+    LSR A
+    LSR A
+    STA column_parity,X
     PLA
     CLC
     ADC #1
@@ -210,6 +266,8 @@ ENDMACRO
     STA zp_screen
     LDA zp_render_base + 1
     STA zp_screen + 1
+    LDA #HI(light_masks)
+    STA zp_mask + 1
 .row_loop
     JSR set_row_pointer
     LDX #0
@@ -219,6 +277,9 @@ ENDMACRO
     STA zp_screen_lower + 1
 .column_loop
     LDY column_tile,X
+    LDA (zp_light_row_pointer),Y
+    ORA column_parity,X
+    STA zp_mask
     LDA (zp_shape_row_pointer),Y
     STA zp_render_shape
     LDA (zp_row_pointer),Y      \ The material: two pages each
@@ -237,7 +298,7 @@ ENDMACRO
     TAY
     LDA (zp_offsets_pointer),Y
     STA zp_tile
-    COPY_CELL zp_screen_lower
+    DRAW_CELL zp_screen_lower
     INX
     CPX zp_render_width
     BEQ row_done
@@ -245,14 +306,15 @@ ENDMACRO
     LDA zp_screen_lower
     ADC #CELL_BYTES
     STA zp_screen_lower
-    BCC column_loop
+    BCC next_column
     INC zp_screen_lower + 1
     LDA zp_screen_lower + 1
     CMP #HI(SCREEN_END)
-    BNE column_loop
+    BNE next_column
     LDA #HI(SCREEN_START)
     STA zp_screen_lower + 1
-    BNE column_loop
+.next_column
+    JMP column_loop
 .row_done
     CLC                         \ The next row
     LDA zp_screen + 1
@@ -272,6 +334,7 @@ ENDMACRO
 
 .column_tile        SKIP 2
 .column_offset      SKIP 2
+.column_parity      SKIP 2      \ 8 for odd world cell columns
 
 \ The sprite is SPRITE_COLUMNS bytes wide. Point zp_screen, zp_screen_lower
 \ and zp_tile at the cells of its three columns on the character row of its

@@ -20,6 +20,17 @@ Drawing. A tile at level L keeps a pixel where the 4 x 4 Bayer threshold at
 its world position is below the pixel coverage for L, and is black
 elsewhere (`coverage`). The pattern is fixed to the world, as scrolling
 moves the screen by whole character cells.
+
+The renderer. The tile cache holds a light plane, each tile's level times
+LIGHT_SCALE, which is the offset of the level's masks in the mask page
+(`light_masks`): for each level, the eight lines of a cell in an even world
+cell column, then in an odd one (a cell is two pixels wide, so the Bayer
+pattern's columns alternate between cells). Each line of a tile cell is
+drawn ANDed with its mask. A mask always keeps bits 7 and 6, colour bit 3 of
+both pixels, so a dark pixel is tile colour 8 (black), still marked as
+terrain.
+
+For now the light plane holds `fixed_light`, a stand-in for daylight.
 """
 
 from __future__ import annotations
@@ -29,8 +40,11 @@ import math
 import numpy as np
 
 from stratagem.tiles import PASSABLE, SHAPE_BITS, SHAPE_FULL, WATER
+from stratagem.world import HEIGHTS
 
 FULL = 15
+LIGHT_SCALE = 16        # light plane value per level: 16 mask bytes per level
+FIXED_FLOOR = 3         # fixed_light never goes below this
 
 BAYER = np.array([
     [0, 8, 2, 10],
@@ -162,3 +176,38 @@ def lit_pixels(pixels: np.ndarray, levels: np.ndarray, origin_x: int = 0, origin
     thresholds = BAYER[ys[:, None], xs[None, :]]
     cover = np.where(levels >= FULL, 16, np.maximum(levels, 0))
     return np.where(thresholds < cover, pixels, 0)
+
+
+def mask_byte(level: int, parity: int, line: int) -> int:
+    """The AND mask for a line of a cell in a world cell column of `parity`
+    (0 even, 1 odd) at `level`: the cell's two pixels are at world pixel x
+    mod 4 = 2 * parity and 2 * parity + 1."""
+    thresholds = BAYER[line % 4]
+    byte = 0xC0
+    if thresholds[2 * parity] < coverage(level):
+        byte |= 0xAA
+    if thresholds[2 * parity + 1] < coverage(level):
+        byte |= 0x55
+    return byte
+
+
+def light_masks() -> bytes:
+    """The mask page: at level * LIGHT_SCALE + parity * 8 + line."""
+    return bytes(mask_byte(level, parity, line)
+                 for level in range(FULL + 1) for parity in range(2) for line in range(8))
+
+
+def cell_masks(light_at):
+    """The mask for line `line` of world cell (u, v), given each tile's
+    level by light_at(x, y): for screen.render_view."""
+    def mask_at(u: int, v: int, line: int) -> int:
+        return mask_byte(light_at(u // 4, v // 2), u % 2, line)
+    return mask_at
+
+
+def fixed_light(x: int, y: int) -> int:
+    """A stand-in for daylight: full down to the surface, then a level less
+    each tile deeper, down to FIXED_FLOOR, so that underground stays
+    playable."""
+    depth = y - HEIGHTS[x]
+    return FULL if depth <= 0 else max(FIXED_FLOOR, FULL - depth)

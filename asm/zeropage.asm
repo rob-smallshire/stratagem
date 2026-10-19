@@ -32,8 +32,9 @@ GUARD &90
 .zp_shape_row_pointer SKIP 2    \ ... and shapes
 .zp_offsets_pointer SKIP 2      \ The CELL_OFFSETS row for a cell
 .zp_render_shape    SKIP 1      \ The shape of the tile being drawn
-.zp_render_column   SKIP 1      \ World cell column being drawn
-.zp_render_across   SKIP 1      \ Columns still to draw across a row
+.zp_light_row_pointer SKIP 2    \ ... and light
+.zp_render_light    SKIP 1      \ The light of the tile being drawn, scaled
+.zp_mask            SKIP 2      \ The dither masks for the cell being drawn
 
 \ World workspace (used only by world code)
 .zp_world_x         SKIP 1

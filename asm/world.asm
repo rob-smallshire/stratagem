@@ -439,6 +439,12 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
     STA zp_fill_pointer + 1
     LDA zp_world_shape
     STA (zp_fill_pointer),Y     \ The shape
+    LDA zp_fill_pointer + 1
+    CLC
+    ADC #HI(tile_cache_light - tile_cache_shapes)
+    STA zp_fill_pointer + 1
+    JSR fixed_light
+    STA (zp_fill_pointer),Y     \ The light
     LDA zp_fill_down
     BNE down
     INC zp_fill_x
@@ -448,6 +454,38 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
 .next
     DEC zp_fill_count
     BNE loop
+    RTS
+}
+
+\ The light at (zp_fill_x, zp_fill_y), times LIGHT_SCALE: a stand-in for
+\ daylight (lighting.fixed_light). Full down to the surface, then a level
+\ less each tile deeper, down to LIGHT_FIXED_FLOOR. Preserves Y.
+.fixed_light
+{
+    ASSERT LIGHT_SCALE = 16
+    LDX zp_fill_x
+    LDA zp_fill_y
+    SEC
+    SBC world_heights,X         \ The depth below the surface
+    BCC full                    \ Above it
+    BEQ full                    \ At it
+    CMP #LIGHT_FULL - LIGHT_FIXED_FLOOR
+    BCS floor
+    STA zp_world_temp
+    LDA #LIGHT_FULL
+    SEC
+    SBC zp_world_temp
+    JMP scale
+.floor
+    LDA #LIGHT_FIXED_FLOOR
+    BNE scale                   \ Always branches
+.full
+    LDA #LIGHT_FULL
+.scale
+    ASL A
+    ASL A
+    ASL A
+    ASL A
     RTS
 }
 

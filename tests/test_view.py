@@ -6,7 +6,7 @@ import pytest
 from beebium.client import Beebium
 
 from conftest import boot_until_ready
-from stratagem import actions, camera, player, sprites
+from stratagem import actions, camera, lighting, player, sprites
 from stratagem.actions import Hands
 from stratagem.camera import Camera
 from stratagem.player import Player
@@ -52,7 +52,8 @@ def read_state(bbc: Beebium, labels: dict[str, int]) -> tuple[Camera, Player, in
 
 
 def expected_screen(state: Camera, hero: Player, screen_start: int, world_tile_at=tile_at) -> dict[int, int]:
-    image = render_view(screen_start, state.camera_x, state.camera_y, world_tile_at, tile_bytes)
+    image = render_view(screen_start, state.camera_x, state.camera_y, world_tile_at, tile_bytes,
+                        lighting.cell_masks(lighting.fixed_light))
     frame = FRAMES[sprites.frame_for(hero)]
     column = (hero.px >> 1) - state.camera_x
     line = hero.py - state.camera_y * 8
@@ -71,11 +72,13 @@ def assert_tile_cache_holds_view(bbc: Beebium, labels: dict[str, int], state: Ca
     size = TILE_CACHE_SIZE ** 2
     materials = bbc.memory.address.peek[labels["tile_cache"]:labels["tile_cache"] + size]
     shapes = bbc.memory.address.peek[labels["tile_cache_shapes"]:labels["tile_cache_shapes"] + size]
+    lights = bbc.memory.address.peek[labels["tile_cache_light"]:labels["tile_cache_light"] + size]
     wrong = []
     for ty in range(state.camera_y >> 1, (state.camera_y + camera.VIEW_ROWS - 1 >> 1) + 1):
         for tx in range(state.camera_x >> 2, (state.camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1):
             index = (ty % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + tx % TILE_CACHE_SIZE
-            if (materials[index], shapes[index]) != world_tile_at(tx, ty):
+            if (materials[index], shapes[index]) != world_tile_at(tx, ty) or \
+                    lights[index] != lighting.fixed_light(tx, ty) * lighting.LIGHT_SCALE:
                 wrong.append((tx, ty))
     assert wrong[:8] == [], f"{len(wrong)} cached tiles are wrong"
 

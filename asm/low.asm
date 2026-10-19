@@ -299,10 +299,12 @@ INCLUDE "asm/machine.asm"
 
 \ The tile cache: the tiles around the view, which the world fills and the
 \ renderer and the game read. A 32 x 32 ring: the material of tile (x, y) is
-\ at tile_cache + (y MOD 32) * 32 + (x MOD 32), and its shape at the same
-\ offset in tile_cache_shapes. It overlays nothing, so it isn't saved.
+\ at tile_cache + (y MOD 32) * 32 + (x MOD 32), its shape at the same
+\ offset in tile_cache_shapes, and its light level times LIGHT_SCALE in
+\ tile_cache_light. It overlays nothing, so it isn't saved.
 ALIGN &100
 .tile_cache         SKIP TILE_CACHE_SIZE * TILE_CACHE_SIZE
 .tile_cache_shapes  SKIP TILE_CACHE_SIZE * TILE_CACHE_SIZE
+.tile_cache_light   SKIP TILE_CACHE_SIZE * TILE_CACHE_SIZE
 
 SAVE "STRAT", strat_start, strat_end

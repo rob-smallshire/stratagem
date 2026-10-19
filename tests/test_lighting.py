@@ -63,3 +63,24 @@ def test_dither_coverage_counts_pixels():
         kept = np.count_nonzero(lighting.lit_pixels(pixels, np.full((4, 4), level)))
         assert kept == lighting.coverage(level)
     assert lighting.coverage(FULL) == 16 and lighting.coverage(0) == 0
+
+
+def test_masks_dither_as_the_pixel_model_does():
+    """A cell's bytes ANDed with its masks are the cell's pixels dithered
+    by lit_pixels, every level and both column parities; and dark pixels
+    stay in the tile colour group (black is colour 8)."""
+    from stratagem.screen import mode2_byte, mode2_pixels
+    pixels = np.array([[15, 13], [9, 14], [11, 10], [12, 15]] * 2)   # tile colours 8-15, 8 lines
+    for level in range(FULL + 1):
+        for parity in range(2):
+            expected = lighting.lit_pixels(pixels - 8, np.full(pixels.shape, level), origin_x=2 * parity) + 8
+            for line in range(8):
+                byte = mode2_byte(*pixels[line]) & lighting.mask_byte(level, parity, line)
+                assert mode2_pixels(byte) == tuple(expected[line]), (level, parity, line)
+
+
+def test_fixed_light_fades_below_the_surface():
+    from stratagem.world import HEIGHTS
+    h = HEIGHTS[60]
+    assert [lighting.fixed_light(60, y) for y in range(h - 1, h + 15)] == \
+        [15, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 3, 3]
