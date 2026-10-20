@@ -197,6 +197,48 @@ def light_masks() -> bytes:
                  for level in range(FULL + 1) for parity in range(2) for line in range(8))
 
 
+# Daylight down shafts (docs/lighting-tactics.md section 6): direct sunlight
+# falls down each column to its first opaque tile, however deep (the
+# column's sky depth); then, a row at a time from the top, it spreads through
+# open tiles, down (losing SUN_DOWN_STEP a tile) and sideways (SUN_SIDE_STEP),
+# never up. Walls are lit at their faces and soaked as by `spread`.
+
+SUN_DOWN_STEP = 2
+SUN_SIDE_STEP = 2
+
+
+def sky_depths(clear: np.ndarray) -> np.ndarray:
+    """Each column's first opaque row (the region's height if none)."""
+    height = clear.shape[0]
+    opaque = ~clear
+    return np.where(opaque.any(axis=0), opaque.argmax(axis=0), height)
+
+
+def sunlight(clear: np.ndarray, sun: int = FULL, down_step: int = SUN_DOWN_STEP, side_step: int = SUN_SIDE_STEP,
+             wall_step: int | None = 4) -> np.ndarray:
+    """Daylight per tile of a region whose row 0 is the top of the world."""
+    height, width = clear.shape
+    depth = sky_depths(clear)
+    light = np.zeros(clear.shape, dtype=int)
+    for y in range(height):
+        row = light[y]
+        for x in range(width):
+            if not clear[y, x]:
+                continue
+            if y < depth[x]:
+                row[x] = sun
+            elif y > 0 and clear[y - 1, x]:
+                row[x] = max(0, light[y - 1, x] - down_step)
+        for xs in (range(1, width), range(width - 2, -1, -1)):
+            step = 1 if xs.step == 1 else -1
+            for x in xs:
+                if clear[y, x] and clear[y, x - step]:
+                    row[x] = max(row[x], row[x - step] - side_step)
+    if wall_step is None:
+        return light_surfaces(light, clear)
+    return spread(light, clear, None, wall_step=wall_step)
+
+
 def cell_masks(light_at):
     """The mask for line `line` of world cell (u, v), given each tile's
     level by light_at(x, y): for screen.render_view."""
