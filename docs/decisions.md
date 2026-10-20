@@ -124,3 +124,8 @@ A running log of design decisions. Add to it whenever one is made.
   (56 slots at `&B100`), rather than composing as each cell is drawn (80-130
   cycles more a cell, in every drawing path). Pieces have their own masks,
   so black stays black. The torch is the first piece.
+- **Daylight tapers down shafts:** sunlight loses a level for each 4 tiles
+  below the column's surface, so a shaft darkens slowly as it deepens (the
+  glow fades over about 11 tiles; this over about 60). Chosen in the
+  daylight lab over a narrower reach (2 columns) and a dimmer start for the
+  shaft's walls.

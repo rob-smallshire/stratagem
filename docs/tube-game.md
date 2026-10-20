@@ -118,8 +118,10 @@ open tile is lit fully above its column's sky depth, else from the nearest
 column within 4 open to the sky at its row, 3 levels less a column away; a
 wall fully at its column's sky depth, 4 less a tile below it, from a column
 open to the sky beside it, and, as a floor, as brightly as the open tile
-above it. So daylight falls down a dug shaft and pools where it meets a
-cave. Light ignores what lies between the column and the tile, so it can
+above it; then a level less for each 4 tiles the tile is below its
+column's surface (`SHAFT_TAPER`). So daylight falls down a dug shaft,
+dimming slowly as it goes (four times more slowly than the glow), and pools
+where it meets a cave. Light ignores what lies between the column and the tile, so it can
 seep a few tiles through rock, and it doesn't creep down slopes away from
 the shaft: the price of being cheap. The glow is the host-only game's
 stand-in, `fixed_light`, 4 levels dimmer: it shades the rock below the
@@ -185,6 +187,9 @@ Measured while digging and tunnelling (529 frames):
 Daylight adds about 1,200 cycles a frame on average while digging down a
 shaft and along a tunnel (17,300 against 16,100 in py65 over the same
 490 frames), and frames over 60,000 go from 16 to 20.
+
+The taper costs nothing measurable (17,311 against 17,333 over the same
+490 frames).
 
 Slots add about 30 cycles a frame (17,333 against 17,306 over the same
 490 frames; with torches dropped, 18,827 against 18,801 over 794, the

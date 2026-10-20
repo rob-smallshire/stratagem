@@ -11,7 +11,7 @@ from mos6502 import Machine6502
 from stratagem import lighting
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.world import CHUNK_SIZE, CHUNKS_ACROSS, generate_tile
+from stratagem.world import CHUNK_SIZE, CHUNKS_ACROSS, HEIGHTS, generate_tile
 
 TILE_CACHE_SIZE = 32
 SUN_DEPTH = 0xBD00              # asm/parasite.asm
@@ -75,9 +75,10 @@ class ParasiteGame:
         return self.memory[self.labels["tile_cache_light"] + index]
 
 
-def check_daylight(game: ParasiteGame) -> int:
+def check_daylight(game: ParasiteGame) -> tuple[int, int]:
     """Compare the cache's tiles with the model; returns how many are lit by
-    sunlight beyond the glow."""
+    sunlight beyond the glow, and how many of those are tapered (dimmed
+    with depth below the surface)."""
     left, right = game.byte("cached_left"), game.byte("cached_right")
     top, bottom = game.byte("cached_top"), game.byte("cached_bottom")
 
@@ -88,26 +89,29 @@ def check_daylight(game: ParasiteGame) -> int:
     for x in range(max(0, left - lighting.SHAFT_REACH), min(255, right + lighting.SHAFT_REACH) + 1):
         depth[x] = lighting.sky_depth(clear_at, x)
         assert game.memory[SUN_DEPTH + x] == depth[x], f"column {x}'s sky depth"
-    beyond = 0
+    beyond = tapered = 0
     for y in range(top, bottom + 1):
         for x in range(left, right + 1):
             sun = lighting.shaft_sun(depth, clear_at(x, y), x, y, clear_above=y > 0 and clear_at(x, y - 1))
             day = max(sun, lighting.glow(x, y))
             assert game.cache_light(x, y) == day * lighting.LIGHT_SCALE, f"tile ({x}, {y}): light"
             beyond += sun > lighting.glow(x, y)
-    return beyond
+            tapered += sun > lighting.glow(x, y) and y - HEIGHTS[x] >= lighting.SHAFT_TAPER
+    return beyond, tapered
 
 
 def test_daylight_matches_the_model(game_build):
     game = ParasiteGame(game_build)
-    cycles, checks, lit = [], 0, 0
+    cycles, checks, lit, tapered = [], 0, 0, 0
     for count, keys in SCRIPT:
         for _ in range(count):
             cycles.append(game.frame(sum(KEYS[k] for k in keys)))
             idle = not game.byte("sun_busy") and game.byte("torch_queue_head") == game.byte("torch_queue_tail")
             if idle:
-                lit = max(lit, check_daylight(game))
+                beyond, deep = check_daylight(game)
+                lit, tapered = max(lit, beyond), max(tapered, deep)
                 checks += 1
     assert checks > 30
     assert lit > 0, "no sunlight beyond the glow: the shaft isn't lit"
+    assert tapered > 0, "no sunlight deep enough down the shaft to be tapered"
     print(f"\nthe parasite's frames: mean {np.mean(cycles):.0f} cycles, max {max(cycles)}")

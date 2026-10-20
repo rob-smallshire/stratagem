@@ -3,8 +3,10 @@
 \ world in sun_depth. An open tile is lit fully above its column's sky depth,
 \ else from the nearest column within SHAFT_REACH open to the sky at its
 \ row; a wall at its column's sky depth and below it, from a column open to
-\ the sky beside it, and, as a floor, as brightly as the open tile above it.
-\ A tile's daylight is the brighter of that and the glow (lighting.glow).
+\ the sky beside it, and, as a floor, as brightly as the open tile above it;
+\ then a level less for each SHAFT_TAPER tiles below its column's surface,
+\ so that it dims slowly down a shaft. A tile's daylight is the brighter of
+\ that and the glow (lighting.glow).
 \
 \ Daylight is worked out as tiles enter the tile cache. A change to the
 \ world relights the tiles around the columns whose sky depth it changes,
@@ -320,8 +322,9 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
 }
 
 \ The daylight of tile (zp_fill_x, zp_fill_y), in the tile cache, scaled, in
-\ A: the brighter of its sunlight and the glow (LIGHT_FULL - GLOW_LOSS down
-\ to the surface, then a level less a tile deeper).
+\ A: the brighter of its sunlight, a level less for each SHAFT_TAPER tiles
+\ it is below its column's surface, and the glow (LIGHT_FULL - GLOW_LOSS
+\ down to the surface, then a level less a tile deeper).
 .sun_daylight
 {
     JSR sun_tile
@@ -332,6 +335,17 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
     SBC world_heights,X
     BCC full
     STA sun_tmp
+    LSR A                       \ The taper
+    LSR A
+    ASSERT SHAFT_TAPER = 4
+    STA sun_taper
+    LDA sun_level
+    SEC
+    SBC sun_taper
+    BCS tapered
+    LDA #0
+.tapered
+    STA sun_level
     LDA #LIGHT_FULL - GLOW_LOSS
     SEC
     SBC sun_tmp

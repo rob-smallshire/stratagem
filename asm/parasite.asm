@@ -188,6 +188,7 @@ GUARD &0800
 .sun_old_depth      SKIP 1
 .sun_save_x         SKIP 1
 .sun_save_y         SKIP 1
+.sun_taper          SKIP 1
 .para_material      SKIP 1      \ The tile being sent
 .para_shape         SKIP 1
 .piece_shape        SKIP 1      \ Pieces (pieces.asm)

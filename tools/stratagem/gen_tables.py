@@ -224,7 +224,8 @@ def light_source() -> str:
     for name in ("MINER_LEVEL", "MINER_RADIUS", "OPEN_STEP", "OPEN_DIAGONAL_STEP", "WALL_STEP", "NO_TILE"):
         lines.append(f"{'' if name.startswith('MINER') else 'LIGHT_'}{name} = {getattr(lighting, name)}")
     lines.append(f"MINER_SPAN = {2 * lighting.MINER_RADIUS + 1}")
-    for name in ("SUN_WALL_STEP", "GLOW_LOSS", "SHAFT_SIDE_STEP", "SHAFT_REACH", "SHAFT_WALL_REACH"):
+    for name in ("SUN_WALL_STEP", "GLOW_LOSS", "SHAFT_SIDE_STEP", "SHAFT_REACH", "SHAFT_WALL_REACH",
+                 "SHAFT_TAPER"):
         lines.append(f"{name} = {getattr(lighting, name)}")
     lines.append(f"MINER_WINDOW = {len(lighting.MINER_ORDER)}")
     lines.append("")

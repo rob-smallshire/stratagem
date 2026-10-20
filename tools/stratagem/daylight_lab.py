@@ -7,9 +7,9 @@ natural caves under the hills), untouched and dug, lit by daylight alone,
 each way: as before (`lighting.fixed_light`: a level less per tile below the
 original surface, open or not); spreading down shafts (`lighting.sunlight`),
 with the glow (the stand-in, dimmed, so that shallow caves can be made out);
-and by columns (`lighting.shaft_sun`, as the game does it), losing 3 or 2 a
-column, and reaching 4 columns (as the game does), 3 or 2; and dimming a
-level each 4 or 8 tiles below the surface, down a shaft. Then
+and by columns (`lighting.shaft_sun`), losing 3 or 2 a column, reaching 4
+columns or 2, untapered or (as the game does) tapered: a level less for
+each 4 tiles below the surface, so that it dims slowly down a shaft. Then
 screen-sized views of each with the torches and the miner's light. Writes
 daylight.png and views.png.
 """
@@ -34,28 +34,23 @@ def glow(scene, clear):
     return np.maximum(0, as_now(scene, clear) - lighting.GLOW_LOSS)
 
 
-def tapered(scene, clear, taper, reach):
-    """By columns, sunlight dimming a level each `taper` tiles below each
-    column's surface."""
-    surface = [HEIGHTS[scene.left + i] for i in range(clear.shape[1])]
-    return lighting.shaft_sunlight(clear, reach=reach, taper=taper, surface=surface)
+def surface(scene, clear):
+    return [HEIGHTS[scene.left + i] for i in range(clear.shape[1])]
 
 
 METHODS = [
     ("as now", as_now),
     ("down shafts, with a glow", lambda scene, clear: np.maximum(lighting.sunlight(clear), glow(scene, clear))),
-    ("by columns, step 3", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear), glow(scene, clear))),
-    ("by columns, step 2", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, 2), glow(scene, clear))),
-    ("by columns, step 3, reach 3",
-     lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=3), glow(scene, clear))),
-    ("by columns, step 3, reach 2",
-     lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=2), glow(scene, clear))),
-    ("reach 4, a level per 4 tiles down",
-     lambda scene, clear: np.maximum(tapered(scene, clear, 4, lighting.SHAFT_REACH), glow(scene, clear))),
-    ("reach 4, a level per 8 tiles down",
-     lambda scene, clear: np.maximum(tapered(scene, clear, 8, lighting.SHAFT_REACH), glow(scene, clear))),
-    ("reach 2, a level per 4 tiles down",
-     lambda scene, clear: np.maximum(tapered(scene, clear, 4, 2), glow(scene, clear))),
+    ("by columns, step 3 (untapered)", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear),
+                                                                       glow(scene, clear))),
+    ("by columns, step 2 (untapered)", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, 2),
+                                                                       glow(scene, clear))),
+    ("by columns, reach 2, tapered",
+     lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=2, surface=surface(scene, clear)),
+                                     glow(scene, clear))),
+    ("by columns, as the game: tapered",
+     lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, surface=surface(scene, clear)),
+                                     glow(scene, clear))),
 ]
 
 
