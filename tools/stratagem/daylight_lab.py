@@ -8,8 +8,9 @@ each way: as before (`lighting.fixed_light`: a level less per tile below the
 original surface, open or not); spreading down shafts (`lighting.sunlight`),
 with the glow (the stand-in, dimmed, so that shallow caves can be made out);
 and by columns (`lighting.shaft_sun`, as the game does it), losing 3 or 2 a
-column. Then screen-sized views of each with the torches and the miner's
-light. Writes daylight.png and views.png.
+column, and reaching 4 columns (as the game does), 3 or 2. Then
+screen-sized views of each with the torches and the miner's light. Writes
+daylight.png and views.png.
 """
 
 from __future__ import annotations
@@ -37,6 +38,10 @@ METHODS = [
     ("down shafts, with a glow", lambda scene, clear: np.maximum(lighting.sunlight(clear), glow(scene, clear))),
     ("by columns, step 3", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear), glow(scene, clear))),
     ("by columns, step 2", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, 2), glow(scene, clear))),
+    ("by columns, step 3, reach 3",
+     lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=3), glow(scene, clear))),
+    ("by columns, step 3, reach 2",
+     lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=2), glow(scene, clear))),
 ]
 
 

@@ -542,29 +542,29 @@ SHAFT_WALL_REACH = FULL // SUN_WALL_STEP + 1
 
 
 def shaft_sun(depth, clear: bool, x: int, y: int, side_step: int = SHAFT_SIDE_STEP,
-              clear_above: bool = False) -> int:
+              clear_above: bool = False, reach: int = SHAFT_REACH) -> int:
     """Sunlight at tile (x, y), from `depth[x]`, each column's sky depth
-    (a sequence over the whole world)."""
+    (a sequence over the whole world), from columns at most `reach` away."""
     def open_to_sky(column):
         return 0 <= column < len(depth) and y < depth[column]
     if clear:
-        for d in range(0, FULL // side_step):
+        for d in range(0, min(FULL // side_step, reach + 1)):
             if open_to_sky(x - d) or open_to_sky(x + d):
                 return FULL - side_step * d
         return 0
     best = max(0, FULL - SUN_WALL_STEP * (y - depth[x])) if y >= depth[x] else 0
-    for d in range(1, SHAFT_WALL_REACH + 1):
+    for d in range(1, min(SHAFT_WALL_REACH, reach) + 1):
         if open_to_sky(x - d) or open_to_sky(x + d):
             best = max(best, FULL - SUN_WALL_STEP * (d - 1))
             break
     if clear_above:
-        best = max(best, shaft_sun(depth, True, x, y - 1, side_step))
+        best = max(best, shaft_sun(depth, True, x, y - 1, side_step, reach=reach))
     return best
 
 
-def shaft_sunlight(clear: np.ndarray, side_step: int = SHAFT_SIDE_STEP) -> np.ndarray:
+def shaft_sunlight(clear: np.ndarray, side_step: int = SHAFT_SIDE_STEP, reach: int = SHAFT_REACH) -> np.ndarray:
     """shaft_sun for each tile of a region whose row 0 is the top of the
     world."""
     depth = sky_depths(clear)
-    return np.array([[shaft_sun(depth, clear[y, x], x, y, side_step, y > 0 and clear[y - 1, x])
+    return np.array([[shaft_sun(depth, clear[y, x], x, y, side_step, y > 0 and clear[y - 1, x], reach)
                       for x in range(clear.shape[1])] for y in range(clear.shape[0])])
