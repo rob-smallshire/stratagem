@@ -100,3 +100,7 @@ A running log of design decisions. Add to it whenever one is made.
   only the cells whose pixels change, from a list the parasite sends.
 - **No double buffering:** the Integra-B can't show shadow RAM, so the game
   must work with one screen; drawing stays ahead of the beam.
+- **The Tube game is accepted:** played on a B+128K with a 3 MHz 65C02, it
+  plays smoothly, with no visible problems; the occasional late frame went
+  unnoticed. Torches, with per-tile light beside the miner's per-block light,
+  look right. Development carries on from the Tube game.
