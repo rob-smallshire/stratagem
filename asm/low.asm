@@ -134,6 +134,16 @@ ENDMACRO
     STA zp_boot_status
     LDA #&77                    \ Close the !BOOT EXEC file
     JSR OSBYTE
+    LDA #&EA                    \ A second processor? Then this runs on it,
+    LDX #0                      \ not on the BBC: the Tube game is for that
+    LDY #&FF
+    JSR OSBYTE
+    CPX #0
+    BEQ no_tube
+    LDX #LO(message_tube)
+    LDY #HI(message_tube)
+    JMP fail
+.no_tube
     JSR detect_machine
     LDA zp_machine
     CMP #MACHINE_INTEGRA_B
@@ -292,6 +302,7 @@ ENDMACRO
 .message_machine    EQUS "Stratagem needs a BBC B+ 128K or an Integra-B", 13, 0
 .message_banks      EQUS "Stratagem needs 48K of free sideways RAM", 13, 0
 .message_shadow     EQUS "Stratagem needs shadow RAM", 13, 0
+.message_tube       EQUS "With a second processor, boot", 13, "stratagem-tube.ssd", 13, 0
 
 INCLUDE "asm/machine.asm"
 
