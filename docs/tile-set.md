@@ -115,52 +115,58 @@ This is the hard part, and the only part bounded by memory.
 The renderer draws a tile from its material's page of graphics against a
 background, pre-composed: each material has two pages (cave, sky), each
 with four cell variants (512 bytes). Four backgrounds that way would
-double every material's graphics; so pieces, and terrain over the new
-backgrounds, must be drawn over their background as the cell is drawn:
+double every material's graphics. Three ways round it were weighed, and
+the first two timed in py65 (a cell, 8 bytes, as the renderer draws it):
 
-    LDA piece,Y : TAX : LDA backdrop,Y : AND clear_mask,X : ORA piece,Y
+| Drawing a cell | Full light | Dimmed |
+|---|---|---|
+| As now: a pre-composed graphic | 98 | 138 |
+| Composed as drawn, black clear (a 256-byte table finds the clear pixels) | 226 | 266 |
+| Composed as drawn, the piece with its own mask | 178 | 218 |
 
-where `clear_mask` is a 256-byte table giving, for any screen byte, the
-pixels that are colour 8 (the tile group's black, which shows the
-background). A piece is then 64 bytes, whatever its background, and the
-same mask lets the miner be drawn *behind* a piece drawn in front (next
-steps, item 1), for free.
+Composing as drawn costs 80-130 cycles more a cell, in every path that
+draws one (new rows, new columns at the beam, changed tiles, the light's
+list), and every one of them would need a second form.
 
-The cost is in the renderer: every path that draws a cell (new rows, new
-columns, changed tiles, and the light's list, which today sends each
-cell's one graphics address) learns the second, composed, form. The fast
-pre-composed path stays for terrain over sky or cave, which is most of the
-screen.
+**The third way, recommended: compose once, into a cache of slots.** The
+host keeps every piece's graphics, and its mask, in its program RAM (about
+18K free in the Tube game, where the renderer can't read but other host
+code can), and a cache of slots in the render region: each slot a piece
+already composed over one backdrop, 64 bytes. When a tile with a piece
+enters the parasite's tile cache, the parasite makes sure its pair (piece,
+backdrop) has a slot, and if not, tells the host in the packet (slot, piece,
+backdrop: three bytes); the host composes it, about 1,500 cycles (timed),
+once. The tile the host gets names the slot as an ordinary material and
+shape, so **the renderer doesn't change at all**, and costs what it does
+now. The light's list looks the slot up the same way.
 
-### The memory budget
+- Slots as materials: a material's two pages hold eight whole-tile slots,
+  given three pseudo-shapes (there are three spare shape numbers) whose
+  cells are all one variant: so slot k of a group is drawn as variant k
+  (0-3) of the cave or sky page. The 4K at `&B000`-`&BFFF` holds 56-64
+  slots (a page table in place of `material * 2` lets groups sit anywhere).
+- How many are needed: the lab's busiest view (a forest, a hut, a cave)
+  holds 29 pairs in a screen's 16 x 16 tiles and 41 in the whole scene
+  (44 x 30, about the tile cache's 32 x 32). So 56 is enough with room, and
+  a slot is freed when its pair leaves the tile cache (a count per slot,
+  kept as the cache fills).
+- Masked pieces cost nothing at draw time, so pieces keep black as black
+  (the lab: black-clear lets the backdrop through black detail, which
+  suits leaves but not bark or outlines). At 128 bytes a piece, 18K holds
+  over a hundred.
+- The miner drawn behind a piece in front uses the piece's mask, kept
+  beside the slot (next steps, item 1).
 
-The renderer can see only the render bank while the screen is paged in:
-16K, mostly used (the ten materials are 5K, the miner's frames 1.2K). Free
-in the Tube game: about 0.8K below `&A000` and the 4K at `&B000`-`&BFFF`.
-About 4.8K, then:
+This replaces the budget below and the cache of piece graphics: it is that
+cache, holding composed pairs rather than pieces.
 
-| | Bytes |
-|---|---|
-| Four backdrops (sky, cave, plank wall, stone wall), 64 each | 256 |
-| `clear_mask` | 256 |
-| 50 pieces at 64 bytes | 3,200 |
-| Item sprites (for pieces that fly out), a dozen small ones | about 600 |
-| Spare | about 500 |
+### The memory budget (superseded by the slots)
 
-The torch's 512 bytes return to the pool when it becomes a piece. Fifty
-pieces is enough for the set below, with room for a second look of some.
-
-### Beyond fifty: a cache of piece graphics
-
-If the set outgrows the budget, the host could keep a cache of piece
-graphics instead: say 32 slots of 64 bytes, holding the pieces in view.
-The parasite, which has room, keeps every piece's graphics (compressed, if
-need be); when a tile enters its tile cache, it makes sure the tile's piece
-has a slot, sending its 64 bytes over the Tube if not, and the tile the
-host gets names the slot, not the piece. The view rarely holds more than a
-few kinds of piece, so the limit becomes what the parasite holds, for an
-occasional transfer as something new scrolls in. Prototyped only if the
-fixed budget runs out.
+Drawing as composed, the renderer would need everything in the render
+bank: 16K, mostly used (the ten materials are 5K, the miner's frames
+1.2K). Free in the Tube game: about 0.8K below `&A000` and the 4K at
+`&B000`-`&BFFF`, so about fifty pieces at 64 bytes. With slots, the 4K
+holds the slots and the pieces live in host program RAM.
 
 ### Not variable-length tiles
 
@@ -209,17 +215,35 @@ an anvil, make a better pickaxe.
   or rows around a tile (is there a tree rooted near here?): measure what
   it adds to a new row's 29,000 cycles.
 
+## What the prototypes found
+
+- **The piece lab** (`uv run strat-piece-lab`, into `build/pieces/`): the
+  set drawn in a scene. Pieces over backdrops read well; the miner behind a
+  tree or a mushroom drawn in front works. Back walls must be dim (sparse
+  colour on black), or they swamp what stands in front of them. Dithered
+  leaves let the backdrop through, as in Stryker's Run.
+- **Daylight leaks into buildings.** Daylight by columns (`shaft_sun`)
+  lights a tile from an open column up to 4 away whatever lies between, so
+  a roofed hut is lit inside through its walls. For shelter to be dark,
+  the light from beside must stop at an opaque tile on its row: a scan of
+  up to 4 tiles, for tiles below their own column's sky depth only.
+  Measure it before choosing.
+- **Drawing:** composing as drawn costs 80-130 cycles more a cell; composing
+  once into slots costs about 1,500 cycles a new pair and nothing a frame.
+  See Drawing.
+
 ## To prototype
 
-1. **A lab in Python**, as the lighting lab: a scene with a tree, a vine, a
-   hut (back walls, a door, a ladder, a platform, a bench, a torch inside),
-   drawn with the composed pieces and lit; the miner in front of and behind
-   pieces. Decides the look and the format.
-2. **The renderer's composed path** on the host, measured, and the light's
-   list carrying it. This is where the risk is.
-3. **Property tables**, replacing material number tests, with no change in
+1. ~~A lab in Python~~: done (above).
+2. **Slots in the game**, with the torch as the first piece: the host's
+   library of pieces and its composer, the slots as materials with the
+   pseudo-shapes, the parasite's pairs and counts, the packet's compose
+   command; measured on both sides (the composer, and the parasite's cost
+   as tiles enter the cache). The torch's 512 bytes go back to the pool.
+3. **Daylight that stops at walls**, measured, so that shelter is dark.
+4. **Property tables**, replacing material number tests, with no change in
    behaviour (the tests must stay green).
-4. **Climbing and platforms** in the player's model and on the 6502.
-5. **Trees** grown by the generator, felled by the rule, wood counted.
-6. **Placing** pieces from an inventory, and the first recipes.
-7. **Flying pieces** (the object list), measured on both sides.
+5. **Climbing and platforms** in the player's model and on the 6502.
+6. **Trees** grown by the generator, felled by the rule, wood counted.
+7. **Placing** pieces from an inventory, and the first recipes.
+8. **Flying pieces** (the object list), measured on both sides.
