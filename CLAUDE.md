@@ -9,6 +9,8 @@ filing system resident, and is tested in the Beebium emulator.
 - `docs/next-steps.md`: the agreed plan ahead.
 - `docs/tube-game.md`: the game on a 6502 second processor (its own disc,
   `build/stratagem-tube.ssd`); `docs/tube-prototypes.md`, how we got there.
+- `docs/tile-set.md`: the planned tile set (pieces, objects, back walls) and
+  how the format and renderer could carry it.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).
 - `docs/architecture.md`: memory model, memory map, screen, world, frame.
