@@ -121,7 +121,8 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   its default (`&2D`) leaves the Tube off, so the host runs BASIC.
   `*CONFIGURE TUBE` (checked with `*STATUS TUBE`) then Ctrl-Break
   (`keyboard.ctrl_break()`) or power-on turns it on, as does `*TUBE ON`
-  at once (#203). **V** (in Beebium)
+  at once. From Beebium 0.12.0 (#203) an Integra-B launched with a second
+  processor starts with TUBE configured. **V** (in Beebium)
 - Display: the B+ video reads main or shadow RAM according to `&FE34`
   bit 7, at every character fetch, so the displayed screen can be swapped
   between them. The Integra-B video always reads main RAM, so there it

@@ -121,11 +121,6 @@ def tube_bbc(tube_machine):
             pytest.skip(str(e))
         bbc.system.set_speed_multiplier(0.0)
         wait_for_prompt(bbc)
-        if machine.name == "integra-b":
-            # IBOS leaves the Tube off by default (beebium #203).
-            type_line(bbc, "*CONFIGURE TUBE")
-            bbc.keyboard.ctrl_break()
-            wait_for_prompt(bbc)
         yield bbc
 
 

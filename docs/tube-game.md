@@ -12,8 +12,9 @@ processor (a 3 MHz 65C02, or the 4 MHz 65C102).
 
 - In Beebium, import `presets/stratagem-b-plus-128k-65c02.json` (File >
   Import Presets...): a B+ 128K with a 3 MHz 65C02. From the command line,
-  add `--tube-65c02` to the server's options. On the Integra-B, until
-  Beebium starts it so, type `*CONFIGURE TUBE` and press Ctrl-Break first.
+  add `--tube-65c02` to the server's options: from Beebium 0.12.0 an
+  Integra-B so launched boots across the Tube (one saved by an earlier
+  version still needs `*CONFIGURE TUBE` and Ctrl-Break once).
 - Insert `build/stratagem-tube.ssd` and Shift-Break.
 
 The keys are the host-only game's (`implementation-record.md`), and T:
