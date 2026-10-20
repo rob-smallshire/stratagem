@@ -235,11 +235,12 @@ an anvil, make a better pickaxe.
 ## To prototype
 
 1. ~~A lab in Python~~: done (above).
-2. **Slots in the game**, with the torch as the first piece: the host's
-   library of pieces and its composer, the slots as materials with the
-   pseudo-shapes, the parasite's pairs and counts, the packet's compose
-   command; measured on both sides (the composer, and the parasite's cost
-   as tiles enter the cache). The torch's 512 bytes go back to the pool.
+2. ~~Slots in the game~~: done, with the torch as the first piece
+   (`docs/tube-game.md`, Pieces and slots). Composing a slot costs the host
+   about 1,800 cycles; the parasite pays about 30 cycles a frame. Slots are
+   freed by sweeping the tile cache when none is free, rather than by
+   counts. The torch's material pages are still in the render region (the
+   host-only game shares them); they can go when the two part.
 3. **Daylight that stops at walls**, measured, so that shelter is dark.
 4. **Property tables**, replacing material number tests, with no change in
    behaviour (the tests must stay green).

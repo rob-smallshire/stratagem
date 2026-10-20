@@ -566,6 +566,14 @@ GRID_COLUMN = 8 * GRID_RADIUS - (BLOCK_PIXELS DIV 2 + RADIAL_CENTRE)
     LDA (sl_shape_ptr),Y        \ The tile's graphics page
     STA sl_shape
     LDA (sl_map_ptr),Y
+    CMP #FIRST_PIECE            \ A piece: its slot's (pieces.asm)
+    BCC material
+    CMP #FIRST_PIECE + PIECE_COUNT
+    BCS material
+    LDX sl_shape
+    JSR piece_shown
+    STX sl_shape
+.material
     ASL A
     BIT sl_shape
     BVC cave
@@ -606,6 +614,17 @@ GRID_COLUMN = 8 * GRID_RADIUS - (BLOCK_PIXELS DIV 2 + RADIAL_CENTRE)
     LDA #LO(smooth_graphics_odd)
     LDX #HI(smooth_graphics_odd)
 .graphic
+    LDY sl_page                 \ A slot's are in its own tables, slot * 8
+    CPY #2 * SLOT_MATERIAL      \ on (pieces.asm)
+    BCC material_graphics
+    LDA sl_c
+    LSR A
+    LDA #LO(slot_visibility_even - 64 * SLOT_MATERIAL)
+    LDX #HI(slot_visibility_even - 64 * SLOT_MATERIAL)
+    BCC material_graphics
+    LDA #LO(slot_visibility_odd - 64 * SLOT_MATERIAL)
+    LDX #HI(slot_visibility_odd - 64 * SLOT_MATERIAL)
+.material_graphics
     STA sl_ptr2                 \ This parity's graphics: + page * 32
     STX sl_ptr2 + 1
     LDA sl_page

@@ -41,7 +41,8 @@ PACKET_STRIPS = 12              \ Then that many strips of new tiles: down
                                 \ CHANGES_PER_FRAME), and each: x, y,
                                 \ material, shape, light
 PACKET_REDRAW = &80
-TILE_BYTES_SENT = 3
+TILE_BYTES_SENT = 3              \ (A piece's tile may follow PIECE_COMPOSE,
+PIECE_COMPOSE = &FF             \ its slot, piece and backdrop: pieces.asm)
 CHANGES_PER_FRAME = 3           \ Changed tiles in a packet, at most
 
 \ The draw list: a count, then per cell its masks' low byte, its graphics'

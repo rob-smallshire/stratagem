@@ -111,3 +111,16 @@ A running log of design decisions. Add to it whenever one is made.
   at the cost of light seeping a little through rock and not creeping down
   slopes. The full model needed a 2K window, background work and about
   12,000 cycles a frame; this needs 1K of tables and about 1,200.
+- **A tile set planned ahead** (`docs/tile-set.md`): terrain erodes; pieces
+  (trees, ladders, ropes, platforms, built blocks, doors, stations) are
+  whole tiles that break whole, with a part number in the shape byte, so
+  objects are rules over tiles, not a table; a two-bit background for back
+  walls; property tables in place of material tests. Tiles stay two fixed
+  bytes where read every frame; changed chunks are to be packed (about 21
+  bytes instead of 128, measured) before spilling to disc.
+- **Pieces are drawn through slots:** the host keeps every piece in its
+  program RAM and composes each pair of piece and backdrop in the tile
+  cache once, into a slot that the renderer draws as an ordinary material
+  (56 slots at `&B100`), rather than composing as each cell is drawn (80-130
+  cycles more a cell, in every drawing path). Pieces have their own masks,
+  so black stays black. The torch is the first piece.

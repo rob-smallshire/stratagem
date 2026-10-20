@@ -197,8 +197,11 @@ def cell_variant(shape: int, half: int, column: int) -> int:
 
 def cell_offset(shape: int, half: int, column: int) -> int:
     """The offset, within a material's page for its background, of cell
-    (half, column) of a tile of `shape`."""
-    return cell_variant(shape, half, column) * VARIANT_BYTES + half * 32 + column * 8
+    (half, column) of a tile of `shape`, or of a slot's pseudo-shape."""
+    variant = SLOT_SHAPE_VARIANTS.get(shape & SHAPE_BITS)
+    if variant is None:
+        variant = cell_variant(shape, half, column)
+    return variant * VARIANT_BYTES + half * 32 + column * 8
 
 
 def background(shape: int) -> int:
@@ -287,8 +290,94 @@ def material_pages(material: int) -> bytes:
     )
 
 
+# Pieces (docs/tile-set.md): materials drawn whole over a backdrop, the
+# background that shows through their clear pixels. The torch is the first.
+# A piece's graphics are its pixels and a mask of the clear ones; the host
+# keeps them in its program RAM, and composes each pair of piece and
+# backdrop that is in the tile cache once, into a slot in the render region,
+# which the renderer draws as an ordinary material (below).
+PIECES = [TORCH]
+FIRST_PIECE = TORCH
+PIECE_COUNT = len(PIECES)
+assert PIECES == list(range(FIRST_PIECE, FIRST_PIECE + PIECE_COUNT))
+BACKDROPS = [AIR, SKY]                  # by the shape byte's background bit
+
+
+def piece_pixels(material: int) -> list[list[int | None]]:
+    """A piece's pixels, None where clear."""
+    assert material == TORCH
+    return [[_torch(x, y) if _torch_covers(x, y) else None for x in range(TILE_WIDTH_PIXELS)]
+            for y in range(TILE_HEIGHT_LINES)]
+
+
+def _torch_covers(x: int, y: int) -> bool:
+    row, column = y - TORCH_TOP, x - TORCH_LEFT
+    return 0 <= row < len(_TORCH_ROWS) and 0 <= column < len(_TORCH_ROWS[row]) and _TORCH_ROWS[row][column] != "."
+
+
+def composed_pixels(material: int, backdrop: int) -> list[list[int]]:
+    """A piece drawn over a backdrop's pixels."""
+    return [[MATERIAL_PIXELS[backdrop][y][x] if colour is None else colour for x, colour in enumerate(row)]
+            for y, row in enumerate(piece_pixels(material))]
+
+
+def piece_graphics(material: int) -> bytes:
+    """A piece's 128 bytes: its 64 bytes of screen data (clear pixels 0),
+    then 64 of mask (clear pixels' bits set)."""
+    pixels = piece_pixels(material)
+    data = encode_tile([[0 if c is None else TILE_COLOUR_BASE + c for c in row] for row in pixels])
+    mask = encode_tile([[15 if c is None else 0 for c in row] for row in pixels])
+    return data + mask
+
+
+def backdrop_graphics(backdrop: int) -> bytes:
+    return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in MATERIAL_PIXELS[backdrop]])
+
+
+def compose(material: int, backdrop: int) -> bytes:
+    """What the host composes into a slot: (backdrop AND mask) OR data."""
+    graphics, back = piece_graphics(material), backdrop_graphics(backdrop)
+    return bytes(back[i] & graphics[64 + i] | graphics[i] for i in range(64))
+
+
+def pair_of(tile: tuple[int, int]) -> int:
+    """The pair (piece, backdrop) a piece tile needs: piece index * 2 + sky."""
+    material, shape = tile
+    return (material - FIRST_PIECE) * 2 + (1 if shape & BACKGROUND_SKY else 0)
+
+
+# Slots: SLOT_COUNT composed pairs, 64 bytes each, in SLOT_GROUPS materials
+# from SLOT_MATERIAL, each of whose two pages (cave, sky) holds four as its
+# four variants: so slot s is variant s AND 3 of page (s >> 2) AND 1 of
+# material SLOT_MATERIAL + s >> 3, drawn whole with a pseudo-shape whose
+# cells are all that variant (shape numbers above the real shapes), and its
+# graphics are at material_pages + SLOT_MATERIAL * 512 + s * 64.
+SLOT_MATERIAL = 24
+SLOT_GROUPS = 7
+SLOT_COUNT = 8 * SLOT_GROUPS
+SLOT_SHAPES = [SHAPE_FULL, MAX_SHAPES - 3, MAX_SHAPES - 2, MAX_SHAPES - 1]    # variants 0-3
+SLOT_SHAPE_VARIANTS = {MAX_SHAPES - 3: VARIANT_TOP, MAX_SHAPES - 2: VARIANT_BOTTOM, MAX_SHAPES - 1: VARIANT_EMPTY}
+assert SHAPE_COUNT <= MAX_SHAPES - 3
+assert VARIANT_FULL == 0 and (VARIANT_TOP, VARIANT_BOTTOM, VARIANT_EMPTY) == (1, 2, 3)
+
+
+def slot_tile(slot: int) -> tuple[int, int]:
+    """The tile the host is sent for a piece in `slot`."""
+    return SLOT_MATERIAL + (slot >> 3), SLOT_SHAPES[slot & 3] | (BACKGROUND_SKY if slot & 4 else 0)
+
+
+def slot_of(tile: tuple[int, int]) -> int | None:
+    """The slot a host tile shows, or None if it is not a slot."""
+    material, shape = tile
+    if not SLOT_MATERIAL <= material < SLOT_MATERIAL + SLOT_GROUPS:
+        return None
+    return (material - SLOT_MATERIAL) * 8 + (4 if shape & BACKGROUND_SKY else 0) + SLOT_SHAPES.index(shape & SHAPE_BITS)
+
+
 def tile_pixels(material: int, shape: int) -> list[list[int]]:
     """A tile's pixels (in the tile colour group, without the base)."""
+    if material in PIECES:
+        return composed_pixels(material, background(shape))
     if material in PASSABLE:
         return MATERIAL_PIXELS[material]
     cells = set(solid_quarter_cells(material, shape))

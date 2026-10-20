@@ -47,6 +47,7 @@
     LDA #HI(SCREEN_START)
     STA zp_screen_start + 1
     JSR world_reset
+    JSR piece_init
     JSR sun_init
     JSR sl_init
     JSR plan_camera             \ The focus is outside the view, so redraw
@@ -386,7 +387,7 @@ ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
     LDY zp_fill_y
     JMP sl_reset_tile
 }
-ASSERT 1 + CHANGES_PER_FRAME * (2 + TILE_BYTES_SENT) < &100 - TILE_BYTES_SENT
+ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
 
 \ Fill the tile cache from the world (as the host-only game pages it in to
 \ do), and record what was filled in the packet: a strip.
@@ -468,20 +469,22 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + TILE_BYTES_SENT) < &100 - TILE_BYTES_SENT
 }
 
 \ Copy the tile at para_cache (material, shape, light) to the packet at
-\ (para_write),Y onwards, advancing Y. Adds to para_write if Y would wrap.
+\ (para_write),Y onwards, advancing Y. A piece is sent as its slot, after
+\ its slot's pair if the slot is new (pieces.asm). Adds to para_write if Y
+\ would wrap.
 .para_copy_tile
 {
     STY para_y
     LDY #0
     LDA (para_cache),Y
-    PHA
+    STA para_material
     LDA para_cache + 1
     PHA
     CLC
     ADC #HI(tile_cache_shapes - tile_cache)
     STA para_cache + 1
     LDA (para_cache),Y
-    TAX
+    STA para_shape
     CLC
     LDA para_cache + 1
     ADC #HI(tile_cache_light - tile_cache_shapes)
@@ -491,16 +494,47 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + TILE_BYTES_SENT) < &100 - TILE_BYTES_SENT
     PLA
     STA para_cache + 1
     LDY para_y
-    PLA
+    LDA para_material
+    CMP #FIRST_PIECE
+    BCC plain
+    CMP #FIRST_PIECE + PIECE_COUNT
+    BCS plain
+    LDX para_shape
+    STY para_y
+    JSR piece_slot
+    LDY para_y
+    BCC slot_held
+    LDA #PIECE_COMPOSE          \ A new slot: compose it first
     STA (para_write),Y
     INY
     TXA
     STA (para_write),Y
     INY
+    LDA piece_pair
+    LSR A
+    STA (para_write),Y          \ The piece
+    INY
+    LDA #0
+    ROL A
+    STA (para_write),Y          \ The backdrop
+    INY
+.slot_held
+    LDA para_material           \ Its slot, or its backdrop if none
+    LDX para_shape
+    JSR piece_shown
+    STA para_material
+    STX para_shape
+.plain
+    LDA para_material
+    STA (para_write),Y
+    INY
+    LDA para_shape
+    STA (para_write),Y
+    INY
     LDA para_tmp
     STA (para_write),Y
     INY
-    CPY #&100 - TILE_BYTES_SENT
+    CPY #&100 - PARA_TILE_MOST
     BCC done
     TYA                         \ Keep Y small: move para_write on instead
     CLC
@@ -513,3 +547,4 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + TILE_BYTES_SENT) < &100 - TILE_BYTES_SENT
 .done
     RTS
 }
+PARA_TILE_MOST = 4 + TILE_BYTES_SENT    \ The most a tile takes in a packet

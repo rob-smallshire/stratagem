@@ -19,7 +19,7 @@
 \   &1C00-&27FF  the tile cache (as the host-only game's)
 \   &2800-&37FF  the light's plane
 \   &3800-&42FF  the light's grid of excess
-\   &4300-&7FFF  PGAME
+\   &4300-&7FFF  PGAME, then pieces' slots
 \   &8000-&BCFF  PWORLD and its store
 \   &BD00-&C0FF  daylight's tables: sky depths and reaches (daylight.asm)
 \   &C100-&F7FF  PLIGHT, then tables the light sets up each pass
@@ -45,6 +45,7 @@ sun_reach_3 = &C000
 ORG &D1                         \ Daylight's zero page
 .sun_ptr            SKIP 2      \ A row of the tile cache's materials
 .sun_shape          SKIP 2      \ ... and shapes
+.piece_ptr          SKIP 2      \ A slot's visibility (pieces.asm)
 ASSERT P% <= &E6
 
 ORG &E6
@@ -75,6 +76,7 @@ INCLUDE "asm/player.asm"
 INCLUDE "asm/actions.asm"
 INCLUDE "asm/miner_light.asm"
 INCLUDE "asm/torches.asm"
+INCLUDE "asm/pieces.asm"
 INCLUDE "build/generated/miner.asm"
 INCLUDE "build/generated/smooth.asm"
 
@@ -129,6 +131,14 @@ ALIGN &100
 .sun_reach_4        SKIP &100   \ Daylight (daylight.asm)
 .pgame_end
 
+\ Pieces' slots (pieces.asm), not saved with the code
+.slot_visibility_even   SKIP SLOT_COUNT * 8 \ Each slot's, as the light finds it
+.slot_pair              SKIP SLOT_COUNT     \ Each slot's pair, or PIECE_NO_SLOT
+ORG slot_visibility_even + &200
+.slot_visibility_odd    SKIP SLOT_COUNT * 8
+.slot_mark              SKIP SLOT_COUNT
+.pair_slot              SKIP PIECE_COUNT * 2    \ Each pair's slot, or PIECE_NO_SLOT
+
 SAVE "PGAME", pgame_start, pgame_end, pgame_start
 
 ASSERT sl_plane = &2800 AND sl_grid = &3800
@@ -137,6 +147,7 @@ INCLUDE "asm/world.asm"
 SAVE "PWORLD", world_start, world_end, world_start
 
 ASSERT world_slots + WORLD_SLOT_COUNT * SLOT_BYTES <= sun_depth
+
 ASSERT sun_reach_3 + &100 <= sl_radial
 
 ORG &C100                       \ Clear of world.asm's guard at &C000
@@ -177,6 +188,11 @@ GUARD &0800
 .sun_old_depth      SKIP 1
 .sun_save_x         SKIP 1
 .sun_save_y         SKIP 1
+.para_material      SKIP 1      \ The tile being sent
+.para_shape         SKIP 1
+.piece_shape        SKIP 1      \ Pieces (pieces.asm)
+.piece_pair         SKIP 1
+.piece_slot_found   SKIP 1
 
 \ And tables the light sets up afresh each pass, above daylight's window
 ORG plight_end

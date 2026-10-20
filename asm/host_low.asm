@@ -116,6 +116,8 @@ ENDMACRO
 .host_change        EQUB 0
 .host_change_x      SKIP CHANGES_PER_FRAME  \ ... and where
 .host_change_y      SKIP CHANGES_PER_FRAME
+.zp_romsel_compose  EQUB 0      \ The render bank without the screen
+.host_slot_pair     SKIP SLOT_COUNT \ Each slot's pair, piece * 2 + backdrop
 
 \ ---------------------------------------------------------------------------
 \ Loader
@@ -187,6 +189,7 @@ ENDMACRO
     BEQ copy_render
     AND #&0F
 .copy_render
+    STA zp_romsel_compose       \ (ANDY on the B+; no MEMSEL on the Integra-B)
     LDX #HI(RENDER_REGION_END - RENDER_START)
     JSR copy_to_paged
 

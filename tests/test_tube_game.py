@@ -9,7 +9,8 @@ from conftest import RUN_TIMEOUT_EMULATED_SECONDS
 from stratagem import camera, lighting, player, sprites
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
-from stratagem.tiles import TORCH, tile_bytes
+from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, SHAPE_FULL, SLOT_COUNT, TORCH, slot_of,
+                             tile_bytes)
 
 TILE_CACHE_SIZE = 32       # asm/layout.asm
 FRAMES = sprites.sprite_frames()
@@ -33,16 +34,23 @@ def _signed(byte: int) -> int:
 
 
 def host_tiles(bbc, labels):
-    """The tiles the host holds, by world position (wrapping)."""
+    """The tiles the host holds, by world position (wrapping): a slot as the
+    piece it was composed from (tiles.py), over its backdrop."""
     size = TILE_CACHE_SIZE ** 2
     peek = bbc.memory.address.peek
     materials = peek[labels["tile_cache"]:labels["tile_cache"] + size]
     shapes = peek[labels["tile_cache_shapes"]:labels["tile_cache_shapes"] + size]
     lights = peek[labels["tile_cache_light"]:labels["tile_cache_light"] + size]
+    slot_pairs = peek[labels["host_slot_pair"]:labels["host_slot_pair"] + SLOT_COUNT]
 
     def at(x, y):
         index = (y % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + x % TILE_CACHE_SIZE
-        return (materials[index], shapes[index]), lights[index] // lighting.LIGHT_SCALE
+        tile = materials[index], shapes[index]
+        slot = slot_of(tile)
+        if slot is not None:
+            pair = slot_pairs[slot]
+            tile = FIRST_PIECE + (pair >> 1), SHAPE_FULL | (BACKGROUND_SKY if pair & 1 else 0)
+        return tile, lights[index] // lighting.LIGHT_SCALE
     return at
 
 

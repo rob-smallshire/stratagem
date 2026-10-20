@@ -65,6 +65,7 @@ While the host draws a frame, the parasite works out the next.
 | `asm/miner_light.asm` | parasite | the light: flood, soft blend, pass, draw list, resets |
 | `asm/torches.asm` | parasite | torches |
 | `asm/daylight.asm` | parasite | daylight: sky depths, sunlight by columns, the glow |
+| `asm/pieces.asm` | parasite | pieces' slots: giving, sweeping, showing |
 | `asm/host_main.asm` | host | reading packets, the mailbox, drawing |
 | `asm/camera.asm`, `cache.asm`, `view.asm`, `scroll.asm`, `pixels.asm` | shared | split out of `main.asm` |
 
@@ -87,6 +88,27 @@ are queued, with their new light, and sent as changed tiles, three a frame
 (so a torch's light spreads in over a few frames). The parasite's tile cache
 takes a tile's new light only when it is sent, so the miner's light always
 compares against what the host shows. Torches can't yet be picked up.
+
+### Pieces and slots
+
+A piece is a material drawn whole over a backdrop, the background that
+shows through its clear pixels (`tiles.PIECES`; `docs/tile-set.md`). The
+torch is the only one so far. The host keeps each piece's graphics and mask
+(128 bytes) and each backdrop's (64) in its program RAM, and draws pieces
+through slots: 56 composed pairs of piece and backdrop in the render bank
+at `&B100`-`&BEFF`, each drawn as an ordinary material (7 materials from
+`SLOT_MATERIAL`, each page holding four slots as its four cell variants,
+drawn whole with pseudo-shapes 61-63), so the renderer is unchanged.
+
+On the parasite (`asm/pieces.asm`), each pair in the tile cache has a
+slot. When a piece's tile is sent and its pair has none, it is given a free
+one (its visibility, for the light, copied in), and the tile goes after
+`PIECE_COMPOSE`, the slot, the piece and the backdrop; the host composes
+the slot before reading the tile (`host_compose`, about 1,800 cycles with
+reading). When no slot is free, the tile cache is swept and the slots whose
+pairs have left it are freed; if there are still none, the piece is sent as
+its backdrop alone. The light looks a piece tile's slot up for the graphics
+the host draws it with.
 
 ### Daylight
 
@@ -135,6 +157,10 @@ tiles, lit by the brighter of daylight (and torchlight) and the model's
 light, with the sprite. One script drops torches, and checks they are in
 view and light tiles beyond daylight.
 
+`tests/test_pieces.py` checks slots in py65: given, shown, their
+visibility copied and freed by a sweep on the parasite, and composed on the
+host as `tiles.compose` does.
+
 `tests/test_daylight.py` plays the parasite alone in py65 (the host played
 by a hook), down a shaft from the surface and along a tunnel, and whenever
 relighting is done checks every tile in the tile cache against
@@ -159,6 +185,10 @@ Measured while digging and tunnelling (529 frames):
 Daylight adds about 1,200 cycles a frame on average while digging down a
 shaft and along a tunnel (17,300 against 16,100 in py65 over the same
 490 frames), and frames over 60,000 go from 16 to 20.
+
+Slots add about 30 cycles a frame (17,333 against 17,306 over the same
+490 frames; with torches dropped, 18,827 against 18,801 over 794, the
+worst frame unchanged).
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the

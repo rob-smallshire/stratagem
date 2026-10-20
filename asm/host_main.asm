@@ -268,6 +268,12 @@ INKEY_T = &100 - 36
     STA zp_ptr
     LDY #0
     READ_BYTE
+    CMP #PIECE_COMPOSE          \ A slot to compose first?
+    BNE material
+    JSR host_compose
+    LDY #0
+    READ_BYTE
+.material
     STA (zp_ptr),Y
     LDA zp_ptr + 1
     CLC
@@ -283,6 +289,79 @@ INKEY_T = &100 - 36
     STA (zp_ptr),Y
     RTS
 }
+
+\ Read a slot, a piece and a backdrop from the parasite, and compose the
+\ piece over the backdrop into the slot's graphics (tiles.compose): the
+\ backdrop where the piece's mask is set, and the piece. The slots are in
+\ the render bank, paged in without the screen, so that the library here in
+\ program RAM can be read. Preserves zp_ptr.
+.host_compose
+{
+    READ_BYTE                   \ The slot's graphics: SLOT_GRAPHICS + slot * 64
+    STA host_compose_slot
+    LSR A
+    LSR A
+    CLC
+    ADC #HI(SLOT_GRAPHICS)
+    STA zp_screen + 1
+    LDA host_compose_slot
+    ROR A                       \ (Carry clear from the ADC)
+    ROR A
+    ROR A
+    AND #&C0
+    STA zp_screen
+    READ_BYTE                   \ The piece: piece_library + piece * 128
+    STA host_compose_pair
+    LSR A
+    TAX
+    LDA #0
+    ROR A
+    STA zp_tile
+    STA zp_mask
+    TXA
+    CLC
+    ADC #HI(piece_library)
+    STA zp_tile + 1
+    STA zp_mask + 1
+    LDA zp_mask                 \ ... its mask, 64 bytes on
+    ORA #64
+    STA zp_mask
+    READ_BYTE                   \ The backdrop: backdrop_library + backdrop * 64
+    TAX
+    ASL host_compose_pair       \ The pair, for tests
+    ORA host_compose_pair
+    LDY host_compose_slot
+    STA host_slot_pair,Y
+    TXA
+    LSR A
+    ROR A
+    ROR A
+    STA zp_screen_lower
+    LDA #HI(backdrop_library)
+    STA zp_screen_lower + 1
+.*host_compose_start            \ (For timing)
+    LDA zp_romsel_compose
+    STA ROMSEL_COPY
+    STA ROMSEL
+    LDY #63
+.loop
+    LDA (zp_screen_lower),Y
+    AND (zp_mask),Y
+    ORA (zp_tile),Y
+    STA (zp_screen),Y
+    DEY
+    BPL loop
+    LDA zp_romsel_game
+    STA ROMSEL_COPY
+    STA ROMSEL
+.*host_compose_end
+    RTS
+}
+ASSERT LO(piece_library) = 0 AND LO(backdrop_library) = 0
+SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
+
+.host_compose_slot  EQUB 0
+.host_compose_pair  EQUB 0
 
 \ ---------------------------------------------------------------------------
 \ Input
@@ -333,6 +412,15 @@ INKEY_T = &100 - 36
 INCLUDE "asm/pixels.asm"
 INCLUDE "asm/scroll.asm"
 INCLUDE "asm/view.asm"
+
+\ The pieces' graphics (data then mask, 128 bytes each) and the backdrops'
+\ (64 each), which host_compose composes into slots.
+ALIGN &100
+.piece_library
+    PIECE_LIBRARY
+ALIGN &100
+.backdrop_library
+    BACKDROP_LIBRARY
 
 .host_main_end
 

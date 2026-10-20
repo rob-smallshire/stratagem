@@ -62,8 +62,27 @@ def tiles_source() -> str:
     lines.append("MACRO CELL_OFFSETS")
     for cell in range(8):
         half, column = divmod(cell, 4)
-        lines += _bytes_lines([tiles.cell_offset(shape, half, column) if shape < tiles.SHAPE_COUNT else 0
+        lines += _bytes_lines([tiles.cell_offset(shape, half, column)
+                               if shape < tiles.SHAPE_COUNT or shape in tiles.SLOT_SHAPE_VARIANTS else 0
                                for shape in range(tiles.MAX_SHAPES)])
+    lines.append("ENDMACRO")
+    lines.append("")
+    lines.append("\\ Pieces and the slots they are composed into (tiles.py).")
+    for name in ("FIRST_PIECE", "PIECE_COUNT", "SLOT_MATERIAL", "SLOT_GROUPS", "SLOT_COUNT"):
+        lines.append(f"{name} = {getattr(tiles, name)}")
+    lines.append("MACRO SLOT_SHAPES")
+    lines += _bytes_lines(tiles.SLOT_SHAPES)
+    lines.append("ENDMACRO")
+    lines.append("\\ Each piece's data and mask, 128 bytes; each backdrop's graphics, 64.")
+    lines.append("MACRO PIECE_LIBRARY")
+    for material in tiles.PIECES:
+        lines.append(f"    \\ {tiles.MATERIAL_NAMES[material]}")
+        lines += _bytes_lines(tiles.piece_graphics(material))
+    lines.append("ENDMACRO")
+    lines.append("MACRO BACKDROP_LIBRARY")
+    for backdrop in tiles.BACKDROPS:
+        lines.append(f"    \\ {tiles.MATERIAL_NAMES[backdrop]}")
+        lines += _bytes_lines(tiles.backdrop_graphics(backdrop))
     lines.append("ENDMACRO")
     return "\n".join(lines) + "\n"
 
@@ -275,23 +294,37 @@ def _reach(dy: int) -> int:
 GRAPHICS_SLOTS = 32            # cell graphics in a material's page
 
 
+def _cell_visibility(cell: bytes, parity: int) -> int:
+    """A cell's 8 bytes drawn in a cell of `parity`: a bit per Bayer
+    threshold (in order) that falls on a pixel of colour."""
+    order = lighting.parity_thresholds(parity)
+    bits = 0
+    for line in range(lighting.CELL_LINES):
+        for x, colour_bits in ((0, 0b00101010), (1, 0b00010101)):     # left, right: colour bits 0-2
+            if cell[line] & colour_bits:
+                bits |= 1 << order.index(int(lighting.BAYER[line % 4][2 * parity + x]))
+    return bits
+
+
 def _graphics_visibility(parity: int) -> list[int]:
     """For each cell graphic in the material pages (page material * 2 +
-    background, then slot: offset / 8), drawn in a cell of `parity`: a bit
-    per Bayer threshold (in order) that falls on a pixel of colour."""
-    order = lighting.parity_thresholds(parity)
+    background, then slot: offset / 8), its visibility (_cell_visibility)."""
     visibility = []
     for material in range(tiles.MATERIAL_COUNT):
         graphics = tiles.material_pages(material)
-        for slot in range(len(graphics) // 8):
-            bits = 0
-            for line in range(lighting.CELL_LINES):
-                byte = graphics[slot * 8 + line]
-                for x, colour_bits in ((0, 0b00101010), (1, 0b00010101)):     # left, right: colour bits 0-2
-                    if byte & colour_bits:
-                        bits |= 1 << order.index(int(lighting.BAYER[line % 4][2 * parity + x]))
-            visibility.append(bits)
+        visibility += [_cell_visibility(graphics[n:n + 8], parity) for n in range(0, len(graphics), 8)]
     assert len(visibility) == tiles.MATERIAL_COUNT * 2 * GRAPHICS_SLOTS
+    return visibility
+
+
+def _pair_visibility(parity: int) -> list[int]:
+    """For each pair (piece index * 2 + backdrop), its eight cells'
+    visibility, in the order of a slot's (half * 4 + column)."""
+    visibility = []
+    for material in tiles.PIECES:
+        for backdrop in tiles.BACKDROPS:
+            graphics = tiles.compose(material, backdrop)
+            visibility += [_cell_visibility(graphics[n:n + 8], parity) for n in range(0, 64, 8)]
     return visibility
 
 
@@ -314,6 +347,8 @@ def smooth_source() -> str:
         ("smooth_tile_index", [_tile_index(dx, dy) for dx, dy in lighting.MINER_ORDER]),
         ("smooth_graphics_even", _graphics_visibility(0)),
         ("smooth_graphics_odd", _graphics_visibility(1)),
+        ("pair_visibility_even", _pair_visibility(0)),
+        ("pair_visibility_odd", _pair_visibility(1)),
         ("smooth_between_even", [_between(old, new, 0) for old in range(16) for new in range(16)]),
         ("smooth_between_odd", [_between(old, new, 1) for old in range(16) for new in range(16)]),
     ]:
