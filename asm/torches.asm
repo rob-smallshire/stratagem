@@ -355,7 +355,7 @@ TORCH_QUEUE = 128               \ Tiles awaiting redrawing (a power of 2)
     STA zp_fill_x
     LDA torch_row
     STA zp_fill_y
-    JSR fixed_light             \ Daylight, or the torches' light
+    JSR sun_daylight            \ Daylight, or the torches' light
     STA torch_new
     JSR torch_light
     CMP torch_new

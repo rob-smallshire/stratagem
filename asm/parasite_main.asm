@@ -47,6 +47,7 @@
     LDA #HI(SCREEN_START)
     STA zp_screen_start + 1
     JSR world_reset
+    JSR sun_init
     JSR sl_init
     JSR plan_camera             \ The focus is outside the view, so redraw
     JMP first_frame
@@ -149,9 +150,12 @@
     LDA #0
     STA para_changes
     LDA redraw_tile
-    BEQ queued
+    BEQ changed_done
     LDA #0
     STA redraw_tile
+    LDX redraw_tile_x
+    LDY redraw_tile_y
+    JSR sun_tile_changed
     LDX redraw_tile_x
     LDY redraw_tile_y
     JSR torch_tile_changed
@@ -160,6 +164,10 @@
     LDA redraw_tile_y
     STA zp_fill_y
     JSR para_emit_change
+.changed_done
+.*para_daylight
+    JSR sun_step                \ Relighting by daylight, queueing changes
+.*para_daylit
 .queued
     LDA para_changes
     CMP #CHANGES_PER_FRAME
@@ -393,6 +401,7 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + TILE_BYTES_SENT) < &100 - TILE_BYTES_SENT
     LDA zp_fill_down
     STA para_strip_down
     JSR fill_cache
+    JSR sun_light_strip
     JSR torch_light_strip
     LDY #0
     LDA para_strip_down

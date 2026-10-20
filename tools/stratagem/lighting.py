@@ -197,14 +197,26 @@ def light_masks() -> bytes:
                  for level in range(FULL + 1) for parity in range(2) for line in range(8))
 
 
-# Daylight down shafts (docs/lighting-tactics.md section 6): direct sunlight
-# falls down each column to its first opaque tile, however deep (the
-# column's sky depth); then, a row at a time from the top, it spreads through
-# open tiles, down (losing SUN_DOWN_STEP a tile) and sideways (SUN_SIDE_STEP),
-# never up. Walls are lit at their faces and soaked as by `spread`.
+# Daylight down shafts (docs/lighting-tactics.md section 6). Sunlight falls
+# down each column to its first opaque tile, however deep (the column's sky
+# depth); then, a row at a time from the top, it spreads through open tiles,
+# down (losing SUN_DOWN_STEP a tile) and sideways (SUN_SIDE_STEP), never up.
+# A wall is lit at its faces (as bright as the open tile beside it, above or
+# below), and soaks sideways and downwards, losing SUN_WALL_STEP a tile, never
+# upwards: so each row is final once the row below it is open-lit, and a pass
+# from the top is exact. Daylight is the brighter of sunlight and the glow:
+# fixed_light, GLOW_LOSS levels darker, which lets shallow caves be made out.
+# This is the look we chose (in the daylight lab); the game uses the cheaper
+# `shaft_sun` below.
+#
+# `sun_rows` works a rectangle of a region, taking what lies just outside the
+# rectangle from the plane as it stands, and anything outside the region as
+# opaque and unlit.
 
 SUN_DOWN_STEP = 2
 SUN_SIDE_STEP = 2
+SUN_WALL_STEP = 4
+GLOW_LOSS = 4
 
 
 def sky_depths(clear: np.ndarray) -> np.ndarray:
@@ -214,29 +226,76 @@ def sky_depths(clear: np.ndarray) -> np.ndarray:
     return np.where(opaque.any(axis=0), opaque.argmax(axis=0), height)
 
 
-def sunlight(clear: np.ndarray, sun: int = FULL, down_step: int = SUN_DOWN_STEP, side_step: int = SUN_SIDE_STEP,
-             wall_step: int | None = 4) -> np.ndarray:
-    """Daylight per tile of a region whose row 0 is the top of the world."""
+def sky_depth(clear_at, x: int, start: int = 0) -> int:
+    """Column x's first opaque row, looking down from row `start`."""
+    y = start
+    while y < 255 and clear_at(x, y):
+        y += 1
+    return y
+
+
+def sun_rows(plane: np.ndarray, clear: np.ndarray, depth, left: int, right: int, top: int, bottom: int,
+             sun: int = FULL, down_step: int = SUN_DOWN_STEP, side_step: int = SUN_SIDE_STEP,
+             wall_step: int = SUN_WALL_STEP) -> None:
+    """Work out the sunlight of `plane` (a region: `clear` its tiles,
+    `depth[x]` each column's sky depth, relative to the region's top) in
+    columns left-right and rows top-bottom, inclusive."""
     height, width = clear.shape
-    depth = sky_depths(clear)
-    light = np.zeros(clear.shape, dtype=int)
-    for y in range(height):
-        row = light[y]
-        for x in range(width):
+
+    def open_row(y):
+        for x in range(left, right + 1):
             if not clear[y, x]:
                 continue
             if y < depth[x]:
-                row[x] = sun
+                plane[y, x] = sun
             elif y > 0 and clear[y - 1, x]:
-                row[x] = max(0, light[y - 1, x] - down_step)
-        for xs in (range(1, width), range(width - 2, -1, -1)):
-            step = 1 if xs.step == 1 else -1
-            for x in xs:
-                if clear[y, x] and clear[y, x - step]:
-                    row[x] = max(row[x], row[x - step] - side_step)
-    if wall_step is None:
-        return light_surfaces(light, clear)
-    return spread(light, clear, None, wall_step=wall_step)
+                plane[y, x] = max(0, plane[y - 1, x] - down_step)
+            else:
+                plane[y, x] = 0
+        _passes(y, lambda x: clear[y, x], side_step)
+
+    def wall_row(y):
+        for x in range(left, right + 1):
+            if clear[y, x]:
+                continue
+            best = 0
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                if 0 <= nx < width and 0 <= ny < height and clear[ny, nx]:
+                    best = max(best, plane[ny, nx])
+            if y > 0 and not clear[y - 1, x]:
+                best = max(best, plane[y - 1, x] - wall_step)
+            plane[y, x] = best
+        _passes(y, lambda x: not clear[y, x], wall_step)
+
+    def _passes(y, kind, step):
+        """Spread along row y between tiles of a kind, both ways, from the
+        tiles just outside the rectangle too."""
+        for x in range(max(left, 1), right + 1):
+            if kind(x) and kind(x - 1):
+                plane[y, x] = max(plane[y, x], plane[y, x - 1] - step)
+        for x in range(min(right, width - 2), left - 1, -1):
+            if kind(x) and kind(x + 1):
+                plane[y, x] = max(plane[y, x], plane[y, x + 1] - step)
+
+    for y in range(top, bottom + 1):
+        open_row(y)
+        if y > top:
+            wall_row(y - 1)
+    wall_row(bottom)
+
+
+def sunlight(clear: np.ndarray, depth=None, **steps) -> np.ndarray:
+    """Sunlight per tile of a region; by default its row 0 is the top of the
+    world, and the sky depths are its own."""
+    plane = np.zeros(clear.shape, dtype=int)
+    sun_rows(plane, clear, sky_depths(clear) if depth is None else depth, 0, clear.shape[1] - 1, 0,
+             clear.shape[0] - 1, **steps)
+    return plane
+
+
+def glow(x: int, y: int) -> int:
+    """The glow: fixed_light, GLOW_LOSS levels darker."""
+    return max(0, fixed_light(x, y) - GLOW_LOSS)
 
 
 def cell_masks(light_at):
@@ -466,3 +525,46 @@ def shows(visibility: int, before: int, after: int, parity: int) -> bool:
     """Whether a cell with `visibility` looks different at level `after`."""
     low, high = sorted((mask_class(before, parity), mask_class(after, parity)))
     return visibility & ((1 << high) - (1 << low)) != 0
+
+
+# Daylight by columns: cheaper than `sunlight`, needing only each column's sky
+# depth. An open tile is lit fully above its own column's sky depth, else
+# from the nearest column within SHAFT_REACH that is open to the sky at its
+# row, losing SHAFT_SIDE_STEP a column. A wall is lit fully at its column's
+# sky depth, losing SUN_WALL_STEP a tile below it, from a column open to the
+# sky beside it, losing SUN_WALL_STEP a column beyond the first, and, as a
+# floor, as brightly as the open tile above it. Light ignores what lies
+# between, so it can seep a little way through rock.
+
+SHAFT_SIDE_STEP = 3
+SHAFT_REACH = FULL // SHAFT_SIDE_STEP - 1
+SHAFT_WALL_REACH = FULL // SUN_WALL_STEP + 1
+
+
+def shaft_sun(depth, clear: bool, x: int, y: int, side_step: int = SHAFT_SIDE_STEP,
+              clear_above: bool = False) -> int:
+    """Sunlight at tile (x, y), from `depth[x]`, each column's sky depth
+    (a sequence over the whole world)."""
+    def open_to_sky(column):
+        return 0 <= column < len(depth) and y < depth[column]
+    if clear:
+        for d in range(0, FULL // side_step):
+            if open_to_sky(x - d) or open_to_sky(x + d):
+                return FULL - side_step * d
+        return 0
+    best = max(0, FULL - SUN_WALL_STEP * (y - depth[x])) if y >= depth[x] else 0
+    for d in range(1, SHAFT_WALL_REACH + 1):
+        if open_to_sky(x - d) or open_to_sky(x + d):
+            best = max(best, FULL - SUN_WALL_STEP * (d - 1))
+            break
+    if clear_above:
+        best = max(best, shaft_sun(depth, True, x, y - 1, side_step))
+    return best
+
+
+def shaft_sunlight(clear: np.ndarray, side_step: int = SHAFT_SIDE_STEP) -> np.ndarray:
+    """shaft_sun for each tile of a region whose row 0 is the top of the
+    world."""
+    depth = sky_depths(clear)
+    return np.array([[shaft_sun(depth, clear[y, x], x, y, side_step, y > 0 and clear[y - 1, x])
+                      for x in range(clear.shape[1])] for y in range(clear.shape[0])])

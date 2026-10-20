@@ -1,15 +1,15 @@
-"""The daylight lab: daylight down dug shafts, against the game's stand-in.
+"""The daylight lab: daylight down dug shafts, against the stand-in.
 
     uv run strat-daylight-lab [OUTPUT_DIRPATH]
 
 Draws the lighting lab's mine scene (a shaft into a cave, tunnels, shallow
 natural caves under the hills), untouched and dug, lit by daylight alone,
-each way: as now (`lighting.fixed_light`: a level less per tile below the
-original surface, open or not), and as proposed (`lighting.sunlight`:
-direct light down every open column, pools spreading from it, walls lit at
-their faces), plain or with a faint glow from the surface left in, so that
-shallow caves can still be made out. Then screen-sized views of each with
-the torches and the miner's light. Writes daylight.png and views.png.
+each way: as before (`lighting.fixed_light`: a level less per tile below the
+original surface, open or not); spreading down shafts (`lighting.sunlight`),
+with the glow (the stand-in, dimmed, so that shallow caves can be made out);
+and by columns (`lighting.shaft_sun`, as the game does it), losing 3 or 2 a
+column. Then screen-sized views of each with the torches and the miner's
+light. Writes daylight.png and views.png.
 """
 
 from __future__ import annotations
@@ -23,25 +23,20 @@ from stratagem import lighting
 from stratagem.world import World
 from stratagem.lighting_lab import Scene, _clear, mine_scene, picture, player_light, sheet, torches_spread
 
-GLOW_LOSS = 4       # the glow: the stand-in, this many levels darker
-
-
 def as_now(scene, clear):
     rows, columns = clear.shape
     return np.array([[lighting.fixed_light(scene.left + i, j) for i in range(columns)] for j in range(rows)])
 
 
 def glow(scene, clear):
-    return np.maximum(0, as_now(scene, clear) - GLOW_LOSS)
+    return np.maximum(0, as_now(scene, clear) - lighting.GLOW_LOSS)
 
 
 METHODS = [
     ("as now", as_now),
-    ("down shafts", lambda scene, clear: lighting.sunlight(clear)),
-    ("down shafts, walls soak less", lambda scene, clear: lighting.sunlight(clear, wall_step=2)),
     ("down shafts, with a glow", lambda scene, clear: np.maximum(lighting.sunlight(clear), glow(scene, clear))),
-    ("down shafts, rock as now", lambda scene, clear: np.maximum(lighting.sunlight(clear),
-                                                                 np.where(clear, 0, as_now(scene, clear)))),
+    ("by columns, step 3", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear), glow(scene, clear))),
+    ("by columns, step 2", lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, 2), glow(scene, clear))),
 ]
 
 

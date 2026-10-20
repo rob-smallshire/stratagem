@@ -27,7 +27,8 @@ The keys are the host-only game's (`implementation-record.md`), and T:
 | SPACE | Place a soil block |
 | T | Drop a torch where the miner stands (in air: up to 24) |
 
-Dig down a few tiles to leave the daylight: the miner's light shows below.
+Dig down a few tiles to leave the daylight: the miner's light shows below,
+and daylight follows down the shaft.
 
 ## How it works
 
@@ -62,6 +63,8 @@ While the host draws a frame, the parasite works out the next.
 | `asm/tube_layout.asm` | both | buffers, mailbox, packet layout, host addresses |
 | `asm/parasite_main.asm` | parasite | the frame, packets, strips of tiles |
 | `asm/miner_light.asm` | parasite | the light: flood, soft blend, pass, draw list, resets |
+| `asm/torches.asm` | parasite | torches |
+| `asm/daylight.asm` | parasite | daylight: sky depths, sunlight by columns, the glow |
 | `asm/host_main.asm` | host | reading packets, the mailbox, drawing |
 | `asm/camera.asm`, `cache.asm`, `view.asm`, `scroll.asm`, `pixels.asm` | shared | split out of `main.asm` |
 
@@ -85,6 +88,32 @@ are queued, with their new light, and sent as changed tiles, three a frame
 takes a tile's new light only when it is sent, so the miner's light always
 compares against what the host shows. Torches can't yet be picked up.
 
+### Daylight
+
+`lighting.shaft_sun`, brightened by the glow (`asm/daylight.asm`). Each
+column's sky depth, its first opaque tile, is kept for the whole world. An
+open tile is lit fully above its column's sky depth, else from the nearest
+column within 4 open to the sky at its row, 3 levels less a column away; a
+wall fully at its column's sky depth, 4 less a tile below it, from a column
+open to the sky beside it, and, as a floor, as brightly as the open tile
+above it. So daylight falls down a dug shaft and pools where it meets a
+cave. Light ignores what lies between the column and the tile, so it can
+seep a few tiles through rock, and it doesn't creep down slopes away from
+the shaft: the price of being cheap. The glow is the host-only game's
+stand-in, `fixed_light`, 4 levels dimmer: it shades the rock below the
+surface and lets shallow caves be made out.
+
+Daylight is worked out as tiles enter the tile cache (tables of the deepest
+sky depth within 1 to 4 columns of each make that quick, and tell at once
+when a tile is too deep to be lit). Digging a tile that changes a column's
+sky depth relights the tiles within reach, a row a frame, queued as the
+torches' changes are; one that doesn't relights just the tile and the floor
+below it.
+
+The daylight lab (`uv run strat-daylight-lab`) draws it against the fuller
+model we chose the look from (`lighting.sunlight`, which spreads light
+through open tiles a row at a time, and costs too much here).
+
 ### The light
 
 `lighting.smooth_miner_light(..., soft=True)`, brightened by each tile's
@@ -106,6 +135,12 @@ tiles, lit by the brighter of daylight (and torchlight) and the model's
 light, with the sprite. One script drops torches, and checks they are in
 view and light tiles beyond daylight.
 
+`tests/test_daylight.py` plays the parasite alone in py65 (the host played
+by a hook), down a shaft from the surface and along a tunnel, and whenever
+relighting is done checks every tile in the tile cache against
+`lighting.shaft_sun` and the glow, from the world as the parasite holds it,
+and each column's sky depth.
+
 ## Costs
 
 Measured while digging and tunnelling (529 frames):
@@ -120,6 +155,10 @@ Measured while digging and tunnelling (529 frames):
   (reading the window from the cache 9,800, the flood 9,200, the soft blend
   12,000); with a new tile row from the world (generating it, up to 29,000)
   or many changed blocks, a frame can take up to about 97,000.
+
+Daylight adds about 1,200 cycles a frame on average while digging down a
+shaft and along a tunnel (17,300 against 16,100 in py65 over the same
+490 frames), and frames over 60,000 go from 16 to 20.
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the

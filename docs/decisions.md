@@ -104,3 +104,10 @@ A running log of design decisions. Add to it whenever one is made.
   plays smoothly, with no visible problems; the occasional late frame went
   unnoticed. Torches, with per-tile light beside the miner's per-block light,
   look right. Development carries on from the Tube game.
+- **Daylight down shafts:** the look of the lab's "down shafts, with a glow"
+  (sunlight spreading through open tiles, the old stand-in four levels
+  dimmer beneath it, so shallow caves can still be made out), built
+  cheaply: by columns (`lighting.shaft_sun`), from each column's sky depth,
+  at the cost of light seeping a little through rock and not creeping down
+  slopes. The full model needed a 2K window, background work and about
+  12,000 cycles a frame; this needs 1K of tables and about 1,200.

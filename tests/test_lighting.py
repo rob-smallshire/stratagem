@@ -84,3 +84,48 @@ def test_fixed_light_fades_below_the_surface():
     h = HEIGHTS[60]
     assert [lighting.fixed_light(60, y) for y in range(h - 1, h + 18)] == \
         [15, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0]
+
+
+def test_sunlight_falls_down_shafts_and_pools_below():
+    clear = grid("""
+        ......
+        ##.###
+        ##.###
+        ......
+        ######
+    """)
+    sun = lighting.sunlight(clear)
+    assert sun[2, 2] == FULL and sun[3, 2] == FULL                 # down the shaft, to the floor
+    assert sun[3].tolist() == [FULL - 4, FULL - 2, FULL, FULL - 2, FULL - 4, FULL - 6]    # the pool
+    assert sun[2, 1] == FULL and sun[2, 0] == FULL - lighting.SUN_WALL_STEP             # walls: faces, soaked
+    assert sun[4, 2] == FULL                                       # the floor's face
+
+
+def test_sunlight_does_not_soak_upwards():
+    clear = grid("""
+        ######
+        ######
+        ......
+    """)
+    depth = np.array([5] * 6)       # lit as if from a shaft
+    sun = lighting.sunlight(clear, depth)
+    assert sun[1].tolist() == [FULL] * 6 and sun[0].tolist() == [0] * 6
+
+
+
+def test_shaft_sun_lights_down_shafts_and_beside_them():
+    clear = grid("""
+        ......
+        ##.###
+        ##.###
+        ......
+        ######
+    """)
+    depth = lighting.sky_depths(clear)
+    sun = lighting.shaft_sunlight(clear)
+    assert sun[2, 2] == FULL and sun[3, 2] == FULL                 # down the shaft, to the floor
+    step = lighting.SHAFT_SIDE_STEP
+    assert sun[3].tolist() == [FULL - 2 * step, FULL - step, FULL, FULL - step, FULL - 2 * step, FULL - 3 * step]
+    assert sun[2, 1] == FULL and sun[2, 0] == FULL - lighting.SUN_WALL_STEP     # walls beside the shaft
+    assert sun[4, 2] == FULL and sun[4, 4] == FULL - 2 * step                   # floors, lit as above
+    assert lighting.shaft_sun(depth, True, 2, 3) == FULL
