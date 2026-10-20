@@ -8,7 +8,8 @@ each way: as before (`lighting.fixed_light`: a level less per tile below the
 original surface, open or not); spreading down shafts (`lighting.sunlight`),
 with the glow (the stand-in, dimmed, so that shallow caves can be made out);
 and by columns (`lighting.shaft_sun`, as the game does it), losing 3 or 2 a
-column, and reaching 4 columns (as the game does), 3 or 2. Then
+column, and reaching 4 columns (as the game does), 3 or 2; and dimming a
+level each 4 or 8 tiles below the surface, down a shaft. Then
 screen-sized views of each with the torches and the miner's light. Writes
 daylight.png and views.png.
 """
@@ -21,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from stratagem import lighting
-from stratagem.world import World
+from stratagem.world import HEIGHTS, World
 from stratagem.lighting_lab import Scene, _clear, mine_scene, picture, player_light, sheet, torches_spread
 
 def as_now(scene, clear):
@@ -33,6 +34,13 @@ def glow(scene, clear):
     return np.maximum(0, as_now(scene, clear) - lighting.GLOW_LOSS)
 
 
+def tapered(scene, clear, taper, reach):
+    """By columns, sunlight dimming a level each `taper` tiles below each
+    column's surface."""
+    surface = [HEIGHTS[scene.left + i] for i in range(clear.shape[1])]
+    return lighting.shaft_sunlight(clear, reach=reach, taper=taper, surface=surface)
+
+
 METHODS = [
     ("as now", as_now),
     ("down shafts, with a glow", lambda scene, clear: np.maximum(lighting.sunlight(clear), glow(scene, clear))),
@@ -42,6 +50,12 @@ METHODS = [
      lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=3), glow(scene, clear))),
     ("by columns, step 3, reach 2",
      lambda scene, clear: np.maximum(lighting.shaft_sunlight(clear, reach=2), glow(scene, clear))),
+    ("reach 4, a level per 4 tiles down",
+     lambda scene, clear: np.maximum(tapered(scene, clear, 4, lighting.SHAFT_REACH), glow(scene, clear))),
+    ("reach 4, a level per 8 tiles down",
+     lambda scene, clear: np.maximum(tapered(scene, clear, 8, lighting.SHAFT_REACH), glow(scene, clear))),
+    ("reach 2, a level per 4 tiles down",
+     lambda scene, clear: np.maximum(tapered(scene, clear, 4, 2), glow(scene, clear))),
 ]
 
 
