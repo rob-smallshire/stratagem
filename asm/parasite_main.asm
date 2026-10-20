@@ -145,6 +145,7 @@
 .reset_row
     JSR sl_reset_row
 .planned
+    JSR sun_bounds              \ The tile cache, now up to date
 
     LDA #1                      \ Changed tiles: a dug or placed one, its
     STA para_change_y           \ torches flooded again, then those queued
@@ -389,6 +390,38 @@ ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
 }
 ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
 
+\ Set sun_safe_l/r/t/b to the tiles the tile cache holds: those both
+\ cached and in the view, which differ while the cache is being filled
+\ (daylight.asm reads tiles there from the cache, elsewhere from the world).
+.sun_bounds
+{
+    LDA cached_left
+    CMP view_left
+    BCS left_set
+    LDA view_left
+.left_set
+    STA sun_safe_l
+    LDA cached_right
+    CMP view_right
+    BCC right_set
+    LDA view_right
+.right_set
+    STA sun_safe_r
+    LDA cached_top
+    CMP view_top
+    BCS top_set
+    LDA view_top
+.top_set
+    STA sun_safe_t
+    LDA cached_bottom
+    CMP view_bottom
+    BCC bottom_set
+    LDA view_bottom
+.bottom_set
+    STA sun_safe_b
+    RTS
+}
+
 \ Fill the tile cache from the world (as the host-only game pages it in to
 \ do), and record what was filled in the packet: a strip.
 .call_fill_cache
@@ -402,6 +435,7 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
     LDA zp_fill_down
     STA para_strip_down
     JSR fill_cache
+    JSR sun_bounds
     JSR sun_light_strip
     JSR torch_light_strip
     LDY #0

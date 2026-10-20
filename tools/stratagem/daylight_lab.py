@@ -9,9 +9,11 @@ original surface, open or not); spreading down shafts (`lighting.sunlight`),
 with the glow (the stand-in, dimmed, so that shallow caves can be made out);
 and by columns (`lighting.shaft_sun`), losing 3 or 2 a column, reaching 4
 columns or 2, untapered or (as the game does) tapered: a level less for
-each 4 tiles below the surface, so that it dims slowly down a shaft. Then
-screen-sized views of each with the torches and the miner's light. Writes
-daylight.png and views.png.
+each 4 tiles below the surface, so that it dims slowly down a shaft. The
+dug scene has a hut of soil on the hill to the right, roofed: light by
+columns stops at walls, so the hut is dark inside. Then screen-sized views
+of each with the torches and the miner's light. Writes daylight.png and
+views.png.
 """
 
 from __future__ import annotations
@@ -22,8 +24,20 @@ from pathlib import Path
 import numpy as np
 
 from stratagem import lighting
+from stratagem.tiles import SHAPE_FULL, SOIL
 from stratagem.world import HEIGHTS, World
-from stratagem.lighting_lab import Scene, _clear, mine_scene, picture, player_light, sheet, torches_spread
+from stratagem.lighting_lab import Scene, _clear, mine_scene, open_up, picture, player_light, sheet, torches_spread
+
+def build_hut(world: World, left: int = 84, right: int = 88, floor: int = 39, roof: int = 35) -> None:
+    """A hut of soil blocks: walls at `left` and `right`, a roof, and its
+    floor levelled."""
+    for x in range(left, right + 1):
+        for y in range(roof, floor + 1):
+            if y in (roof, floor) or x in (left, right):
+                world.set_tile(x, y, (SOIL, SHAPE_FULL))
+            else:
+                open_up(world, x, y)
+
 
 def as_now(scene, clear):
     rows, columns = clear.shape
@@ -31,7 +45,8 @@ def as_now(scene, clear):
 
 
 def glow(scene, clear):
-    return np.maximum(0, as_now(scene, clear) - lighting.GLOW_LOSS)
+    rows, columns = clear.shape
+    return np.array([[lighting.glow(scene.left + i, j) for i in range(columns)] for j in range(rows)])
 
 
 def surface(scene, clear):
@@ -58,6 +73,7 @@ def main() -> None:
     output_dirpath = Path(sys.argv[1] if len(sys.argv) > 1 else "build/lighting")
     output_dirpath.mkdir(parents=True, exist_ok=True)
     dug = mine_scene()
+    build_hut(dug.world)
     untouched = Scene(World(), dug.x0, dug.y0, dug.width, dug.height, player=dug.player)
     scenes = [("untouched", untouched), ("dug", dug)]
 
@@ -70,10 +86,10 @@ def main() -> None:
             panels.append((f"{scene_name}: {label}", picture(scene, tiles, light, backdrop=True, scale=1)))
             if scene_name == "dug":
                 lit = np.maximum.reduce([light, torches_spread(scene, clear), player_light(scene, clear)])
-                for window in ((scene.x0, 40, 16, 16), (scene.x0 + 4, 50, 16, 16)):
+                for window in ((scene.x0, 40, 16, 16), (scene.x0 + 4, 50, 16, 16), (scene.x0 + 20, 30, 16, 16)):
                     views.append((label, picture(scene, tiles, lit, backdrop=True, window=window, scale=2)))
     sheet(panels, len(METHODS)).save(output_dirpath / "daylight.png")
-    sheet(views, 2).save(output_dirpath / "views.png")
+    sheet(views, 3).save(output_dirpath / "views.png")
     print(f"Wrote {output_dirpath}")
 
 

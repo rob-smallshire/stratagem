@@ -222,12 +222,16 @@ an anvil, make a better pickaxe.
   tree or a mushroom drawn in front works. Back walls must be dim (sparse
   colour on black), or they swamp what stands in front of them. Dithered
   leaves let the backdrop through, as in Stryker's Run.
-- **Daylight leaks into buildings.** Daylight by columns (`shaft_sun`)
-  lights a tile from an open column up to 4 away whatever lies between, so
-  a roofed hut is lit inside through its walls. For shelter to be dark,
-  the light from beside must stop at an opaque tile on its row: a scan of
-  up to 4 tiles, for tiles below their own column's sky depth only.
-  Measure it before choosing.
+- **Daylight leaked into buildings**, and now doesn't. Daylight by columns
+  (`shaft_sun`) lit a tile from an open column up to 4 away whatever lay
+  between, so a roofed hut was lit inside through its walls; and the glow
+  lit everything above the surface. Now light reaches a tile only through
+  open tiles, then (into a wall) through walls, never out into the open
+  again; and the glow lights only below the original surface (a tile at or
+  above it is in the sun unless something built covers it). So a hut is
+  dark inside, and light no longer seeps through rock into caves beside a
+  shaft. A hut's floor can still be lit by light soaking in from outside,
+  under its wall. See `docs/tube-game.md`, Daylight.
 - **Drawing:** composing as drawn costs 80-130 cycles more a cell; composing
   once into slots costs about 1,500 cycles a new pair and nothing a frame.
   See Drawing.
@@ -241,7 +245,10 @@ an anvil, make a better pickaxe.
    freed by sweeping the tile cache when none is free, rather than by
    counts. The torch's material pages are still in the render region (the
    host-only game shares them); they can go when the two part.
-3. **Daylight that stops at walls**, measured, so that shelter is dark.
+3. ~~Daylight that stops at walls~~: done (above). About 700 cycles a
+   frame more on average, and up to 9,400 in the worst frame; it left the
+   parasite with only a few dozen bytes free, so memory needs reworking
+   before much more is added there.
 4. **Property tables**, replacing material number tests, with no change in
    behaviour (the tests must stay green).
 5. **Climbing and platforms** in the player's model and on the 6502.

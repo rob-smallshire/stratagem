@@ -1,9 +1,9 @@
 """Daylight on the parasite (asm/daylight.asm) matches the model: whenever
 its relighting is done and the queue sent, every tile in the tile cache has
 the brighter of lighting.shaft_sun and the glow, from the world as the
-parasite holds it, and each column's sky depth is right. The game runs in
-py65 (a 65C02), the host played by a hook. Run with -s to see what the
-parasite's frames cost."""
+parasite holds it, and each column's sky depth is right; and a hut built
+of blocks is dark inside. The game runs in py65 (a 65C02), the host played
+by a hook. Run with -s to see what the parasite's frames cost."""
 
 import numpy as np
 
@@ -11,6 +11,7 @@ from mos6502 import Machine6502
 from stratagem import lighting
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.tiles import SHAPE_FULL, SOIL
 from stratagem.world import CHUNK_SIZE, CHUNKS_ACROSS, HEIGHTS, generate_tile
 
 TILE_CACHE_SIZE = 32
@@ -70,6 +71,24 @@ class ParasiteGame:
         offset = (y % CHUNK_SIZE) * CHUNK_SIZE + x % CHUNK_SIZE
         return self.memory[base + offset], self.memory[base + SLOT_BYTES // 2 + offset]
 
+    def word(self, name: str) -> int:
+        return self.memory[self.labels[name]] | self.memory[self.labels[name] + 1] << 8
+
+    def place(self, x: int, y: int, material: int, shape: int) -> None:
+        """Change tile (x, y), in view, as the game's placing does
+        (change_target), between frames; the next frame relights."""
+        mpu, memory = self.mpu, self.memory
+        saved = mpu.pc, mpu.sp, mpu.a, mpu.x, mpu.y, mpu.p, bytes(memory[0x100:0x200])
+        memory[self.labels["target_x"]] = x
+        memory[self.labels["target_y"]] = y
+        memory[self.labels["zp_world_new_shape"]] = shape
+        Machine6502.call(self.machine, self.labels["change_target"], a=material)
+        mpu.pc, mpu.sp, mpu.a, mpu.x, mpu.y, mpu.p, stack = saved
+        memory[0x100:0x200] = list(stack)
+
+    def idle(self) -> bool:
+        return not self.byte("sun_busy") and self.byte("torch_queue_head") == self.byte("torch_queue_tail")
+
     def cache_light(self, x: int, y: int) -> int:
         index = (y % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + x % TILE_CACHE_SIZE
         return self.memory[self.labels["tile_cache_light"] + index]
@@ -92,7 +111,7 @@ def check_daylight(game: ParasiteGame) -> tuple[int, int]:
     beyond = tapered = 0
     for y in range(top, bottom + 1):
         for x in range(left, right + 1):
-            sun = lighting.shaft_sun(depth, clear_at(x, y), x, y, clear_above=y > 0 and clear_at(x, y - 1))
+            sun = lighting.shaft_sun(depth, clear_at, x, y)
             day = max(sun, lighting.glow(x, y))
             assert game.cache_light(x, y) == day * lighting.LIGHT_SCALE, f"tile ({x}, {y}): light"
             beyond += sun > lighting.glow(x, y)
@@ -106,8 +125,7 @@ def test_daylight_matches_the_model(game_build):
     for count, keys in SCRIPT:
         for _ in range(count):
             cycles.append(game.frame(sum(KEYS[k] for k in keys)))
-            idle = not game.byte("sun_busy") and game.byte("torch_queue_head") == game.byte("torch_queue_tail")
-            if idle:
+            if game.idle():
                 beyond, deep = check_daylight(game)
                 lit, tapered = max(lit, beyond), max(tapered, deep)
                 checks += 1
@@ -115,3 +133,28 @@ def test_daylight_matches_the_model(game_build):
     assert lit > 0, "no sunlight beyond the glow: the shaft isn't lit"
     assert tapered > 0, "no sunlight deep enough down the shaft to be tapered"
     print(f"\nthe parasite's frames: mean {np.mean(cycles):.0f} cycles, max {max(cycles)}")
+
+
+def test_a_hut_is_dark_inside(game_build):
+    """Blocks placed one a frame, as the game places them, to make a roofed
+    hut on flat ground around the miner: the tiles inside are dark."""
+    game = ParasiteGame(game_build)
+    for _ in range(20):
+        game.frame(0)
+    left, floor = 125, 55
+    assert HEIGHTS[left:left + 5] == [floor] * 5
+    roof = floor - 4
+    blocks = [(x, y) for y in range(floor - 1, roof - 1, -1) for x in range(left, left + 5)
+              if y == roof or x in (left, left + 4)]
+    inside = [(x, y) for x in range(left + 1, left + 4) for y in range(roof + 1, floor)]
+    for x, y in blocks:
+        game.place(x, y, SOIL, SHAPE_FULL)
+        game.frame(0)
+    for _ in range(100):
+        if game.idle():
+            break
+        game.frame(0)
+    assert game.idle()
+    check_daylight(game)
+    assert all(lighting.transparent(game.tile_at(x, y)) for x, y in inside)
+    assert [game.cache_light(x, y) for x, y in inside] == [0] * len(inside)

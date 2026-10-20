@@ -128,4 +128,32 @@ def test_shaft_sun_lights_down_shafts_and_beside_them():
     assert sun[3].tolist() == [FULL - 2 * step, FULL - step, FULL, FULL - step, FULL - 2 * step, FULL - 3 * step]
     assert sun[2, 1] == FULL and sun[2, 0] == FULL - lighting.SUN_WALL_STEP     # walls beside the shaft
     assert sun[4, 2] == FULL and sun[4, 4] == FULL - 2 * step                   # floors, lit as above
-    assert lighting.shaft_sun(depth, True, 2, 3) == FULL
+    assert lighting.shaft_sun(depth, lambda x, y: bool(clear[y, x]), 2, 3) == FULL
+
+
+def test_shaft_sun_stops_at_walls():
+    """Light doesn't pass through a wall into the open beyond: not into a
+    roofed hut, nor through rock into a cave beside a shaft."""
+    hut = grid("""
+        ..........
+        ..#####...
+        ..#...#...
+        ..#...#...
+        ##########
+        ##########
+    """)
+    sun = lighting.shaft_sunlight(hut)
+    assert sun[2:4, 3:6].tolist() == [[0] * 3] * 2                  # inside
+    assert sun[4, 3:6].tolist() == [0] * 3                          # its floor
+    assert sun[1, 2:7].tolist() == [FULL] * 5                       # the roof
+    assert sun[2:4, 2].tolist() == [FULL] * 2 and sun[2:4, 6].tolist() == [FULL] * 2      # the walls
+    beside = grid("""
+        ......
+        #.####
+        #.####
+        #.#..#
+        #.####
+    """)
+    sun = lighting.shaft_sunlight(beside)
+    assert sun[3, 3:5].tolist() == [0, 0]                           # the cave
+    assert sun[3, 2] == FULL and sun[3, 0] == FULL                  # the shaft's walls
