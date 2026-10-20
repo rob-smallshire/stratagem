@@ -87,9 +87,24 @@ tunneller will fill them, and then digging is quietly refused.
   through the OS (OSFIND/OSGBPB, so it works on DFS, MMFS, ADFS and
   Econet), and read them back when needed. The directory entry can mark a
   chunk as "on disc".
-- Compression: most changed chunks are mostly unchanged; store changes
-  against the generated tiles (a bitmap plus changed tiles) to fit more in
-  RAM.
+- Compression first, before the disc: most of a changed chunk is still
+  what the generator made. Measured by the chunk lab (`uv run
+  strat-chunk-lab`, random mining, 181 chunks): a chunk has 14 tiles
+  changed on average (median 12, at most 48); 63% of changed tiles are dug
+  out, 36% partly dug, 1% anything else. Stored as two 8-byte maps (which
+  tiles differ from the generator's; which of those are dug out), then a
+  byte for each partly dug tile (its shape) and two for any other, a chunk
+  takes 21 bytes on average (at most 36; a quarried room 16), against 128
+  now. In 16-byte granules that is about 31 bytes, so about 420 chunks
+  instead of 104 in the same 13K: four times as much digging before the
+  store is full. Fall back to the raw 128 bytes when that is smaller (a
+  base packed with placed pieces).
+- Decoding: `tile_at` would read a decoded chunk, from a small cache of
+  them (a few chunks of 128 bytes, the most recently used), decoded when
+  the tile cache fills a row or column; a change re-encodes the chunk. So
+  frames cost what they do now, except when a chunk is decoded or
+  re-encoded. The store needs an allocator for chunks of varying size
+  (granules, compacted when fragmented).
 - This is also how games are saved, and the basis for several worlds on
   disc (a world is a seed plus its changed chunks).
 - Disc access during play stalls the game; do it at moments the player

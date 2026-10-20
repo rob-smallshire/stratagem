@@ -150,6 +150,27 @@ About 4.8K, then:
 The torch's 512 bytes return to the pool when it becomes a piece. Fifty
 pieces is enough for the set below, with room for a second look of some.
 
+### Beyond fifty: a cache of piece graphics
+
+If the set outgrows the budget, the host could keep a cache of piece
+graphics instead: say 32 slots of 64 bytes, holding the pieces in view.
+The parasite, which has room, keeps every piece's graphics (compressed, if
+need be); when a tile enters its tile cache, it makes sure the tile's piece
+has a slot, sending its 64 bytes over the Tube if not, and the tile the
+host gets names the slot, not the piece. The view rarely holds more than a
+few kinds of piece, so the limit becomes what the parasite holds, for an
+occasional transfer as something new scrolls in. Prototyped only if the
+fixed budget runs out.
+
+### Not variable-length tiles
+
+Tiles stay two fixed bytes wherever they are read at random every frame
+(the tile caches, collision, light, drawing): a variable-length tile would
+cost on every access. Compactness belongs where tiles are stored: changed
+chunks (next steps, item 5: about 21 bytes a chunk instead of 128,
+measured) and on disc. The material byte already gives rare, complicated
+tiles the same two bytes as soil, with their detail in the tables.
+
 ## A first set
 
 | Kind | Parts | Notes |
