@@ -131,6 +131,7 @@ def test_initial_view_matches_model(game, machine, game_build):
 
 KEY_INPUTS = {"Z": camera.INPUT_LEFT, "X": camera.INPUT_RIGHT, "K": camera.INPUT_UP, "M": camera.INPUT_DOWN,
               "L": camera.INPUT_ACTION, "SPACE": camera.INPUT_PLACE}
+QUICK_SCRIPTS = {"dig-down"}       # the rest are marked slow
 SCRIPTS = {
     "walk-right": [(90, ["X"]), (30, [])],
     "walk-left": [(90, ["Z"]), (30, [])],
@@ -157,7 +158,8 @@ def press(bbc: Beebium, keys: list[str], down: bool) -> None:
             (bbc.keyboard.key_down if down else bbc.keyboard.key_up)(key)
 
 
-@pytest.mark.parametrize("script", SCRIPTS.values(), ids=SCRIPTS.keys())
+@pytest.mark.parametrize("script", [script if name in QUICK_SCRIPTS else pytest.param(script, marks=pytest.mark.slow)
+                                    for name, script in SCRIPTS.items()], ids=SCRIPTS.keys())
 def test_every_frame_matches_model_while_playing(game, machine, script):
     bbc, labels = game
     peek = bbc.memory.address.peek

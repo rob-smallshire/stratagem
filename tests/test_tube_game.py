@@ -89,6 +89,7 @@ def expected_screen(bbc, labels):
     return image
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("script", SCRIPTS.values(), ids=SCRIPTS.keys())
 def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script):
     bbc = tube_bbc

@@ -81,7 +81,8 @@ def starts():
                                                    y=(floor * TILE_HEIGHT - PLAYER_HEIGHT) * 16)
 
 
-@pytest.mark.parametrize("direction", DIRECTIONS.keys())
+@pytest.mark.parametrize("direction", [d if d == "down" else pytest.param(d, marks=pytest.mark.slow)
+                                       for d in DIRECTIONS])
 def test_every_dig_opens_space_next_to_the_player(direction):
     keys = DIRECTIONS[direction] | INPUT_ACTION
     digs = 0

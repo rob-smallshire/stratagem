@@ -98,6 +98,7 @@ def _random_tile(rng: random.Random) -> tuple[int, int]:
     return rng.choice(DIGGABLE), rng.randrange(1, SHAPE_COUNT) | rng.choice([0, BACKGROUND_SKY])
 
 
+@pytest.mark.slow
 def test_player_matches_model(main_machine, game_build):
     harness = PlayerHarness(main_machine, game_build.labels["STRATAGEM"])
     rng = random.Random(1989)

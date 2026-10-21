@@ -15,6 +15,7 @@ def world_machine(game_build):
     return machine
 
 
+@pytest.mark.slow
 def test_tile_at_matches_model_everywhere(world_machine, game_build):
     tile_at_address = game_build.labels["STRATAGEM"]["tile_at"]
     shape_address = game_build.labels["STRATAGEM"]["zp_world_shape"]

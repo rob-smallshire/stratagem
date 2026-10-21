@@ -102,6 +102,7 @@ def report(name: str, cycles: list[int]) -> None:
           f"first {cycles[0]} (a 3 MHz frame is 60,000)")
 
 
+@pytest.mark.slow
 def test_smooth_light_while_walking(game_build):
     scene = mine_scene()
     parasite = Parasite(game_build, scene.world)
@@ -109,6 +110,7 @@ def test_smooth_light_while_walking(game_build):
     report("walking", check_moves(parasite, moves))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("seed", range(3))
 def test_smooth_light_in_random_ground(game_build, seed):
     rng = random.Random(seed)

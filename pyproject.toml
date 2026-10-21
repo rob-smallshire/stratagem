@@ -45,3 +45,4 @@ packages = ["tools/stratagem"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 timeout = 300
+markers = ["slow: long emulator runs, left out of the quick run (-m \"not slow\")"]

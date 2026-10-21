@@ -53,6 +53,7 @@ INPUTS = [
 ]
 
 
+@pytest.mark.slow
 def test_actions_match_model(machine, game_build):
     labels = game_build.labels["STRATAGEM"]
     harness = PlayerHarness(machine, labels)
@@ -105,8 +106,10 @@ def test_actions_match_model(machine, game_build):
                 assert (mpu.a, memory[labels["zp_world_shape"]]) == world.tile_at(x, y), (x, y)
 
 
-@pytest.mark.parametrize("keys", [INPUT_LEFT | INPUT_DOWN, INPUT_RIGHT | INPUT_DOWN,
-                                  INPUT_LEFT | INPUT_UP, INPUT_RIGHT | INPUT_UP],
+@pytest.mark.parametrize("keys", [pytest.param(INPUT_LEFT | INPUT_DOWN, marks=pytest.mark.slow),
+                                  INPUT_RIGHT | INPUT_DOWN,
+                                  pytest.param(INPUT_LEFT | INPUT_UP, marks=pytest.mark.slow),
+                                  pytest.param(INPUT_RIGHT | INPUT_UP, marks=pytest.mark.slow)],
                          ids=["down-left", "down-right", "up-left", "up-right"])
 def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
     """Holding a diagonal dig for a long time, from places on the surface
@@ -151,6 +154,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
     assert digs > 100
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("keys", [INPUT_LEFT | INPUT_DOWN, INPUT_RIGHT | INPUT_DOWN,
                                   INPUT_LEFT | INPUT_UP, INPUT_RIGHT | INPUT_UP],
                          ids=["down-left", "down-right", "up-left", "up-right"])

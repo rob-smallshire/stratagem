@@ -24,6 +24,8 @@ filing system resident, and is tested in the Beebium emulator.
 ```bash
 uv run strat-build        # assemble -> build/stratagem.ssd and build/stratagem-tube.ssd, labels in build/labels/
 uv run pytest             # builds first; emulator tests run on each machine
+uv run pytest -m "not slow"   # the quick run, about a minute: one short case of each kind
+uv run pytest tests/test_daylight.py   # or just the tests that cover the change
 uv run python -m stratagem.index_disassembly SRC INDEX   # index a Level 7 disassembly
 ```
 
