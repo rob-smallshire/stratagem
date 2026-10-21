@@ -118,6 +118,8 @@ ENDMACRO
 .host_change_y      SKIP CHANGES_PER_FRAME
 .zp_romsel_compose  EQUB 0      \ The render bank without the screen
 .host_slot_pair     SKIP SLOT_COUNT \ Each slot's pair, piece * 2 + backdrop
+.host_store_banks   SKIP STORE_BANKS    \ The store's banks (host_store)
+.host_store_count   EQUB 0
 
 \ ---------------------------------------------------------------------------
 \ Loader
@@ -150,7 +152,8 @@ ENDMACRO
 .machine_ok
     JSR find_ram_banks
     LDA ram_bank_count
-    BNE banks_ok
+    CMP #1 + STORE_BANKS        \ The render bank and the store's
+    BCS banks_ok
     LDX #LO(message_banks)
     LDY #HI(message_banks)
     JMP fail
@@ -158,6 +161,10 @@ ENDMACRO
     LDA ram_banks               \ The render bank (the B+ uses ANDY)
     ORA #&80
     STA zp_romsel_render
+    LDA ram_banks + 1           \ The store of changed chunks (host_store)
+    STA host_store_banks
+    LDA ram_banks + 2
+    STA host_store_banks + 1
 
     \ A shadow MODE 2, so that user RAM at &3000-&7FFF is not the screen.
     LDX #0
@@ -310,7 +317,7 @@ ENDMACRO
 
 .message_tube       EQUS "Stratagem needs a 6502 second processor", 13, 0
 .message_machine    EQUS "Stratagem needs a BBC B+ 128K or an Integra-B", 13, 0
-.message_banks      EQUS "Stratagem needs 16K of free sideways RAM", 13, 0
+.message_banks      EQUS "Stratagem needs 48K of free sideways RAM", 13, 0
 .message_shadow     EQUS "Stratagem needs shadow RAM", 13, 0
 
 INCLUDE "asm/machine.asm"

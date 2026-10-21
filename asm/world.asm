@@ -9,9 +9,7 @@ GUARD BANK_END
 .world_start
     EQUB 0, 0, 0, 0, 0, 0, 0, 0 \ Not a ROM header: &8007 = 0 and &8001 <> "("
 
-CHUNK_SIZE = 8
-CHUNK_TILES = CHUNK_SIZE * CHUNK_SIZE
-SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
+STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
 
 \ Return the tile at world (X, Y), y increasing downwards, as changed by the
 \ player: the material in A and the shape in zp_world_shape. Preserves X
@@ -42,9 +40,10 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
     RTS
 }
 
-\ Change the tile at world (X, Y) to material A and shape zp_world_new_shape.
-\ Return with carry clear, or carry set if the chunk is unchanged so far and
-\ there is no free slot for it. Preserves X and Y.
+\ Change the tile at world (X, Y) to material A and shape zp_world_new_shape,
+\ and queue the change for the host's copy of the store (store_emit). Return
+\ with carry clear, or carry set if the chunk is unchanged so far and there
+\ is no free slot for it, or the queue is full. Preserves X and Y.
 .set_tile
 {
     STA zp_world_tile
@@ -52,6 +51,12 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
     STY zp_world_target_y
     STX zp_world_x
     STY zp_world_y
+    LDA store_tail              \ Room in the queue for a new chunk and the
+    SEC                         \ tile: at most STORE_QUEUE - 1 queued
+    SBC store_head
+    AND #STORE_QUEUE - 1
+    CMP #STORE_QUEUE - 3
+    BCS done                    \ Full: carry is set
     JSR find_chunk
     BNE have_slot
     LDA world_slots_used
@@ -61,25 +66,52 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
     LDA world_slots_used
     STA (zp_world_pointer),Y    \ Y = 0
     JSR fill_slot
+    LDA world_slots_used        \ The host copies it whole
+    LDX #STORE_CHUNK
+    JSR store_note
     LDX zp_world_target_x
     LDY zp_world_target_y
     STX zp_world_x
     STY zp_world_y
     JSR find_chunk
 .have_slot
+    PHA
     JSR point_at_slot
     JSR offset_in_chunk
     LDA zp_world_tile
     STA (zp_world_pointer),Y
     TYA
+    TAX
     ORA #CHUNK_TILES
     TAY
     LDA zp_world_new_shape
     STA (zp_world_pointer),Y
+    PLA
+    JSR store_note
     CLC
 .done
     LDX zp_world_target_x
     LDY zp_world_target_y
+    RTS
+}
+
+\ Queue a change for the host's copy of the store: slot A, at offset X (a
+\ tile, zp_world_tile and zp_world_new_shape), or STORE_CHUNK (the whole
+\ chunk, read from the slot when the queue is emitted).
+.store_note
+{
+    LDY store_tail
+    STA store_queue_slot,Y
+    TXA
+    STA store_queue_offset,Y
+    LDA zp_world_tile
+    STA store_queue_material,Y
+    LDA zp_world_new_shape
+    STA store_queue_shape,Y
+    INY
+    TYA
+    AND #STORE_QUEUE - 1
+    STA store_tail
     RTS
 }
 
@@ -189,6 +221,8 @@ SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
 {
     LDA #0
     STA world_slots_used
+    STA store_head
+    STA store_tail
     TAY
     LDX #HI(world_directory)
     STX zp_world_pointer + 1

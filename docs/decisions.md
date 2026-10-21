@@ -150,3 +150,11 @@ A running log of design decisions. Add to it whenever one is made.
   Master later). The host-only game's own files and disc are gone; what it
   shared with the Tube game stays. Its tests now run on the parasite's code
   (py65) or were covered by the Tube game's (frames in Beebium).
+- **The host keeps the store of changed chunks:** in its two spare
+  sideways banks (255 chunks, a quarter of the world, against the
+  parasite's 104), with the parasite to hold only a cache of those near the
+  view, fetched ahead of need: the host draws each frame inside its OSWRCH
+  handler, so a chunk asked for when needed could wait most of a frame.
+  Changes go to both copies, so the parasite never writes a chunk back. A
+  first step keeps the parasite's whole store and checks the host's copy
+  against it. Packing chunks, if needed, belongs between the two.

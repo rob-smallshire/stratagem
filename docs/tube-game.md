@@ -160,6 +160,23 @@ finds its row's address from a table by |dy|, so the inner loop is
 unchanged. Folding left and right would halve it again, but the loop's
 index also reads the grid of excess, which doesn't fold.
 
+### The store of changed chunks
+
+The parasite holds every changed chunk (104 slots of 128 bytes, in
+PWORLD), and the host keeps a copy in its two spare sideways banks (room
+for 255). `set_tile` queues each change (`world.asm`): the slot and the
+tile's offset, material and shape, or, for a chunk's first change, the
+whole chunk. Each packet carries as many queued changes as fit after its
+changed tiles, and the host copies them into its banks as it reads the
+packet (`host_store`), paging each bank in at `&8000` from its program RAM.
+If the queue fills (32 changes), `set_tile` refuses, as when the store is
+full.
+
+This is the first step to the parasite holding only a cache of the chunks
+near the view, fetched from the host ahead of need, which frees most of
+PWORLD's 13K and lets the store grow to 255 chunks (a quarter of the
+world). Chunks could also be packed there, on their way between the two.
+
 ## Checking it
 
 `tests/test_tube_game.py` plays on both machines (digging deep first, as
@@ -168,6 +185,11 @@ displayed screen byte for byte every frame against the models: the host's
 tiles, lit by the brighter of daylight (and torchlight) and the model's
 light, with the sprite. One script drops torches, and checks they are in
 view and light tiles beyond daylight.
+
+`test_host_keeps_a_copy_of_the_store` (in the same file) digs and drops a
+torch on both machines, then checks each slot in the host's banks against
+the parasite's, byte for byte; `tests/test_world.py` checks in py65 that
+the queued changes, applied as the host applies them, reproduce the store.
 
 `tests/test_pieces.py` checks slots in py65: given, shown, their
 visibility copied and freed by a sweep on the parasite, and composed on the
@@ -209,6 +231,14 @@ Packing the radial table costs about 140 cycles a frame (17,455 against
 17,311 over the same 490 frames; the worst 108,475 against 108,166), and
 frees 8.3K. Every read over those frames where the excess isn't FAR reads
 the model's value.
+
+Keeping the host's copy of the store costs the host about 100 cycles a
+frame on average while digging (Beebium, 300 frames on the B+), and about
+3,700 in a frame that carries a whole chunk (4,600 at most, with tiles):
+reading a byte over the Tube takes about 28 host cycles. The parasite pays
+about 150 cycles a frame on average and 2,600 in a frame that copies a
+chunk (py65, which doesn't count the Tube's interrupts for each byte the
+host reads).
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the

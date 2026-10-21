@@ -34,7 +34,11 @@ creatures. A permanent geological skeleton of immutable terrain, with
 substantial pockets of destructible material: the player can reshape the
 pockets extensively but cannot destroy the world's topology. This keeps
 puzzles solvable whatever the player digs, and immutable tiles never need
-modification records.
+modification records. It also bounds the storage: changed chunks are kept
+whole (128 bytes for 8 x 8 tiles), and the host's spare 32K holds 255 of the
+world's 1,024, so a world whose skeleton takes up much of it can have all
+its pockets changed (2026-10-21; packing chunks is the next step, if
+needed).
 
 | Terrain | Traversable | Modifiable | Behaviour |
 |---|---|---|---|

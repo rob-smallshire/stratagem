@@ -214,6 +214,7 @@
     LDY #0
     LDA para_changes
     STA (para_write),Y
+    JSR store_emit
     LDY #PACKET_STRIPS
     LDA para_strips
     STA (para_packet),Y
@@ -315,6 +316,126 @@
     AND #1
     JSR OSWRCH
     INC para_sent
+    RTS
+}
+
+\ After the changed tiles, the changes queued for the host's copy of the
+\ store (world.asm), as many as fit: a count, then each change's slot and
+\ offset, then a tile's material and shape, or the whole chunk.
+.store_emit
+{
+    LDA para_change_y           \ Past the changed tiles
+    CLC
+    ADC para_write
+    STA para_write
+    STA zp_store_count          \ The count goes here
+    LDA para_write + 1
+    ADC #0
+    STA para_write + 1
+    STA zp_store_count + 1
+    INC para_write              \ The changes after it
+    BNE room
+    INC para_write + 1
+.room
+    LDA para_packet             \ Room: the packet's end less para_write
+    CLC
+    ADC #LO(PACKET_BYTES)
+    STA store_room
+    LDA para_packet + 1
+    ADC #HI(PACKET_BYTES)
+    STA store_room + 1
+    LDA store_room
+    SEC
+    SBC para_write
+    STA store_room
+    LDA store_room + 1
+    SBC para_write + 1
+    STA store_room + 1
+    LDA #0
+    STA store_count
+.change
+    LDX store_head
+    CPX store_tail
+    BEQ done
+    LDA store_queue_offset,X
+    CMP #STORE_CHUNK
+    BEQ chunk
+    LDA #STORE_TILE_BYTES       \ A tile
+    JSR store_take
+    BCS done
+    LDY #2
+    LDA store_queue_material,X
+    STA (para_write),Y
+    INY
+    LDA store_queue_shape,X
+    STA (para_write),Y
+    LDA #STORE_TILE_BYTES
+    BNE next                    \ Always branches
+.chunk
+    LDA #STORE_CHUNK_BYTES      \ A whole chunk
+    JSR store_take
+    BCS done
+    LDA store_queue_slot,X
+    JSR point_at_slot
+    LDA para_write              \ Its bytes after the slot and offset
+    CLC
+    ADC #2
+    STA para_write
+    BCC copy
+    INC para_write + 1
+.copy
+    LDY #SLOT_BYTES - 1
+.copy_loop
+    LDA (zp_world_pointer),Y
+    STA (para_write),Y
+    DEY
+    BPL copy_loop
+    LDA #SLOT_BYTES
+.next
+    CLC                         \ Past the change
+    ADC para_write
+    STA para_write
+    BCC taken
+    INC para_write + 1
+.taken
+    INC store_count
+    INX
+    TXA
+    AND #STORE_QUEUE - 1
+    STA store_head
+    JMP change
+.done
+    LDY #0
+    LDA store_count
+    STA (zp_store_count),Y
+    RTS
+}
+
+\ Take A bytes of the packet's room for queued change X, and write its slot
+\ and offset; or return with carry set if there isn't room. Preserves X.
+.store_take
+{
+    STA para_tmp
+    LDA store_room
+    SEC
+    SBC para_tmp
+    STA para_tmp
+    LDA store_room + 1
+    SBC #0
+    BCC full
+    STA store_room + 1
+    LDA para_tmp
+    STA store_room
+    LDY #0
+    LDA store_queue_slot,X
+    STA (para_write),Y
+    INY
+    LDA store_queue_offset,X
+    STA (para_write),Y
+    CLC
+    RTS
+.full
+    SEC
     RTS
 }
 

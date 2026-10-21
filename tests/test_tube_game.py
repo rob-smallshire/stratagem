@@ -120,3 +120,40 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
                 for x in range(camera_x >> 2, (camera_x + camera.VIEW_COLUMNS - 1 >> 2) + 1)]
         assert any(tiles(x, y)[0][0] == TORCH for x, y in view), "no torch in view"
         assert any(tiles(x, y)[1] > lighting.fixed_light(x, y) for x, y in view), "nothing lit by a torch"
+
+
+STORE_SLOT_BYTES = 128      # asm/tube_layout.asm
+STORE_SCRIPT = [(150, ["M", "L"]), (60, ["X", "L"]), (2, ["T"]), (30, ["Z", "L"]), (10, [])]
+
+
+def test_host_keeps_a_copy_of_the_store(tube_bbc, tube_machine, game_build):
+    """Every changed chunk the parasite holds, the host holds in its store's
+    banks, byte for byte, once the packets have carried the changes."""
+    bbc = tube_bbc
+    labels = game_build.labels["HOST"]
+    parasite_labels = game_build.labels["PARASITE"]
+    peek = bbc.memory.address.peek
+    bbc.disc.set_spin_up_delay(False)
+    bbc.boot_disc(str(game_build.disc_filepath))
+    started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
+    assert started, "the game did not start"
+    for count, keys in STORE_SCRIPT:
+        for key in keys:
+            bbc.keyboard.key_down(key)
+        for _ in range(count):
+            bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
+        for key in keys:
+            bbc.keyboard.key_up(key)
+    parasite = bbc.connect_coprocessor().memory.address.peek
+    for _ in range(4):          # until the queue is sent
+        bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
+    assert parasite[parasite_labels["store_head"]] == parasite[parasite_labels["store_tail"]]
+    used = parasite[parasite_labels["world_slots_used"]]
+    assert used >= 3, "too few chunks changed to test"
+    banks = [peek[labels["host_store_banks"] + i] for i in range(2)]
+    slots = parasite_labels["world_slots"]
+    for slot in range(1, used + 1):
+        bank = bbc.memory.region(f"bank_{banks[(slot - 1) // 128]}").peek
+        address = 0x8000 + (slot - 1) % 128 * STORE_SLOT_BYTES
+        held = parasite[slots + (slot - 1) * STORE_SLOT_BYTES:slots + slot * STORE_SLOT_BYTES]
+        assert bank[address:address + STORE_SLOT_BYTES] == held, f"slot {slot}"

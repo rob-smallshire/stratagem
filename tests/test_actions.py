@@ -6,7 +6,7 @@ import random
 
 import pytest
 
-from conftest import parasite_machine
+from conftest import parasite_machine, take_store_changes
 from stratagem import actions, player
 from stratagem.actions import Hands
 from stratagem.camera import INPUT_ACTION, INPUT_PLACE
@@ -72,6 +72,7 @@ def test_actions_match_model(machine, game_build):
             memory[labels["cooldown"]] = hands.cooldown
             machine.call(labels["update_player"])
             machine.call(labels["player_action"])
+            take_store_changes(machine, labels)
             actual, _, _, _ = harness.read()
             expected = player.step(state, inputs, world.tile_at)
             assert actual == expected, f"from {state} with inputs {inputs}"
@@ -133,6 +134,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
                 memory[labels["cooldown"]] = hands.cooldown
                 machine.call(labels["update_player"])
                 machine.call(labels["player_action"])
+                take_store_changes(machine, labels)
                 actual, _, _, _ = harness.read()
                 expected = player.step(state, keys, world.tile_at)
                 assert actual == expected, f"from {state}"
@@ -174,6 +176,7 @@ def test_diagonal_digs_in_random_ground_match_model(machine, game_build, keys):
                 world.set_tile(tx, ty, tile)
                 memory[labels["zp_world_new_shape"]] = tile[1]
                 machine.call(labels["set_tile"], a=tile[0], x=tx, y=ty)
+                take_store_changes(machine, labels)
         px, py = tx0 * 8 + rng.randrange(8), ty0 * 16 + rng.randrange(16)
         # Clear whatever the player would overlap.
         for tx in range(px // 8, (px + 5) // 8 + 1):
@@ -182,6 +185,7 @@ def test_diagonal_digs_in_random_ground_match_model(machine, game_build, keys):
                     world.set_tile(tx, ty, (AIR, SHAPE_FULL))
                     memory[labels["zp_world_new_shape"]] = SHAPE_FULL
                     machine.call(labels["set_tile"], a=AIR, x=tx, y=ty)
+                    take_store_changes(machine, labels)
         if player.hits(world.tile_at, px, py):
             continue
         state = player.Player(x=px * 16 + rng.randrange(16), y=py * 16, on_ground=rng.random() < 0.7,
@@ -192,6 +196,7 @@ def test_diagonal_digs_in_random_ground_match_model(machine, game_build, keys):
         memory[labels["inventory"]] = hands.inventory
         memory[labels["cooldown"]] = 0
         machine.call(labels["player_action"])
+        take_store_changes(machine, labels)
         dx = 1 if keys & INPUT_RIGHT else -1
         target, ramp = actions.diagonal(state, dx, 1 if keys & INPUT_DOWN else -1, world.tile_at)
         if target and ramp is None:

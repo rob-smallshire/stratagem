@@ -79,6 +79,13 @@ def parasite_machine(game_build: BuildResult):
     return machine, game_build.labels["PARASITE"]
 
 
+def take_store_changes(machine, labels) -> None:
+    """Empty the queue of changes for the host's copy of the store, as
+    store_emit does each frame, for tests that set tiles without frames."""
+    memory = machine.mpu.memory
+    memory[labels["store_head"]] = memory[labels["store_tail"]]
+
+
 def wait_for_prompt(bbc: Beebium) -> None:
     prompt = bbc.run_until_or_timeout(
         lambda: bbc.video.screen_text().text.rstrip().endswith(">"),

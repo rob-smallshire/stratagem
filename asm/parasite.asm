@@ -5,7 +5,7 @@
 \
 \   PGAME   the game (&4300), run at pgame_start
 \   PWORLD  the world: generator and changed-chunk store (&8000)
-\   PLIGHT  the light's radial table (&C100), and daylight
+\   PLIGHT  the light's radial table (&C100), daylight and torches
 \
 \ The parasite's memory:
 \
@@ -42,6 +42,9 @@ sun_reach_1 = &BE00             \ ... and the deepest within 1 to 4 columns
 sun_reach_2 = &BF00
 sun_reach_3 = &C000
 
+TORCH_MAX = 24                  \ Torches (torches.asm)
+TORCH_QUEUE = 128               \ Tiles awaiting redrawing (a power of 2)
+
 ORG &D1                         \ Daylight's zero page
 .sun_ptr            SKIP 2      \ A row of the tile cache's materials
 .sun_shape          SKIP 2      \ ... and shapes
@@ -75,7 +78,6 @@ INCLUDE "asm/cache.asm"
 INCLUDE "asm/player.asm"
 INCLUDE "asm/actions.asm"
 INCLUDE "asm/miner_light.asm"
-INCLUDE "asm/torches.asm"
 INCLUDE "asm/pieces.asm"
 INCLUDE "build/generated/miner.asm"
 INCLUDE "build/generated/smooth.asm"
@@ -156,6 +158,7 @@ INCBIN "build/generated/radial_packed.bin"
 .sl_radial_end
 INCLUDE "build/generated/radial_rows.asm"
 INCLUDE "asm/daylight.asm"
+INCLUDE "asm/torches.asm"
 .plight_end
 
 \ Variables that need no starting value: after the game's
@@ -194,6 +197,14 @@ GUARD &0800
 .piece_shape        SKIP 1      \ Pieces (pieces.asm)
 .piece_pair         SKIP 1
 .piece_slot_found   SKIP 1
+.store_head         SKIP 1      \ Changes for the host's copy of the store
+.store_tail         SKIP 1      \ (world.asm, store_emit)
+.store_room         SKIP 2      \ ... the packet's room left for them
+.store_count        SKIP 1      \ ... how many are in this packet
+.store_queue_slot   SKIP STORE_QUEUE
+.store_queue_offset SKIP STORE_QUEUE
+.store_queue_material SKIP STORE_QUEUE
+.store_queue_shape  SKIP STORE_QUEUE
 
 \ And tables the light sets up afresh each pass, above daylight's window
 ORG plight_end

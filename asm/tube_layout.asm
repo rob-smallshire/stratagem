@@ -51,6 +51,19 @@ CHANGES_PER_FRAME = 3           \ Changed tiles in a packet, at most
 LIST_ENTRY_BYTES = 5
 LIST_MAX = 255
 
+\ The store of changed chunks: the parasite's, and the host's copy in its
+\ sideways RAM, slot n (from 1) at &8000 + ((n - 1) MOD 128) * 128 of the
+\ store's bank (n - 1) DIV 128. A packet's changes to it follow its changed
+\ tiles: a count, then each change's slot and offset, then a tile's
+\ material and shape, or (offset STORE_CHUNK) the whole chunk.
+CHUNK_SIZE = 8
+CHUNK_TILES = CHUNK_SIZE * CHUNK_SIZE
+SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
+STORE_BANKS = 2
+STORE_CHUNK = &FF
+STORE_TILE_BYTES = 4
+STORE_CHUNK_BYTES = 2 + SLOT_BYTES
+
 \ Host addresses the parasite puts into draw lists (asserted in render.asm)
 HOST_MATERIAL_PAGES = &8100
 HOST_LIGHT_MASKS = &9700

@@ -5,6 +5,9 @@ import pytest
 from conftest import parasite_machine
 from stratagem.world import WORLD_SIZE, tile_at
 
+STORE_QUEUE, STORE_CHUNK = 32, 0xFF     # asm/world.asm, asm/tube_layout.asm
+SLOT_BYTES = 128
+
 
 @pytest.fixture(scope="module")
 def world_machine(game_build):
@@ -35,6 +38,23 @@ def test_changes_match_model_until_the_world_is_full(world_machine, game_build):
     world_machine.call(labels["world_reset"])
     rng = random.Random(7)
     chunks = [(rng.randrange(32), rng.randrange(32)) for _ in range(SLOT_COUNT + 40)]
+    memory = world_machine.mpu.memory
+    slots = labels["world_slots"]
+    host = {}           # the host's copy of the store: slot -> bytes
+
+    def take_changes():
+        """Apply the queued changes, as the host does from a packet."""
+        head, tail = memory[labels["store_head"]], memory[labels["store_tail"]]
+        while head != tail:
+            slot, offset = memory[labels["store_queue_slot"] + head], memory[labels["store_queue_offset"] + head]
+            if offset == STORE_CHUNK:
+                host[slot] = memory[slots + (slot - 1) * SLOT_BYTES:slots + slot * SLOT_BYTES]
+            else:
+                host[slot][offset] = memory[labels["store_queue_material"] + head]
+                host[slot][offset + CHUNK_SIZE ** 2] = memory[labels["store_queue_shape"] + head]
+            head = (head + 1) % STORE_QUEUE
+        memory[labels["store_head"]] = head
+
     refused = 0
     for step in range(1500):
         cx, cy = rng.choice(chunks[: 20 + step // 5])
@@ -46,7 +66,12 @@ def test_changes_match_model_until_the_world_is_full(world_machine, game_build):
         assert (mpu.p & 1 == 0) == accepted, f"set_tile({x}, {y}) carry disagrees"
         assert (mpu.x, mpu.y) == (x, y)
         refused += not accepted
+        take_changes()
     assert refused > 0, "the world never filled up"
+    used = memory[labels["world_slots_used"]]
+    assert sorted(host) == list(range(1, used + 1))
+    for slot, data in host.items():
+        assert data == memory[slots + (slot - 1) * SLOT_BYTES:slots + slot * SLOT_BYTES], f"slot {slot}"
     assert world_machine.mpu.memory[labels["world_slots_used"]] == SLOT_COUNT
     tile_at_address = labels["tile_at"]
     for cx, cy in set(chunks):

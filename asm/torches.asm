@@ -13,9 +13,6 @@
 \ a tile is sent, so that the miner's light always compares against what the
 \ host shows.
 
-TORCH_MAX = 24
-TORCH_QUEUE = 128               \ Tiles awaiting redrawing (a power of 2)
-
 \ Drop a torch on a fresh press of T.
 .torch_input
 {

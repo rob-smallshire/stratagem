@@ -121,6 +121,8 @@ INKEY_T = &100 - 36
     CPX host_changes
     BNE change
 .changes_done
+    JSR host_store
+.*host_stored                   \ (For timing)
     JSR host_release
 
     JSR read_input              \ The input, to the parasite's mailbox
@@ -182,6 +184,71 @@ INKEY_T = &100 - 36
     STA zp_columns_width
     INC host_frame_count
 .*host_frame_shown              \ Tests stop here
+    RTS
+}
+
+\ The packet's changes to the store of changed chunks (the parasite's
+\ store_emit): copy each into the store's banks, slot n (from 1) at &8000 +
+\ ((n - 1) MOD 128) * 128 of bank (n - 1) DIV 128, as the parasite holds it.
+.host_store
+{
+    READ_BYTE
+    STA host_store_count
+    BNE change
+    RTS
+.change
+    READ_BYTE                   \ The slot: page its bank in and point at it
+    SEC
+    SBC #1
+    TAY
+    LSR A
+    STA chunk_to + 2
+    LDA #0
+    ROR A
+    STA chunk_to + 1
+    STA material_to + 1
+    ORA #CHUNK_TILES
+    STA shape_to + 1
+    LDA chunk_to + 2
+    AND #&3F
+    ORA #&80
+    STA chunk_to + 2
+    STA material_to + 2
+    STA shape_to + 2
+    TYA
+    ASL A
+    LDA #0
+    ROL A
+    TAX
+    LDA host_store_banks,X
+    SELECT_ROMSEL
+    READ_BYTE                   \ The offset
+    CMP #STORE_CHUNK
+    BEQ chunk
+    TAY                         \ A tile
+    READ_BYTE
+.*material_to
+    STA &8000,Y
+    READ_BYTE
+.*shape_to
+    STA &8000,Y
+    JMP next
+.chunk
+    LDY #0
+.chunk_loop
+    READ_BYTE
+.*chunk_to
+    STA &8000,Y
+    INY
+    CPY #SLOT_BYTES
+    BNE chunk_loop
+.next
+    DEC host_store_count
+    BEQ done
+    JMP change
+.done
+    LDA zp_romsel_game
+    SELECT_ROMSEL
     RTS
 }
 
