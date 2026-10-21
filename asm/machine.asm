@@ -1,5 +1,12 @@
 \ Machine identification and sideways RAM discovery.
 
+MACHINE_MODEL_B   = 0           \ Values of zp_machine
+MACHINE_INTEGRA_B = 1
+MACHINE_B_PLUS    = 2
+MACHINE_MASTER    = 3
+BOOT_READY = &FF                \ zp_boot_status once a program is ready (the
+                                \ tests wait for it)
+
 \ Set zp_machine by looking for IBOS, then from the MOS version. IBOS must
 \ be checked first: it makes OSBYTE &00 report 2, as on a B+.
 .detect_machine

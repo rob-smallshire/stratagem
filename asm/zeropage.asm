@@ -1,39 +1,12 @@
-\ Zero page allocation.
-\
-\ The OS stays resident, so we use only &00-&8F, the language and user
-\ area. Variables are declared with ORG/SKIP rather than as constants so
-\ that beebasm exports them as labels, which the tests look up by name.
-
-BOOT_READY = &FF                \ zp_boot_status once initialisation is done
+\ The parasite's zero page, below the mailbox at &8E (the light's follows it:
+\ miner_light_zp.asm). Variables are declared with ORG/SKIP rather than as
+\ constants so that beebasm exports them as labels, which the tests look up
+\ by name. The host has its own (host_zeropage.asm).
 
 ORG &00
-GUARD &8E                       \ The Tube game's parasite has the mailbox at &8E, then the light
+GUARD &8E
 
-\ Machine and paging
-.zp_boot_status     SKIP 1      \ Zero while starting, BOOT_READY when ready
-.zp_machine         SKIP 1      \ One of the MACHINE_* constants
 .zp_ptr             SKIP 2      \ General purpose pointer
-.zp_romsel_game     SKIP 1      \ ROMSEL while game code runs: the game bank
-.zp_romsel_render   SKIP 1      \ ROMSEL while render code runs: render bank + bit 7
-
-\ Render parameters, set by the game before calling a render routine
-.zp_render_u        SKIP 1      \ World cell column (only the low 7 bits matter)
-.zp_render_v        SKIP 1      \ World cell row (only the low 6 bits matter)
-.zp_render_count    SKIP 1      \ Cells along a row, or rows down columns
-.zp_render_width    SKIP 1      \ Columns side by side (render_columns)
-.zp_render_base     SKIP 2      \ Screen address of the first cell
-
-\ Renderer workspace (used only by render code)
-.zp_screen          SKIP 2      \ Screen address of the current cell
-.zp_screen_lower    SKIP 2      \ A second screen address
-.zp_tile            SKIP 2      \ Graphics of the current cell
-.zp_row_pointer     SKIP 2      \ The tile cache row being drawn: materials
-.zp_shape_row_pointer SKIP 2    \ ... and shapes
-.zp_offsets_pointer SKIP 2      \ The CELL_OFFSETS row for a cell
-.zp_render_shape    SKIP 1      \ The shape of the tile being drawn
-.zp_light_row_pointer SKIP 2    \ ... and light
-.zp_render_light    SKIP 1      \ The light of the tile being drawn, scaled
-.zp_mask            SKIP 2      \ The dither masks for the cell being drawn
 
 \ World workspace (used only by world code)
 .zp_world_x         SKIP 1
@@ -112,19 +85,6 @@ GUARD &8E                       \ The Tube game's parasite has the mailbox at &8
 \ Game
 .zp_screen_start    SKIP 2      \ Screen address of the view's top-left cell
 .zp_frame           SKIP 1      \ Incremented once per pass of the main loop
-.zp_sprite_address  SKIP 2      \ Screen address of the sprite's top line
-.zp_sprite_frame    SKIP 1      \ The frame drawn there
-.zp_sprite_drawn    SKIP 1      \ Non-zero while the sprite is on the screen
-.zp_columns_width   SKIP 1      \ New columns to draw at the next flip...
-.zp_columns_u       SKIP 1      \ ... from this world column
-.zp_columns_base    SKIP 2      \ ... at this screen address
-.zp_rows_left       SKIP 1      \ Rows still to draw in a redraw
-.zp_split_row       SKIP 1      \ New columns are drawn above it, then below
 .zp_temp            SKIP 2
 .zp_temp2           SKIP 2
 
-\ Values of zp_machine
-MACHINE_MODEL_B   = 0
-MACHINE_INTEGRA_B = 1
-MACHINE_B_PLUS    = 2
-MACHINE_MASTER    = 3

@@ -4,7 +4,11 @@
 \ summary, then sets zp_boot_status to BOOT_READY and idles.
 
 INCLUDE "asm/os.asm"
-INCLUDE "asm/zeropage.asm"
+
+ORG &70                         \ In the language's zero page
+.zp_boot_status     SKIP 1      \ Zero while starting, BOOT_READY when ready
+.zp_machine         SKIP 1      \ One of the MACHINE_* constants
+.zp_ptr             SKIP 2
 
 ORG &2000
 GUARD &3000

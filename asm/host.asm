@@ -15,12 +15,7 @@ INCLUDE "build/generated/camera.asm"
 INCLUDE "build/generated/player.asm"
 
 WRCHV = &020E
-BOOT_READY = &FF
 HOST_ADDRESS = &30000           \ A DFS load address of &FFFFxxxx: the host
-MACHINE_MODEL_B   = 0           \ Values of zp_machine (as zeropage.asm)
-MACHINE_INTEGRA_B = 1
-MACHINE_B_PLUS    = 2
-MACHINE_MASTER    = 3
 
 \ The next byte from the parasite, in a transfer to the host.
 MACRO READ_BYTE

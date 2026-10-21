@@ -6,23 +6,23 @@
 
 ORG &57
 GUARD &90
-.zp_screen          SKIP 2      \ Renderer workspace (see zeropage.asm)
-.zp_screen_lower    SKIP 2
-.zp_tile            SKIP 2
-.zp_row_pointer     SKIP 2
-.zp_shape_row_pointer SKIP 2
-.zp_offsets_pointer SKIP 2
-.zp_light_row_pointer SKIP 2
-.zp_mask            SKIP 2
+.zp_screen          SKIP 2      \ Renderer workspace: the current cell's screen address
+.zp_screen_lower    SKIP 2      \ ... a second screen address
+.zp_tile            SKIP 2      \ ... the current cell's graphics
+.zp_row_pointer     SKIP 2      \ ... the tile cache row being drawn: materials
+.zp_shape_row_pointer SKIP 2    \ ... shapes
+.zp_offsets_pointer SKIP 2      \ ... the CELL_OFFSETS row for a cell
+.zp_light_row_pointer SKIP 2    \ ... light
+.zp_mask            SKIP 2      \ ... the dither masks for the cell
 .zp_ptr             SKIP 2
 .zp_temp            SKIP 2
-.zp_render_u        SKIP 1      \ Render parameters
-.zp_render_v        SKIP 1
-.zp_render_count    SKIP 1
-.zp_render_width    SKIP 1
-.zp_render_base     SKIP 2
-.zp_render_shape    SKIP 1
-.zp_render_light    SKIP 1
+.zp_render_u        SKIP 1      \ Render parameters: world cell column (low 7 bits)
+.zp_render_v        SKIP 1      \ ... world cell row (low 6 bits)
+.zp_render_count    SKIP 1      \ ... cells along a row, or rows down columns
+.zp_render_width    SKIP 1      \ ... columns side by side (render_columns)
+.zp_render_base     SKIP 2      \ ... the first cell's screen address
+.zp_render_shape    SKIP 1      \ ... the shape of the tile being drawn
+.zp_render_light    SKIP 1      \ ... and its light, scaled
 .zp_sprite_address  SKIP 2
 .zp_sprite_frame    SKIP 1
 .zp_screen_start    SKIP 2      \ The view (from the parasite's packets)
