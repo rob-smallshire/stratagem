@@ -105,7 +105,7 @@ building is about where the pillars go.
 |---|---|---|
 | From below | by what is under it | tree trunks, wooden ladders, walls, mushrooms, grass, benches, chests |
 | From above | by what is over it | ropes, rope ladders, vines, stalactites |
-| From below or the side, within a span | by what is under it, or a neighbour beside it, one step further from the ground | roofs, platforms, plank and brick blocks, canopy |
+| From below or the side, within a span | by what is under it, or a neighbour beside it, one step further from the ground | roofs, platforms, plank and brick blocks, canopy (held by the canopy over its trunk; leaves at its edge hold only the leaves above them, so touching trees don't hold up each other's leaves) |
 | By any solid neighbour | | torches |
 | Both floor and ceiling | both halves as one | doors |
 
@@ -266,6 +266,18 @@ an anvil, make a better pickaxe.
   the parasite's spare memory), then undone: pieces are clear to daylight,
   lit as the sky over them, and so is inside a building. See
   `docs/decisions.md`.
+- **The feature and support lab** (`uv run strat-feature-lab`, into
+  `build/features/`; the models are `support.py` and `features.py`): 52
+  trees on the surface, placed a column at a time with a table of a byte a
+  column (COVER: the tree covering it, as its trunk's offset and height), so
+  a tile's tree part is one look-up and a subtraction from the surface
+  height. At most 9 distinct pairs of piece and backdrop in any view of the
+  surface (slots: 56). Support as a cellular automaton works: a roof 8
+  between walls breaks in the middle with a span of 3 and holds with 5; a
+  ledge reaches 3 or 5; a felled tree takes its leaves (10 pieces, 5 frames
+  at 2 a frame), an undermined hut 12 and a bridge on a pillar 7. Leaves
+  first held leaves sideways, so a neighbouring tree held up a felled one's;
+  now only the canopy over the trunk holds leaves beside it.
 - **Drawing:** composing as drawn costs 80-130 cycles more a cell; composing
   once into slots costs about 1,500 cycles a new pair and nothing a frame.
   See Drawing.

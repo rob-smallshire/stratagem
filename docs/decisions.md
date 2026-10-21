@@ -172,3 +172,9 @@ A running log of design decisions. Add to it whenever one is made.
   Unlike Terraria, built blocks fall without support, which makes building
   a matter of where the pillars go; the span (3 to 5) is to be chosen by
   playing.
+- **Trees are features placed a column at a time:** a table of a byte a
+  column (the covering tree's trunk offset and height) made with the
+  surface heights, so a tile's tree part costs one look-up, not a search
+  (`features.py`). Leaves are held by the canopy over their trunk, and edge
+  leaves hold only what is above them, so touching trees stand and fall
+  apart.
