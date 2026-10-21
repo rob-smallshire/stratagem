@@ -146,21 +146,22 @@
     SBC view_left
     STA zp_temp + 1
     INC zp_temp + 1             \ Tiles in a row
-    LDA view_left               \ Cached so far: the rows filled
+    LDA view_top
+    STA cached_top
+.fill_loop
+    LDA cached_top
+    JSR fill_tile_row
+    LDA cached_top
+    INC cached_top
+    CMP view_bottom
+    BNE fill_loop
+    LDA view_left
     STA cached_left
     LDA view_right
     STA cached_right
     LDA view_top
     STA cached_top
+    LDA view_bottom
     STA cached_bottom
-.fill_loop
-    LDA cached_bottom
-    JSR fill_tile_row
-    LDA cached_bottom
-    CMP view_bottom
-    BEQ done
-    INC cached_bottom
-    BNE fill_loop               \ Always branches
-.done
     RTS
 }

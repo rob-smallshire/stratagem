@@ -42,7 +42,9 @@ sun_reach_1 = &BE00             \ ... and the deepest within 1 to 4 columns
 sun_reach_2 = &BF00
 sun_reach_3 = &C000
 
-ORG &D1
+ORG &D1                         \ Daylight's zero page
+.sun_ptr            SKIP 2      \ A row of the tile cache's materials
+.sun_shape          SKIP 2      \ ... and shapes
 .piece_ptr          SKIP 2      \ A slot's visibility (pieces.asm)
 ASSERT P% <= &E6
 
@@ -79,11 +81,7 @@ INCLUDE "build/generated/miner.asm"
 INCLUDE "build/generated/smooth.asm"
 
 \ The host-only game pages its world in; here it is simply there.
-.call_set_tile                  \ (Noting for daylight whether the tile let
-    PHA                         \ light through)
-    JSR sun_clear_at
-    STA sun_was_clear
-    PLA
+.call_set_tile
     JMP set_tile
 
 \ The renderer's table of each cell's graphic in its material's page, which
@@ -180,13 +178,8 @@ GUARD &0800
 .sun_near_to        SKIP 1
 .sun_x              SKIP 1      \ The tile being lit
 .sun_y              SKIP 1
-.sun_wall           SKIP 1      \ Walking along its row (sun_walk)
-.sun_most           SKIP 1
-.sun_dist           SKIP 1
-.sun_side           SKIP 1
-.sun_column         SKIP 1
-.sun_in_wall        SKIP 1
-.sun_target         SKIP 2      \ ... the nearest column open to the sky each way
+.sun_lx             SKIP 1
+.sun_rx             SKIP 1
 .sun_best           SKIP 1
 .sun_level          SKIP 1
 .sun_new            SKIP 1
@@ -201,12 +194,6 @@ GUARD &0800
 .piece_shape        SKIP 1      \ Pieces (pieces.asm)
 .piece_pair         SKIP 1
 .piece_slot_found   SKIP 1
-.torch_near         SKIP TORCH_MAX      \ Torches (torches.asm)
-.sun_was_clear      SKIP 1      \ Daylight: the changed tile, before
-.sun_safe_l         SKIP 1      \ ... the tiles held in the tile cache
-.sun_safe_r         SKIP 1
-.sun_safe_t         SKIP 1
-.sun_safe_b         SKIP 1
 
 \ And tables the light sets up afresh each pass, above daylight's window
 ORG plight_end
@@ -216,5 +203,6 @@ GUARD &F800
 .sl_pool_outside    SKIP MINER_WINDOW     \ Non-zero outside the tile cache
 .sl_tile_excess     SKIP GRID_SPAN * GRID_SPAN  \ Row-major, with the border
 .sl_corner          SKIP GRID_SPAN * GRID_SPAN  \ At each tile's top left
+.torch_near         SKIP TORCH_MAX      \ (torches.asm)
 
 SAVE "PLIGHT", sl_radial, plight_end, sl_radial

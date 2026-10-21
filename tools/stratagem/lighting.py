@@ -294,10 +294,8 @@ def sunlight(clear: np.ndarray, depth=None, **steps) -> np.ndarray:
 
 
 def glow(x: int, y: int) -> int:
-    """The glow: fixed_light, GLOW_LOSS levels darker, below the surface
-    only. A tile at or above the surface is in the sun unless something
-    built covers it, and then it is dark, so that a hut is dark inside."""
-    return max(0, fixed_light(x, y) - GLOW_LOSS) if y > HEIGHTS[x] else 0
+    """The glow: fixed_light, GLOW_LOSS levels darker."""
+    return max(0, fixed_light(x, y) - GLOW_LOSS)
 
 
 def cell_masks(light_at):
@@ -535,10 +533,8 @@ def shows(visibility: int, before: int, after: int, parity: int) -> bool:
 # row, losing SHAFT_SIDE_STEP a column. A wall is lit fully at its column's
 # sky depth, losing SUN_WALL_STEP a tile below it, from a column open to the
 # sky beside it, losing SUN_WALL_STEP a column beyond the first, and, as a
-# floor, as brightly as the open tile above it. Light reaches a tile only
-# through open tiles and then, if the tile is a wall, through walls: never
-# through a wall and out into the open again. So it doesn't seep through
-# rock into caves, or through a hut's walls and roof into the hut.
+# floor, as brightly as the open tile above it. Light ignores what lies
+# between, so it can seep a little way through rock.
 
 SHAFT_SIDE_STEP = 3
 SHAFT_REACH = FULL // SHAFT_SIDE_STEP - 1
@@ -546,52 +542,34 @@ SHAFT_WALL_REACH = FULL // SUN_WALL_STEP + 1
 SHAFT_TAPER = 4             # tiles below the surface per level of sunlight lost
 
 
-def shaft_sun(depth, clear_at, x: int, y: int, side_step: int = SHAFT_SIDE_STEP, reach: int = SHAFT_REACH,
-              taper: int | None = SHAFT_TAPER, surface=HEIGHTS) -> int:
+def shaft_sun(depth, clear: bool, x: int, y: int, side_step: int = SHAFT_SIDE_STEP,
+              clear_above: bool = False, reach: int = SHAFT_REACH, taper: int | None = SHAFT_TAPER,
+              surface=HEIGHTS) -> int:
     """Sunlight at tile (x, y), from `depth[x]`, each column's sky depth
-    (a sequence over the whole world), from columns at most `reach` away;
-    `clear_at(x, y)` tells whether a tile lets light through. With `taper`,
-    it is a level less for each `taper` tiles the tile is below its
-    column's surface (`surface[x]`, the original surface row), so that it
-    dims slowly down a shaft."""
-    def nearest(wall, most):
-        """The distance to the nearest column open to the sky at row y, at
-        most `most` away, reached along the row through open tiles (after
-        walls, from a wall), or None."""
-        found = None
-        for direction in (-1, 1):
-            in_wall = wall
-            for d in range(1, most + 1):
-                column = x + direction * d
-                if not 0 <= column < len(depth):
-                    break
-                if y < depth[column]:
-                    found = d if found is None else min(found, d)
-                    break
-                if clear_at(column, y):
-                    in_wall = False
-                elif not in_wall:
-                    break
-        return found
+    (a sequence over the whole world), from columns at most `reach` away.
+    With `taper`, it is a level less for each `taper` tiles the tile is
+    below its column's surface (`surface[x]`, the original surface row), so
+    that it dims slowly down a shaft."""
+    def open_to_sky(column):
+        return 0 <= column < len(depth) and y < depth[column]
 
     def tapered(level):
         if taper is None:
             return level
         return max(0, level - max(0, y - surface[x]) // taper)
 
-    if clear_at(x, y):
-        if y < depth[x]:
-            return tapered(FULL)
-        d = nearest(False, reach)
-        return tapered(max(0, FULL - side_step * d)) if d else 0
-    best = 0
-    if y < depth[x] + SHAFT_WALL_REACH and not any(clear_at(x, row) for row in range(depth[x] + 1, y)):
-        best = max(0, FULL - SUN_WALL_STEP * (y - depth[x]))
-    d = nearest(True, min(SHAFT_WALL_REACH, reach))
-    if d:
-        best = max(best, FULL - SUN_WALL_STEP * (d - 1))
-    if y > 0 and clear_at(x, y - 1):
-        best = max(best, shaft_sun(depth, clear_at, x, y - 1, side_step, reach, None))
+    if clear:
+        for d in range(0, min(FULL // side_step, reach + 1)):
+            if open_to_sky(x - d) or open_to_sky(x + d):
+                return tapered(FULL - side_step * d)
+        return 0
+    best = max(0, FULL - SUN_WALL_STEP * (y - depth[x])) if y >= depth[x] else 0
+    for d in range(1, min(SHAFT_WALL_REACH, reach) + 1):
+        if open_to_sky(x - d) or open_to_sky(x + d):
+            best = max(best, FULL - SUN_WALL_STEP * (d - 1))
+            break
+    if clear_above:
+        best = max(best, shaft_sun(depth, True, x, y - 1, side_step, reach=reach, taper=None))
     return tapered(best)
 
 
@@ -600,10 +578,6 @@ def shaft_sunlight(clear: np.ndarray, side_step: int = SHAFT_SIDE_STEP, reach: i
     """shaft_sun for each tile of a region whose row 0 is the top of the
     world: tapered if `surface` gives its columns' surface rows."""
     depth = sky_depths(clear)
-
-    def clear_at(x, y):
-        return bool(clear[y, x])
-
-    return np.array([[shaft_sun(depth, clear_at, x, y, side_step, reach, taper if surface is not None else None,
-                                surface)
+    return np.array([[shaft_sun(depth, clear[y, x], x, y, side_step, y > 0 and clear[y - 1, x], reach,
+                                taper if surface is not None else None, surface)
                       for x in range(clear.shape[1])] for y in range(clear.shape[0])])

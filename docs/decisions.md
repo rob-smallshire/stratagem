@@ -129,10 +129,12 @@ A running log of design decisions. Add to it whenever one is made.
   glow fades over about 11 tiles; this over about 60). Chosen in the
   daylight lab over a narrower reach (2 columns) and a dimmer start for the
   shaft's walls.
-- **Daylight stops at walls:** light reaches a tile along its row only
-  through open tiles (into a wall, through walls first, then open tiles),
-  and soaks down from the sky depth only through walls; the glow lights
-  only below the original surface. So a roofed hut is dark inside, and
-  light no longer seeps through rock into caves. Simple rules over the
-  existing sky depths, rather than spreading light, at about 700 cycles a
-  frame more on average.
+- **Built things don't stop daylight:** making daylight stop at walls (a
+  roofed hut dark inside, light kept out of caves beside shafts) was built
+  and measured, at about 700 cycles a frame more on average, up to 9,400 in
+  the worst frame, and nearly all the parasite's spare memory, then undone.
+  Darkness inside a building isn't worth that. Pieces (built blocks, doors,
+  trees) are clear to daylight: a column's sky depth passes through them, so
+  they are lit as the sky over them, and so is what they enclose. Terrain
+  still sets the sky depth, as before. The property tables give pieces this
+  (the light property).

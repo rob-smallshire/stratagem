@@ -121,31 +121,18 @@ open to the sky beside it, and, as a floor, as brightly as the open tile
 above it; then a level less for each 4 tiles the tile is below its
 column's surface (`SHAFT_TAPER`). So daylight falls down a dug shaft,
 dimming slowly as it goes (four times more slowly than the glow), and pools
-where it meets a cave.
-
-Light stops at walls: it reaches a tile along its row only through open
-tiles (a wall, through walls first, then open tiles), and soaks down into a
-wall from its column's sky depth only through walls. So a roofed hut is
-dark inside, and light doesn't seep through rock into a cave beside a
-shaft. It doesn't creep down slopes away from the shaft: the price of
-being cheap. The glow is the host-only game's stand-in, `fixed_light`, 4
-levels dimmer, below the original surface only: it shades the rock below
-the surface and lets shallow caves be made out. A tile at or above the
-surface is in the sun unless something built covers it, and then dark.
+where it meets a cave. Light ignores what lies between the column and the tile, so it can
+seep a few tiles through rock, and it doesn't creep down slopes away from
+the shaft: the price of being cheap. The glow is the host-only game's
+stand-in, `fixed_light`, 4 levels dimmer: it shades the rock below the
+surface and lets shallow caves be made out.
 
 Daylight is worked out as tiles enter the tile cache (tables of the deepest
 sky depth within 1 to 4 columns of each make that quick, and tell at once
-when a tile is too deep to be lit). To find whether light passes, the
-nearest column open to the sky each way is found from the sky depths, and
-only the tiles between it and the tile are read: from the tile cache where
-it holds them (`sun_bounds`: both cached and in view, which differ while
-the cache is being filled), otherwise from the world. A tile changed so
-that it lets light through differently (the game notes whether it did as
-it sets the tile) relights the tiles within reach, a row a frame, queued as
-the torches' changes are: if its column's sky depth changes, from the
-highest of the tile and the old and new sky depths to 4 below the lowest;
-otherwise its row, the floors below it, and those that light soaks down to
-through it.
+when a tile is too deep to be lit). Digging a tile that changes a column's
+sky depth relights the tiles within reach, a row a frame, queued as the
+torches' changes are; one that doesn't relights just the tile and the floor
+below it.
 
 The daylight lab (`uv run strat-daylight-lab`) draws it against the fuller
 model we chose the look from (`lighting.sunlight`, which spreads light
@@ -180,9 +167,7 @@ host as `tiles.compose` does.
 by a hook), down a shaft from the surface and along a tunnel, and whenever
 relighting is done checks every tile in the tile cache against
 `lighting.shaft_sun` and the glow, from the world as the parasite holds it,
-and each column's sky depth. Another builds a roofed hut around the miner,
-a block a frame as the game places them, and checks the same, and that the
-hut is dark inside.
+and each column's sky depth.
 
 ## Costs
 
@@ -206,12 +191,6 @@ shaft and along a tunnel (17,300 against 16,100 in py65 over the same
 The taper costs nothing measurable (17,311 against 17,333 over the same
 490 frames).
 
-Stopping at walls costs about 700 cycles a frame more on average (18,045
-against 17,311 over the same 490 frames), and frames over 60,000 go from 20
-to 25. The worst frame, which fills a new strip of tiles beside the shaft
-and floods the miner's light, goes from 108,166 to 117,540: lighting a
-tile beside a shaft now reads the tiles between, about 145 cycles each.
-
 Slots add about 30 cycles a frame (17,333 against 17,306 over the same
 490 frames; with torches dropped, 18,827 against 18,801 over 794, the
 worst frame unchanged).
@@ -226,7 +205,3 @@ host can miss a frame then.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.
-- The parasite's memory is nearly full: a few dozen bytes are free (15 in
-  PLIGHT, 6 in the variables at `&0400`, and alignment gaps in PGAME).
-  The light's radial table (12K) and the changed-chunk store (13K) are the
-  large items to look at first.
