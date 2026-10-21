@@ -28,7 +28,7 @@ class ParasiteGame:
     def __init__(self, game_build):
         self.machine = Machine6502(cmos=True)
         for name in ("PGAME", "PWORLD", "PLIGHT"):
-            self.machine.load(*read_disc_file(game_build.tube_disc_filepath, name))
+            self.machine.load(*read_disc_file(game_build.disc_filepath, name))
         self.labels = game_build.labels["PARASITE"]
         self.mpu = self.machine.mpu
         self.memory = self.mpu.memory

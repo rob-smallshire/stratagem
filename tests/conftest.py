@@ -67,6 +67,18 @@ def game_build() -> BuildResult:
         pytest.skip(str(e))
 
 
+def parasite_machine(game_build: BuildResult):
+    """The parasite's game (PGAME, PWORLD, PLIGHT) in py65's 65C02, for
+    calling its routines directly; returns it and its labels."""
+    from mos6502 import Machine6502
+    from stratagem.build import read_disc_file
+
+    machine = Machine6502(cmos=True)
+    for name in ("PGAME", "PWORLD", "PLIGHT"):
+        machine.load(*read_disc_file(game_build.disc_filepath, name))
+    return machine, game_build.labels["PARASITE"]
+
+
 def wait_for_prompt(bbc: Beebium) -> None:
     prompt = bbc.run_until_or_timeout(
         lambda: bbc.video.screen_text().text.rstrip().endswith(">"),

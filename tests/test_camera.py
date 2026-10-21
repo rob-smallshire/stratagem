@@ -5,18 +5,14 @@ from dataclasses import replace
 
 import pytest
 
-from mos6502 import Machine6502
+from conftest import parasite_machine
 from stratagem import camera
-from stratagem.build import read_disc_file
 from stratagem.camera import Camera
 
 
 @pytest.fixture(scope="module")
 def main_machine(game_build):
-    load_address, data = read_disc_file(game_build.disc_filepath, "MAIN")
-    machine = Machine6502()
-    machine.load(load_address, data)
-    return machine
+    return parasite_machine(game_build)[0]
 
 
 def _signed(byte: int) -> int:
@@ -78,7 +74,7 @@ def _random_state(rng: random.Random) -> Camera:
 
 
 def test_camera_matches_model(main_machine, game_build):
-    labels = game_build.labels["STRATAGEM"]
+    labels = game_build.labels["PARASITE"]
     memory = main_machine.mpu.memory
     rng = random.Random(1988)
     frames = 0

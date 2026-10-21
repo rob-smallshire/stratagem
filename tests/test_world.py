@@ -2,23 +2,19 @@
 
 import pytest
 
-from mos6502 import Machine6502
-from stratagem.build import read_disc_file
+from conftest import parasite_machine
 from stratagem.world import WORLD_SIZE, tile_at
 
 
 @pytest.fixture(scope="module")
 def world_machine(game_build):
-    load_address, data = read_disc_file(game_build.disc_filepath, "WORLD")
-    machine = Machine6502()
-    machine.load(load_address, data)
-    return machine
+    return parasite_machine(game_build)[0]
 
 
 @pytest.mark.slow
 def test_tile_at_matches_model_everywhere(world_machine, game_build):
-    tile_at_address = game_build.labels["STRATAGEM"]["tile_at"]
-    shape_address = game_build.labels["STRATAGEM"]["zp_world_shape"]
+    tile_at_address = game_build.labels["PARASITE"]["tile_at"]
+    shape_address = game_build.labels["PARASITE"]["zp_world_shape"]
     mismatches = []
     for y in range(WORLD_SIZE):
         for x in range(WORLD_SIZE):
@@ -34,7 +30,7 @@ def test_changes_match_model_until_the_world_is_full(world_machine, game_build):
     from stratagem.tiles import MATERIAL_COUNT, SHAPE_COUNT
     from stratagem.world import CHUNK_SIZE, SLOT_COUNT, World
 
-    labels = game_build.labels["STRATAGEM"]
+    labels = game_build.labels["PARASITE"]
     world = World()
     world_machine.call(labels["world_reset"])
     rng = random.Random(7)

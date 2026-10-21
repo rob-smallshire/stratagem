@@ -389,8 +389,8 @@ ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
 }
 ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
 
-\ Fill the tile cache from the world (as the host-only game pages it in to
-\ do), and record what was filled in the packet: a strip.
+\ Fill the tile cache from the world, and record what was filled in the
+\ packet: a strip.
 .call_fill_cache
 {
     LDA zp_fill_x

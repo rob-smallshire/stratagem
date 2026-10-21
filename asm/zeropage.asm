@@ -15,7 +15,6 @@ GUARD &8E                       \ The Tube game's parasite has the mailbox at &8
 .zp_ptr             SKIP 2      \ General purpose pointer
 .zp_romsel_game     SKIP 1      \ ROMSEL while game code runs: the game bank
 .zp_romsel_render   SKIP 1      \ ROMSEL while render code runs: render bank + bit 7
-.zp_bank_world      SKIP 1      \ ROMSEL for the world bank
 
 \ Render parameters, set by the game before calling a render routine
 .zp_render_u        SKIP 1      \ World cell column (only the low 7 bits matter)

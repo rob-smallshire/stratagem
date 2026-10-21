@@ -6,7 +6,7 @@ import pytest
 
 from mos6502 import Machine6502
 from stratagem import player, sprites
-from stratagem.build import read_disc_file
+from conftest import parasite_machine
 from stratagem.camera import INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.player import Player
 from stratagem.tiles import AIR, BACKGROUND_SKY, DIGGABLE, SHAPE_COUNT, SHAPE_FULL, SOIL, STONE
@@ -17,10 +17,7 @@ TILE_CACHE_SIZE = 32       # asm/layout.asm
 
 @pytest.fixture(scope="module")
 def main_machine(game_build):
-    load_address, data = read_disc_file(game_build.disc_filepath, "MAIN")
-    machine = Machine6502()
-    machine.load(load_address, data)
-    return machine
+    return parasite_machine(game_build)[0]
 
 
 def _signed(byte: int) -> int:
@@ -100,7 +97,7 @@ def _random_tile(rng: random.Random) -> tuple[int, int]:
 
 @pytest.mark.slow
 def test_player_matches_model(main_machine, game_build):
-    harness = PlayerHarness(main_machine, game_build.labels["STRATAGEM"])
+    harness = PlayerHarness(main_machine, game_build.labels["PARASITE"])
     rng = random.Random(1989)
     world = World()
     frames = 0

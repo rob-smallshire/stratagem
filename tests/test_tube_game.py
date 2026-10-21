@@ -96,7 +96,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
     labels = game_build.labels["HOST"]
     peek = bbc.memory.address.peek
     bbc.disc.set_spin_up_delay(False)
-    bbc.boot_disc(str(game_build.tube_disc_filepath))
+    bbc.boot_disc(str(game_build.disc_filepath))
     started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
     assert started, "the game did not start"
     frames = 0

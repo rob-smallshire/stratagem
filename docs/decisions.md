@@ -145,3 +145,8 @@ A running log of design decisions. Add to it whenever one is made.
   index also reads the grid of excess. Packing the rows, exact only where a
   block's excess can be other than FAR and overlapping where they agree,
   takes 3.9K where the table was 12K, at about 140 cycles a frame.
+- **The host-only game is dropped:** Stratagem is a game for a BBC with a
+  6502 second processor (a B+ 128K or a Model B with Integra-B, and the
+  Master later). The host-only game's own files and disc are gone; what it
+  shared with the Tube game stays. Its tests now run on the parasite's code
+  (py65) or were covered by the Tube game's (frames in Beebium).

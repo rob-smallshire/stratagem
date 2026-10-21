@@ -1,7 +1,7 @@
 \ MAIN, for the Tube game: the host's side of each frame, in program RAM.
 \ The parasite runs the game and sends a packet a frame (tube_layout.asm);
 \ the host reads it, writes the input it reads into the parasite's mailbox,
-\ and draws as the host-only game does: a new row into the hidden row, then
+\ and draws: a new row into the hidden row, then
 \ at vertical sync the flip, the new columns ahead of the beam, the changed
 \ tile, the light's draw list (read from the Tube as it draws), and the
 \ sprite.

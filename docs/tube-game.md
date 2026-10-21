@@ -1,9 +1,9 @@
 # Stratagem on the Tube
 
 The game running on a 6502 second processor, with the host drawing what it
-sends. Built alongside the host-only game: `uv run strat-build` makes
-`build/stratagem.ssd` (host-only, as before) and `build/stratagem-tube.ssd`
-(this). The prototypes that led here are in `tube-prototypes.md`.
+sends: `uv run strat-build` makes `build/stratagem.ssd`. This is the game;
+the host-only game it grew from was dropped on 2026-10-21 (`decisions.md`).
+The prototypes that led here are in `tube-prototypes.md`.
 
 ## Playing it
 
@@ -15,9 +15,9 @@ processor (a 3 MHz 65C02, or the 4 MHz 65C102).
   add `--tube-65c02` to the server's options: from Beebium 0.12.0 an
   Integra-B so launched boots across the Tube (one saved by an earlier
   version still needs `*CONFIGURE TUBE` and Ctrl-Break once).
-- Insert `build/stratagem-tube.ssd` and Shift-Break.
+- Insert `build/stratagem.ssd` and Shift-Break.
 
-The keys are the host-only game's (`implementation-record.md`), and T:
+The keys are those of `implementation-record.md`, and T:
 
 | Keys | Action |
 |---|---|
@@ -67,13 +67,13 @@ While the host draws a frame, the parasite works out the next.
 | `asm/daylight.asm` | parasite | daylight: sky depths, sunlight by columns, the glow |
 | `asm/pieces.asm` | parasite | pieces' slots: giving, sweeping, showing |
 | `asm/host_main.asm` | host | reading packets, the mailbox, drawing |
-| `asm/camera.asm`, `cache.asm`, `view.asm`, `scroll.asm`, `pixels.asm` | shared | split out of `main.asm` |
+| `asm/camera.asm`, `cache.asm`, `scroll.asm`, `pixels.asm` | parasite | the camera, the tile cache, scrolling |
+| `asm/view.asm`, `render.asm` | host | drawing rows, columns and the sprite |
 
-The host-only game's code is shared where it can be: the parasite runs
-`player.asm`, `actions.asm`, `camera.asm`, `cache.asm` and `world.asm`
-unchanged, with the same zero page and variables; the host runs `view.asm`
-and `render.asm` unchanged, with its own zero page at `&57`-`&8F` (the Tube
-host's code and variables have `&00`-`&56`).
+The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
+and `world.asm`, written first for the host-only game; the host runs
+`view.asm` and `render.asm`, with its own zero page at `&57`-`&8F` (the
+Tube host's code and variables have `&00`-`&56`).
 
 ### Torches
 
@@ -123,7 +123,7 @@ column's surface (`SHAFT_TAPER`). So daylight falls down a dug shaft,
 dimming slowly as it goes (four times more slowly than the glow), and pools
 where it meets a cave. Light ignores what lies between the column and the tile, so it can
 seep a few tiles through rock, and it doesn't creep down slopes away from
-the shaft: the price of being cheap. The glow is the host-only game's
+the shaft: the price of being cheap. The glow is the first game's
 stand-in, `fixed_light`, 4 levels dimmer: it shades the rock below the
 surface and lets shallow caves be made out.
 

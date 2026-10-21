@@ -1,4 +1,4 @@
-"""Machine identification and sideways RAM discovery, in the game and in PROBE."""
+"""Machine identification and sideways RAM discovery, in PROBE."""
 
 from conftest import boot_until_ready
 
@@ -16,19 +16,6 @@ def _detected(bbc, labels):
     peek = bbc.memory.address.peek
     count = peek[labels["ram_bank_count"]]
     return peek[labels["zp_machine"]], [peek[labels["ram_banks"] + i] for i in range(count)]
-
-
-def test_game_identifies_machine_and_allocates_banks(launch_bbc, machine, game_build):
-    bbc = launch_bbc(machine)
-    labels = boot_until_ready(bbc, game_build, "STRATAGEM")
-    expected_machine, expected_banks = EXPECTED[machine.name]
-    assert _detected(bbc, labels) == (expected_machine, expected_banks)
-
-    peek = bbc.memory.address.peek
-    render, world, game = expected_banks[:3]
-    assert peek[labels["zp_romsel_render"]] == render | 0x80
-    assert peek[labels["zp_bank_world"]] == world
-    assert peek[labels["zp_romsel_game"]] == game
 
 
 def test_probe_reports_machine_and_sideways_ram(launch_bbc, machine, game_build):

@@ -9,14 +9,14 @@
 \
 \ The parasite's memory:
 \
-\   &0000-&0089  the game's zero page (as the host-only game's)
+\   &0000-&0089  the game's zero page
 \   &008E-&008F  the mailbox the host writes
 \   &0090-&00E5  the light's zero page
 \   &00E6-&00ED  the packet's pointers (&EE upwards is the parasite OS's)
-\   &0400-&07FF  the game's variables (as the host-only game's), then more
+\   &0400-&07FF  the game's variables, then more
 \                that need no starting value
 \   &0800-&1BFF  two packets and two draw lists (tube_layout.asm)
-\   &1C00-&27FF  the tile cache (as the host-only game's)
+\   &1C00-&27FF  the tile cache
 \   &2800-&37FF  the light's plane
 \   &3800-&42FF  the light's grid of excess
 \   &4300-&7FFF  PGAME, then pieces' slots
@@ -80,7 +80,7 @@ INCLUDE "asm/pieces.asm"
 INCLUDE "build/generated/miner.asm"
 INCLUDE "build/generated/smooth.asm"
 
-\ The host-only game pages its world in; here it is simply there.
+\ Set a tile (actions.asm calls it).
 .call_set_tile
     JMP set_tile
 
@@ -158,9 +158,8 @@ INCLUDE "build/generated/radial_rows.asm"
 INCLUDE "asm/daylight.asm"
 .plight_end
 
-\ Variables that need no starting value: after the game's (the host-only
-\ game's light queue is unused here)
-ORG light_queue_y + 2 * MINER_WINDOW
+\ Variables that need no starting value: after the game's
+ORG variables_end
 GUARD &0800
 .torch_queue_x      SKIP TORCH_QUEUE    \ Torches (torches.asm)
 .torch_queue_y      SKIP TORCH_QUEUE

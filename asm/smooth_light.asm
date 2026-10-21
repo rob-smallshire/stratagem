@@ -5,7 +5,7 @@
 \ Light is a level per block of two character cells (4 pixels by 8 lines),
 \ from the middle of the miner's box: a radial table gives the level on open
 \ ground, and each block loses its excess, from a grid filled by the tile
-\ flood (as lighting.asm's), interpolated between tiles: soft shadows. A plane holds each block's level; a pass updates
+\ flood (lighting.miner_light), interpolated between tiles: soft shadows. A plane holds each block's level; a pass updates
 \ the blocks within reach of the miner now or at the last pass, and queues
 \ each cell whose change shows (a coloured pixel's threshold lies between
 \ the old and new mask classes). A pass does nothing if neither the miner

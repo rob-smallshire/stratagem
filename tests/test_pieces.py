@@ -23,7 +23,7 @@ SLOT_GRAPHICS = 0x8100 + SLOT_MATERIAL * 0x200      # tube_layout.asm's HOST_MAT
 def parasite(game_build):
     machine = Machine6502(cmos=True)
     for name in ("PGAME", "PWORLD", "PLIGHT"):
-        machine.load(*read_disc_file(game_build.tube_disc_filepath, name))
+        machine.load(*read_disc_file(game_build.disc_filepath, name))
     labels = game_build.labels["PARASITE"]
     machine.call(labels["piece_init"])
     return machine, labels
@@ -89,7 +89,7 @@ def test_host_composes_slots(game_build):
     machine = Machine6502()
     machine.mpu.memory = ObservableMemory()
     memory = machine.mpu.memory
-    machine.load(*read_disc_file(game_build.tube_disc_filepath, "MAIN"))
+    machine.load(*read_disc_file(game_build.disc_filepath, "MAIN"))
     labels = game_build.labels["HOST"]
     sent = collections.deque()
     memory.subscribe_to_read([TUBE_R3_STATUS], lambda address: 0x80)

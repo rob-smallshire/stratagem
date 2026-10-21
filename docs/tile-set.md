@@ -246,7 +246,7 @@ an anvil, make a better pickaxe.
    about 1,800 cycles; the parasite pays about 30 cycles a frame. Slots are
    freed by sweeping the tile cache when none is free, rather than by
    counts. The torch's material pages are still in the render region (the
-   host-only game shares them); they can go when the two part.
+   host-only game shared them); they can go now that it is dropped.
 3. ~~Daylight that stops at walls~~: built, measured and undone (above).
 4. **Property tables**, replacing material number tests, with no change in
    behaviour (the tests must stay green).

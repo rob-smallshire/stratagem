@@ -1,4 +1,4 @@
-"""A model of the camera in asm/main.asm, which follows a focus point (the
+"""A model of the camera in asm/camera.asm, which follows a focus point (the
 player), exactly as the 6502 does it.
 
 The focus is in pixels (x, 0-2047) and lines (y, 0-4095). The camera is the

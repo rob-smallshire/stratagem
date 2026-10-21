@@ -7,8 +7,8 @@ filing system resident, and is tested in the Beebium emulator.
 
 - `docs/implementation-record.md`: the game as built so far: start here.
 - `docs/next-steps.md`: the agreed plan ahead.
-- `docs/tube-game.md`: the game on a 6502 second processor (its own disc,
-  `build/stratagem-tube.ssd`); `docs/tube-prototypes.md`, how we got there.
+- `docs/tube-game.md`: the game, which runs on a 6502 second processor;
+  `docs/tube-prototypes.md`, how we got there.
 - `docs/tile-set.md`: the planned tile set (pieces, objects, back walls) and
   how the format and renderer could carry it.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
@@ -22,7 +22,7 @@ filing system resident, and is tested in the Beebium emulator.
 ## Commands
 
 ```bash
-uv run strat-build        # assemble -> build/stratagem.ssd and build/stratagem-tube.ssd, labels in build/labels/
+uv run strat-build        # assemble -> build/stratagem.ssd, labels in build/labels/
 uv run pytest             # builds first; emulator tests run on each machine
 uv run pytest -m "not slow"   # the quick run, about a minute: one short case of each kind
 uv run pytest tests/test_daylight.py   # or just the tests that cover the change
@@ -31,10 +31,11 @@ uv run python -m stratagem.index_disassembly SRC INDEX   # index a Level 7 disas
 
 ## Conventions
 
-- `asm/stratagem.asm` assembles every part of the game together (one label
-  namespace) and SAVEs each as a file: `STRAT` (low RAM: trampolines,
-  shared buffers, loader; run by !BOOT), `RENDER` (render region), `WORLD`
-  (world bank) and `MAIN` (user RAM). `PROBE` is a separate diagnostic.
+- The game is two programs: `asm/host.asm` (the host: `STRAT`, its loader,
+  run by !BOOT; `MAIN`; `RENDER`, the render region) and `asm/parasite.asm`
+  (the second processor: `PGAME`, `PWORLD`, `PLIGHT`). Each assembles its
+  parts together, one label namespace each. `PROBE` is a separate
+  diagnostic; the other sources are prototypes.
   Sources are listed in `SOURCES` in `tools/stratagem/build.py`; assemble
   from the project root (INCLUDE paths are relative to it). Each part
   CLEARs its address range before its ORG.

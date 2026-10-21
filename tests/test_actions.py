@@ -6,28 +6,20 @@ import random
 
 import pytest
 
-from mos6502 import Machine6502
+from conftest import parasite_machine
 from stratagem import actions, player
 from stratagem.actions import Hands
 from stratagem.camera import INPUT_ACTION, INPUT_PLACE
-from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.tiles import AIR, SHAPE_BITS, SHAPE_FULL
 from stratagem.world import CHUNK_SIZE, HEIGHTS, RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World
 from test_player import TILE_CACHE_SIZE, PlayerHarness, _random_start
 
-RTS = 0x60
-
 
 @pytest.fixture
 def machine(game_build):
-    """STRAT, MAIN and WORLD in one flat memory. The renderer shares the
-    world bank's addresses, so it is left out and redrawing does nothing."""
-    machine = Machine6502()
-    for name in ("STRAT", "MAIN", "WORLD"):
-        machine.load(*read_disc_file(game_build.disc_filepath, name))
-    labels = game_build.labels["STRATAGEM"]
-    machine.mpu.memory[labels["call_render_row"]] = RTS
+    """The parasite's game, with an empty world."""
+    machine, labels = parasite_machine(game_build)
     machine.call(labels["world_reset"])
     return machine
 
@@ -55,7 +47,7 @@ INPUTS = [
 
 @pytest.mark.slow
 def test_actions_match_model(machine, game_build):
-    labels = game_build.labels["STRATAGEM"]
+    labels = game_build.labels["PARASITE"]
     harness = PlayerHarness(machine, labels)
     memory = machine.mpu.memory
     rng = random.Random(1990)
@@ -115,7 +107,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
     """Holding a diagonal dig for a long time, from places on the surface
     (slopes included) and underground, the 6502 tunnels exactly as the model
     does, frame by frame."""
-    labels = game_build.labels["STRATAGEM"]
+    labels = game_build.labels["PARASITE"]
     harness = PlayerHarness(machine, labels)
     memory = machine.mpu.memory
     keys |= INPUT_ACTION
@@ -164,7 +156,7 @@ def test_diagonal_digs_in_random_ground_match_model(machine, game_build, keys):
     exactly what the model does: every case of the choice, not only those a
     tunnel meets."""
     from stratagem.tiles import MATERIAL_COUNT, PASSABLE, SHAPE_COUNT, BACKGROUND_SKY
-    labels = game_build.labels["STRATAGEM"]
+    labels = game_build.labels["PARASITE"]
     harness = PlayerHarness(machine, labels)
     memory = machine.mpu.memory
     keys |= INPUT_ACTION

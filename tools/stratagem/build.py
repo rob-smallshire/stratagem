@@ -2,9 +2,9 @@
 
 Generates the table sources into build/generated/, then assembles each
 source in SOURCES with beebasm onto one DFS disc image whose !BOOT runs
-BOOT_FILE. A source may SAVE several files (asm/stratagem.asm saves every
-part of the game, so that they share one set of labels). Each source's
-labels are written to build/labels/<NAME>.txt and returned in the
+BOOT_FILE. A source may SAVE several files (asm/parasite.asm saves every
+part of the parasite's game, so that they share one set of labels). Each
+source's labels are written to build/labels/<NAME>.txt and returned in the
 BuildResult.
 
 beebasm writes a disc image only as far as its last file, so the image is
@@ -36,9 +36,13 @@ DISC_TITLE = "STRATAGEM"
 
 GENERATED_DIRPATH = BUILD_DIRPATH / "generated"
 
-# Source name -> source file. The first creates the disc.
+# Source name -> source file. The first creates the disc. The game runs on
+# a 6502 second processor (docs/tube-game.md): !BOOT runs the host's loader,
+# which loads the parasite's files into the parasite. The rest are
+# diagnostics and prototypes.
 SOURCES = {
-    "STRATAGEM": ASM_DIRPATH / "stratagem.asm",   # STRAT, RENDER, WORLD, MAIN
+    "HOST": ASM_DIRPATH / "host.asm",             # STRAT, MAIN, RENDER (host)
+    "PARASITE": ASM_DIRPATH / "parasite.asm",     # PGAME, PWORLD, PLIGHT (parasite)
     "PROBE": ASM_DIRPATH / "probe.asm",           # PROBE
     "TUBE": ASM_DIRPATH / "tube_proto.asm",       # TUBEH (host), TUBEP (parasite)
     "SMOOTH": ASM_DIRPATH / "smooth_light.asm",   # SMOOTH (parasite)
@@ -46,20 +50,11 @@ SOURCES = {
 }
 BOOT_FILE = "STRAT"
 
-# The Tube game (docs/tube-game.md): a disc of its own, booting the host's
-# loader, which loads the parasite's files into the parasite.
-TUBE_DISC_FILEPATH = BUILD_DIRPATH / "stratagem-tube.ssd"
-TUBE_SOURCES = {
-    "HOST": ASM_DIRPATH / "host.asm",             # STRAT, MAIN, RENDER (host)
-    "PARASITE": ASM_DIRPATH / "parasite.asm",     # PGAME, PWORLD, PLIGHT (parasite)
-}
-
 
 @dataclass(frozen=True)
 class BuildResult:
     disc_filepath: Path
     labels: dict[str, dict[str, int]]   # source name -> label -> address
-    tube_disc_filepath: Path | None = None
 
 
 def find_beebasm() -> str:
@@ -119,8 +114,7 @@ def build() -> BuildResult:
     generate_all(GENERATED_DIRPATH)
     LABELS_DIRPATH.mkdir(parents=True, exist_ok=True)
     labels = _build_disc(DISC_FILEPATH, SOURCES, BOOT_FILE)
-    labels.update(_build_disc(TUBE_DISC_FILEPATH, TUBE_SOURCES, BOOT_FILE))
-    return BuildResult(DISC_FILEPATH, labels, TUBE_DISC_FILEPATH)
+    return BuildResult(DISC_FILEPATH, labels)
 
 
 def read_disc_file(disc_filepath: Path, name: str) -> tuple[int, bytes]:
@@ -146,8 +140,7 @@ def main() -> None:
     except (RuntimeError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
         sys.exit(1)
-    print(f"Built {result.disc_filepath.relative_to(PROJECT_DIRPATH)} and "
-          f"{result.tube_disc_filepath.relative_to(PROJECT_DIRPATH)} with {', '.join(result.labels)}")
+    print(f"Built {result.disc_filepath.relative_to(PROJECT_DIRPATH)} with {', '.join(result.labels)}")
 
 
 if __name__ == "__main__":

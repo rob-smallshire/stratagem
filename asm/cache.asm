@@ -1,6 +1,5 @@
 \ The tile cache: keeping it holding the view's tiles, from the world, as the
-\ camera moves. On the host-only game the world is in its bank (call_fill_cache
-\ pages it in); on the parasite it is simply there.
+\ camera moves.
 
 \ Set view_left/right/top/bottom to the tiles the view at the camera
 \ shows.

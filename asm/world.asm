@@ -1,4 +1,4 @@
-\ WORLD: the world bank: the placeholder generator, which
+\ PWORLD, the parasite's world: the placeholder generator, which
 \ tools/stratagem/world.py models exactly, and the store of changed chunks.
 \ A tile is a material and a shape (see tools/stratagem/tiles.py).
 

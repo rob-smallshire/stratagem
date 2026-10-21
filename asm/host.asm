@@ -4,8 +4,7 @@
 \
 \   STRAT   low RAM: trampolines, the OSWRCH hook, the loader (run by !BOOT)
 \   MAIN    program RAM: each frame's reading and drawing
-\   RENDER  the render region: the host-only game's renderer, and the
-\           light's draw list
+\   RENDER  the render region: the renderer, and the light's draw list
 
 INCLUDE "asm/os.asm"
 INCLUDE "asm/layout.asm"

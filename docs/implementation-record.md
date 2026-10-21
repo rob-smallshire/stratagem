@@ -7,10 +7,14 @@ why things are as they are, `decisions.md`; for the hardware facts relied on,
 `concept.md`. `architecture.md` describes the memory model and scrolling in
 more depth, though where it and this record disagree, this record is newer.
 
-Since 2026-10-20 the game also runs on a 6502 second processor, with
-smooth light and torches: see `tube-game.md`. Its code is shared with what
-is described here (`main.asm` is now split into `camera.asm`, `cache.asm`,
-`view.asm`, `scroll.asm` and `pixels.asm`).
+Since 2026-10-20 the game runs on a 6502 second processor, with smooth
+light and torches: see `tube-game.md`. On 2026-10-21 the host-only game
+described here was dropped (`decisions.md`): its world, physics, digging,
+camera and renderer live on in the Tube game (`main.asm` was split into
+`camera.asm`, `cache.asm`, `view.asm`, `scroll.asm` and `pixels.asm`), but
+its files (`stratagem.asm`, `low.asm`, `main.asm`, `lighting.asm`), its
+banking of the world, and its disc are gone. Read what follows as the
+history of those parts.
 
 ## What it is
 
