@@ -37,12 +37,20 @@ BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 TILE_COLOUR_BASE = 8
 
 AIR, GRASS, SOIL, STONE, ORE, GEM, BEDROCK, WATER, SKY, TORCH = range(10)
-MATERIAL_NAMES = ["air", "grass", "soil", "stone", "ore", "gem", "bedrock", "water", "sky", "torch"]
+# Trees' parts, pieces the generator places (world.py)
+(ROOT, TRUNK, TRUNK_KNOT, CANOPY_LEFT, CANOPY_OVER_TRUNK, CANOPY_RIGHT,
+ CANOPY_TOP_LEFT, CANOPY_TOP, CANOPY_TOP_RIGHT) = range(10, 19)
+MATERIAL_NAMES = ["air", "grass", "soil", "stone", "ore", "gem", "bedrock", "water", "sky", "torch",
+                  "root", "trunk", "trunk, knot", "canopy left", "canopy over trunk", "canopy right",
+                  "canopy top left", "canopy top", "canopy top right"]
 MATERIAL_COUNT = len(MATERIAL_NAMES)
+DRAWN_COUNT = SKY + 1       # materials the renderer draws, with pages of graphics;
+                            # pieces are drawn through slots (below)
+TREE_PARTS = list(range(ROOT, CANOPY_TOP_RIGHT + 1))
 
 # Materials a body can pass through, whatever their shape; the rest are
 # solid in their shape's solid quarter-cells.
-PASSABLE = frozenset({AIR, WATER, SKY, TORCH})
+PASSABLE = frozenset({AIR, WATER, SKY, TORCH, *TREE_PARTS})
 # Materials that can be dug, and so take shapes other than SHAPE_FULL.
 DIGGABLE = [GRASS, SOIL, STONE, ORE, GEM]
 
@@ -264,7 +272,6 @@ MATERIAL_PIXELS = {
     BEDROCK: _pixels(lambda x, y: BLACK if y % 8 == 7 or (x == (0 if y // 8 % 2 else 4)) else MAGENTA),
     WATER: _pixels(lambda x, y: CYAN if y == (x // 2) % 2 else BLUE),
     SKY: _pixels(lambda x, y: BLUE),
-    TORCH: _pixels(lambda x, y: _torch(x, y)),
 }
 
 
@@ -296,7 +303,7 @@ def material_pages(material: int) -> bytes:
 # keeps them in its program RAM, and composes each pair of piece and
 # backdrop that is in the tile cache once, into a slot in the render region,
 # which the renderer draws as an ordinary material (below).
-PIECES = [TORCH]
+PIECES = [TORCH, *TREE_PARTS]
 FIRST_PIECE = TORCH
 PIECE_COUNT = len(PIECES)
 assert PIECES == list(range(FIRST_PIECE, FIRST_PIECE + PIECE_COUNT))
@@ -305,9 +312,15 @@ BACKDROPS = [AIR, SKY]                  # by the shape byte's background bit
 
 def piece_pixels(material: int) -> list[list[int | None]]:
     """A piece's pixels, None where clear."""
-    assert material == TORCH
-    return [[_torch(x, y) if _torch_covers(x, y) else None for x in range(TILE_WIDTH_PIXELS)]
-            for y in range(TILE_HEIGHT_LINES)]
+    if material == TORCH:
+        return [[_torch(x, y) if _torch_covers(x, y) else None for x in range(TILE_WIDTH_PIXELS)]
+                for y in range(TILE_HEIGHT_LINES)]
+    from stratagem import piece_art
+    picture = {ROOT: piece_art.ROOT, TRUNK: piece_art.TRUNK, TRUNK_KNOT: piece_art.TRUNK_KNOT,
+               CANOPY_LEFT: piece_art.CANOPY[1][0], CANOPY_OVER_TRUNK: piece_art.CANOPY[1][1],
+               CANOPY_RIGHT: piece_art.CANOPY[1][2], CANOPY_TOP_LEFT: piece_art.CANOPY[0][0],
+               CANOPY_TOP: piece_art.CANOPY[0][1], CANOPY_TOP_RIGHT: piece_art.CANOPY[0][2]}[material]
+    return [[None if c == piece_art.CLEAR else int(c) for c in row] for row in picture]
 
 
 def _torch_covers(x: int, y: int) -> bool:

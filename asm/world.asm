@@ -535,6 +535,11 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
     STA zp_generate_material
     LDA #SHAPE_FULL
     STA zp_world_shape
+    LDA zp_generate_material    \ In the sky, perhaps a tree
+    CMP #TILE_SKY
+    BNE not_sky
+    JSR tree_part
+.not_sky
     LDA zp_generate_material    \ Diggable: GRASS to GEM
     SEC
     SBC #TILE_GRASS
@@ -615,6 +620,86 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
     LDA zp_generate_material
     LDX zp_generate_x
     LDY zp_generate_y
+    RTS
+}
+
+\ If a tree has a part at (zp_generate_x, zp_generate_y), in the sky, set
+\ zp_generate_material to it and zp_world_shape to its strength
+\ (world.tree_part, world.tree_strength).
+.tree_part
+{
+    LDX zp_generate_x
+    LDA world_cover,X
+    BEQ none
+    STA zp_tree_cover
+    AND #3
+    STA zp_tree_side
+    TXA                         \ The trunk's column: x + 2 - side
+    CLC
+    ADC #2
+    SEC
+    SBC zp_tree_side
+    TAX
+    LDA world_heights,X
+    SEC
+    SBC zp_generate_y
+    BCC none
+    BEQ none
+    STA zp_tree_up
+    LDA zp_tree_cover           \ up - height: 2 the canopy, 3 its top
+    LSR A
+    LSR A
+    STA zp_tree_cover
+    LDA zp_tree_up
+    SEC
+    SBC zp_tree_cover
+    CMP #2
+    BEQ canopy
+    CMP #3
+    BEQ top
+    LDX zp_tree_side            \ Below the canopy, only the trunk's column
+    CPX #2
+    BNE none
+    CMP #2                      \ Above the canopy (up - height 4 and more)
+    BCC below_top               \ (or negative: below it)
+    CMP #&80
+    BCC none
+.below_top
+    LDA zp_tree_up
+    CMP #1
+    BEQ root
+    LDA zp_generate_x           \ The trunk, with a knot where the hash says
+    EOR zp_generate_y
+    TAX
+    LDA world_perm,X
+    AND #3
+    BEQ knot
+    LDA #TILE_TRUNK
+    BNE part
+.knot
+    LDA #TILE_TRUNK_KNOT
+    BNE part
+.root
+    LDA #TILE_ROOT
+    BNE part
+.canopy
+    LDA #TILE_CANOPY_LEFT - 1
+    BNE side
+.top
+    LDA #TILE_CANOPY_TOP_LEFT - 1
+.side
+    CLC
+    ADC zp_tree_side
+.part
+    STA zp_generate_material
+    LDA #GAME_SPAN              \ Strength: the span on the trunk's column,
+    LDX zp_tree_side            \ one less beside it
+    CPX #2
+    BEQ strength
+    LDA #GAME_SPAN - 1
+.strength
+    STA zp_world_shape
+.none
     RTS
 }
 
@@ -811,6 +896,8 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
     WORLD_HEIGHTS
 .world_perm
     WORLD_PERM
+.world_cover
+    WORLD_COVER
 
 .world_slots_used   EQUB 0      \ Slots used in the host's store
 .cache_want_l       EQUB 0      \ The wanted chunks, inclusive (in the order of

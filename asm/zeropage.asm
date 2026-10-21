@@ -30,6 +30,9 @@ GUARD MAILBOX_FETCHED
 .zp_world_target_x  SKIP 1      \ set_tile: where
 .zp_world_target_y  SKIP 1
 .zp_world_index     SKIP 1      \ set_tile: index into a slot being filled
+.zp_tree_cover      SKIP 1      \ tree_part: the column's WORLD_COVER byte
+.zp_tree_side       SKIP 1      \ ... 1 left of the trunk, 2 the trunk, 3 right
+.zp_tree_up         SKIP 1      \ ... rows above the trunk's grass
 
 \ Camera (modelled by tools/stratagem/camera.py)
 .zp_input           SKIP 1      \ INPUT_* bits for this frame

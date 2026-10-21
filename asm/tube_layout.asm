@@ -73,7 +73,7 @@ FETCH_BYTES = 3                 \ Then a chunk to fetch: its slot, and the
 
 \ Host addresses the parasite puts into draw lists (asserted in render.asm)
 HOST_MATERIAL_PAGES = &8100
-HOST_LIGHT_MASKS = &9700
+HOST_LIGHT_MASKS = &9500
 
 \ The Tube itself
 TUBE_ENTRY = &0406              \ Host: claim, release, or start a transfer

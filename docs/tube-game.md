@@ -92,8 +92,10 @@ compares against what the host shows. Torches can't yet be picked up.
 ### Pieces and slots
 
 A piece is a material drawn whole over a backdrop, the background that
-shows through its clear pixels (`tiles.PIECES`; `docs/tile-set.md`). The
-torch is the only one so far. The host keeps each piece's graphics and mask
+shows through its clear pixels (`tiles.PIECES`; `docs/tile-set.md`): the
+torch, and the nine parts of a tree. Pieces are materials after the drawn
+ones (`DRAWN_COUNT`), with no pages of their own in the render region: they
+are only ever drawn through slots. The host keeps each piece's graphics and mask
 (128 bytes) and each backdrop's (64) in its program RAM, and draws pieces
 through slots: 56 composed pairs of piece and backdrop in the render bank
 at `&B100`-`&BEFF`, each drawn as an ordinary material (7 materials from
@@ -109,6 +111,17 @@ reading). When no slot is free, the tile cache is swept and the slots whose
 pairs have left it are freed; if there are still none, the piece is sent as
 its backdrop alone. The light looks a piece tile's slot up for the graphics
 the host draws it with.
+
+### Trees
+
+The generator grows trees on the surface (`world.tree_part`): a root on
+the grass, a trunk of 1 to 4 tiles and a canopy three wide and two high,
+placed a column at a time with `WORLD_COVER`, a byte a column (the
+covering tree's trunk offset + 1, 0 for none, and its height). So
+`generate_tile` finds a tile of sky's part with one look-up and a
+subtraction from the trunk's surface height. A tree part's shape byte holds
+its strength (`support.py`: the span on the trunk's column, one less beside
+it), for support. Trees are passable and clear to light.
 
 ### Daylight
 
