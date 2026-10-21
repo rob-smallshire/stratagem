@@ -83,7 +83,7 @@ diggable range, the passable table, `torches.asm`'s test for an empty tile).
 | Family | terrain (erodes), piece (breaks whole), immutable |
 | Collision | solid (by shape), passable, platform (stand on it, jump up through it, drop through it with down), climbable (ladder, rope, vine) |
 | Light | opaque, transparent (to daylight, every piece is transparent); a light source (and its strength) |
-| Needs | support from below, above or a side, or nothing: a torch needs a wall or floor, a rope something above, a tree the ground, a door both. Breaking a support breaks what it held |
+| Needs | how it is held up (Support, below) |
 | Toughness | hits to break, and the tool tier needed |
 | Drops | the item it gives |
 | Drawn | behind the miner, or in front |
@@ -93,6 +93,38 @@ Items are separate from tiles: an item may place a tile (planks, a ladder),
 or not (a pickaxe, an iron bar). Crafting is a table of recipes (items in,
 an item out, a station needed), generated from Python, and neither costly
 nor risky.
+
+## Support
+
+Every piece says how it is held up, and breaking or placing a tile
+rechecks its neighbours, which pass the check on: a small cellular
+automaton. Built blocks need holding up too (decided 2026-10-21), so
+building is about where the pillars go.
+
+| Held | How | Pieces |
+|---|---|---|
+| From below | by what is under it | tree trunks, wooden ladders, walls, mushrooms, grass, benches, chests |
+| From above | by what is over it | ropes, rope ladders, vines, stalactites |
+| From below or the side, within a span | by what is under it, or a neighbour beside it, one step further from the ground | roofs, platforms, plank and brick blocks, canopy |
+| By any solid neighbour | | torches |
+| Both floor and ceiling | both halves as one | doors |
+
+Each piece has a strength: terrain is an anchor, at full strength; a piece
+held from below or above takes its holder's; one held only from the side
+takes its neighbour's less one; at zero it isn't held, and falls (and
+drops its item). So a roof reaches SPAN tiles from a wall and no further,
+and a canopy wider than that needs branches. SPAN is a number in the
+tables, to choose by playing (3 to 5, say).
+
+- Strength is worked out from the neighbours when something nearby
+  changes, never stored, and the span bounds the search.
+- Nothing is checked each frame. A collapse goes through a queue, a few
+  tiles a frame, as torches' relighting does, so a felled tree comes down
+  over several frames.
+- Strength only comes from the ground, so nothing holds itself up.
+- Which pieces hold others up is a property: ground, blocks, trunks and
+  walls do; a rope holds a rope below it and a ladder a ladder above it,
+  and nothing else.
 
 ## Movement
 

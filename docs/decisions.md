@@ -165,3 +165,10 @@ A running log of design decisions. Add to it whenever one is made.
   the miner goes. Chunks are dropped in turn from beyond the wanted ones,
   with nothing queued for them; a chunk wanted at once is fetched by
   `COMMAND_FETCH`, counted, and never needed in the tests.
+- **Built things need holding up:** every piece is held from below, from
+  above, or from below or the side within a span (a strength that drops by
+  one for each step sideways from something held from below), as a small
+  cellular automaton run only when tiles change (`tile-set.md`, Support).
+  Unlike Terraria, built blocks fall without support, which makes building
+  a matter of where the pillars go; the span (3 to 5) is to be chosen by
+  playing.
