@@ -152,8 +152,9 @@ ASSERT sun_reach_3 + &100 <= sl_radial
 
 ORG &C100                       \ Clear of world.asm's guard at &C000
 .sl_radial
-INCBIN "build/generated/radial.bin"
+INCBIN "build/generated/radial_packed.bin"
 .sl_radial_end
+INCLUDE "build/generated/radial_rows.asm"
 INCLUDE "asm/daylight.asm"
 .plight_end
 

@@ -180,13 +180,6 @@ GRID_COLUMN = 8 * GRID_RADIUS - (BLOCK_PIXELS DIV 2 + RADIAL_CENTRE)
     EOR #&80
     STA sl_hi_y
 
-    LDA sl_myr                  \ |dy|'s parity is my's, for every row: so
-    LSR A                       \ the radial table's low byte is fixed
-    LDA #0
-    ROR A
-    STA sl_radial0 + 1
-    ORA #BLOCK_PIXELS
-    STA sl_radial1 + 1
     LDA sl_mxr                  \ The grid column of a block is its radial
     CLC                         \ column plus this
     ADC #LO(GRID_COLUMN)
@@ -405,10 +398,15 @@ GRID_COLUMN = 8 * GRID_RADIUS - (BLOCK_PIXELS DIV 2 + RADIAL_CENTRE)
     CLC
     ADC #1
 .positive
-    LSR A                       \ The radial row (its low byte is fixed)
+    TAX                         \ The radial row, by |dy| (packed: gen_tables)
+    LDA sl_radial_row_lo,X
+    STA sl_radial0 + 1
     CLC
-    ADC #HI(sl_radial)
+    ADC #BLOCK_PIXELS
+    STA sl_radial1 + 1
+    LDA sl_radial_row_hi,X
     STA sl_radial0 + 2
+    ADC #0
     STA sl_radial1 + 2
 
     LDA sl_oy                   \ The grid row: page oy + GRID_RADIUS, then

@@ -150,6 +150,16 @@ list. The host draws new rows and columns, and changed tiles, as daylight
 alone; the parasite resets those blocks (to 0), so the next pass lights them.
 Cells in new columns are drawn after the list, so they are lit a frame late.
 
+The radial table is packed (`gen_tables.packed_radial`): 3.9K where a
+table of every offset a pass might read was 12K. A pass reads it only for
+blocks of tiles within a tile of the pool's window, and beyond the window a
+block's excess is FAR, which darkens it whatever it reads; so a row need
+only be exact within 38 pixels of the miner's centre across, and rows only
+76 lines down, and rows overlap where their zeros agree. Each cell row
+finds its row's address from a table by |dy|, so the inner loop is
+unchanged. Folding left and right would halve it again, but the loop's
+index also reads the grid of excess, which doesn't fold.
+
 ## Checking it
 
 `tests/test_tube_game.py` plays on both machines (digging deep first, as
@@ -194,6 +204,11 @@ The taper costs nothing measurable (17,311 against 17,333 over the same
 Slots add about 30 cycles a frame (17,333 against 17,306 over the same
 490 frames; with torches dropped, 18,827 against 18,801 over 794, the
 worst frame unchanged).
+
+Packing the radial table costs about 140 cycles a frame (17,455 against
+17,311 over the same 490 frames; the worst 108,475 against 108,166), and
+frees 8.3K. Every read over those frames where the excess isn't FAR reads
+the model's value.
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the

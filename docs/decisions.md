@@ -138,3 +138,10 @@ A running log of design decisions. Add to it whenever one is made.
   they are lit as the sky over them, and so is what they enclose. Terrain
   still sets the sky depth, as before. The property tables give pieces this
   (the light property).
+- **The radial table packed, not computed:** the miner's light reads its
+  radial table about 100 times a frame (276 at most). Computing the level
+  from squares would take 0.4K but about 1,200 cycles a frame more
+  (estimated); folding left and right doesn't fit the inner loop, whose
+  index also reads the grid of excess. Packing the rows, exact only where a
+  block's excess can be other than FAR and overlapping where they agree,
+  takes 3.9K where the table was 12K, at about 140 cycles a frame.
