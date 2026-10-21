@@ -202,10 +202,12 @@ def tree_part(x: int, y: int) -> int | None:
 
 def tree_strength(x: int) -> int:
     """A tree part's strength (support.py): the span on the trunk's column,
-    which is held from below, and one less beside it, held from the side."""
+    which is held from below; beside it, the span too where the canopy rests
+    on the ground, else one less, held from the side."""
     from stratagem.support import GAME_SPAN
-    trunk, _ = COVER[x]
-    return GAME_SPAN if x == trunk else GAME_SPAN - 1
+    trunk, height = COVER[x]
+    resting = HEIGHTS[x] == HEIGHTS[trunk] - 1 - height
+    return GAME_SPAN if x == trunk or resting else GAME_SPAN - 1
 
 
 tile_at = generate_tile   # the world as generated, before any changes

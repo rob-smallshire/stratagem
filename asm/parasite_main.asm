@@ -29,6 +29,9 @@
     STA light_dirty
     STA MAILBOX_FRAME
     STA para_sent
+    STA support_head
+    STA support_tail
+    STA support_lost
     LDA #STARTING_ABILITIES
     STA zp_abilities
     LDA #1
@@ -166,6 +169,7 @@
     STA zp_fill_y
     JSR para_emit_change
 .changed_done
+    JSR support_step            \ Pieces no longer held fall, sent as changed
 .*para_daylight
     JSR sun_step                \ Relighting by daylight, queueing changes
 .*para_daylit

@@ -181,3 +181,7 @@ A running log of design decisions. Add to it whenever one is made.
 - **The span is 5:** chosen from the feature lab's structures; a roof of 8
   between walls holds, a ledge reaches 5 from its wall, and a crossing needs
   a pillar every 10 tiles (`support.GAME_SPAN`).
+- **Support on the 6502 keeps strength in the shape byte:** a piece's
+  strength in bits 0-2, so a check needs only its neighbours, and changes
+  spread through a queue a few tiles a frame. Torches are left out until
+  a falling torch can leave the torches' list.

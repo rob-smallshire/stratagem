@@ -120,8 +120,23 @@ placed a column at a time with `WORLD_COVER`, a byte a column (the
 covering tree's trunk offset + 1, 0 for none, and its height). So
 `generate_tile` finds a tile of sky's part with one look-up and a
 subtraction from the trunk's surface height. A tree part's shape byte holds
-its strength (`support.py`: the span on the trunk's column, one less beside
-it), for support. Trees are passable and clear to light.
+its strength (`support.py`: the span on the trunk's column, and beside it
+where the canopy rests on the ground, else one less). Trees are passable
+and clear to light.
+
+### Support
+
+`asm/support.asm`, the cellular automaton of `support.py`, run only where
+tiles change. A piece's strength is in its shape byte's bits 0-2; each
+material's rule (how it is held, what it holds, its family) is a generated
+byte (`support_rule`). `call_set_tile` queues the changed tile and its
+neighbours; each frame up to 6 are checked (`support_step`), each working
+its strength out again from its neighbours: if it has changed it is
+stored, or at 0 the piece falls, to sky or cave, which queues its
+neighbours in turn, and is sent as a changed tile (no more than the packet
+has room for). Pieces are clear to light and passable, so a fall changes
+neither daylight nor the miner's light. Torches don't fall yet (one that
+did would have to leave the torches' list).
 
 ### Daylight
 
@@ -225,6 +240,10 @@ every cached chunk is the host's, and at the end that every chunk came
 ahead of need; `tests/test_world.py` fills the store and reads chunks back
 through misses; `tests/test_daylight.py` checks the cache each frame too.
 
+`tests/test_support.py` cuts a tree's trunk in py65 and plays until
+nothing is left to check, then checks that what fell, and every strength
+left, are what `support.py` says, and the tile cache the world.
+
 `tests/test_pieces.py` checks slots in py65: given, shown, their
 visibility copied and freed by a sweep on the parasite, and composed on the
 host as `tiles.compose` does.
@@ -277,6 +296,10 @@ that fetches (2,500 at most), with 121 changed chunks round the start
 test_daylight's 490 frames the mean frame is 17,836 (17,455 before the
 store moved), the worst unchanged. PWORLD's tables end at `&A07B`, leaving
 7.1K free below daylight's.
+
+A felled tree (10 pieces) comes down over 9 frames; checking costs the
+parasite about 1,400 cycles a frame while it falls (3,100 at most), and
+the busiest frame of the fall, relighting what fell, about 52,500 (py65).
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the

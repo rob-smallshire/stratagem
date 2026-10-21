@@ -630,7 +630,9 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
 {
     LDX zp_generate_x
     LDA world_cover,X
-    BEQ none
+    BNE tree
+    RTS
+.tree
     STA zp_tree_cover
     AND #3
     STA zp_tree_side
@@ -692,11 +694,23 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
     ADC zp_tree_side
 .part
     STA zp_generate_material
-    LDA #GAME_SPAN              \ Strength: the span on the trunk's column,
-    LDX zp_tree_side            \ one less beside it
-    CPX #2
-    BEQ strength
+    LDA zp_tree_side            \ Strength: the span on the trunk's column,
+    CMP #2                      \ and beside it where the canopy rests on
+    BEQ span                    \ the ground, else one less
+    LDA zp_tree_up              \ The trunk's ground less 1 + height: the
+    CLC                         \ ground under a canopy resting on it
+    ADC zp_generate_y
+    SEC
+    SBC zp_tree_cover
+    SEC
+    SBC #1
+    LDX zp_generate_x
+    CMP world_heights,X
+    BEQ span
     LDA #GAME_SPAN - 1
+    BNE strength
+.span
+    LDA #GAME_SPAN
 .strength
     STA zp_world_shape
 .none

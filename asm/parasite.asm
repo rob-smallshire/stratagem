@@ -5,7 +5,7 @@
 \
 \   PGAME   the game (&4300), run at pgame_start
 \   PWORLD  the world: generator and a cache of changed chunks (&8000)
-\   PLIGHT  the light's radial table (&C100), daylight and torches
+\   PLIGHT  the light's radial table (&C100), daylight, torches and support
 \
 \ The parasite's memory:
 \
@@ -83,9 +83,11 @@ INCLUDE "asm/pieces.asm"
 INCLUDE "build/generated/miner.asm"
 INCLUDE "build/generated/smooth.asm"
 
-\ Set a tile (actions.asm calls it).
+\ Set a tile (actions.asm calls it), and queue it and its neighbours to be
+\ checked for support (support.asm).
 .call_set_tile
-    JMP set_tile
+    JSR set_tile
+    JMP support_note
 
 \ The renderer's table of each cell's graphic in its material's page, which
 \ the light reads to find the graphics it lists.
@@ -160,6 +162,8 @@ INCBIN "build/generated/radial_packed.bin"
 INCLUDE "build/generated/radial_rows.asm"
 INCLUDE "asm/daylight.asm"
 INCLUDE "asm/torches.asm"
+INCLUDE "build/generated/support.asm"
+INCLUDE "asm/support.asm"
 .plight_end
 
 \ Variables that need no starting value: after the game's
@@ -206,6 +210,21 @@ GUARD &0800
 .store_queue_offset SKIP STORE_QUEUE
 .store_queue_material SKIP STORE_QUEUE
 .store_queue_shape  SKIP STORE_QUEUE
+.support_head       SKIP 1      \ Support (support.asm): tiles to check...
+.support_tail       SKIP 1
+.support_queue_x    SKIP SUPPORT_QUEUE
+.support_queue_y    SKIP SUPPORT_QUEUE
+.support_lost       SKIP 1      \ ... dropped when the queue was full
+.support_x          SKIP 1      \ The tile being checked
+.support_y          SKIP 1
+.support_material   SKIP 1
+.support_shape      SKIP 1
+.support_held_rule  SKIP 1      \ ... its rule
+.support_held       SKIP 1      \ ... how it is held
+.support_best       SKIP 1      \ ... the most strength it is given
+.support_side       SKIP 1
+.support_checks     SKIP 1
+.support_tmp        SKIP 1
 
 \ And tables the light sets up afresh each pass, above daylight's window
 ORG plight_end
