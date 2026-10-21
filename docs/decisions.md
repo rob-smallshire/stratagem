@@ -178,3 +178,6 @@ A running log of design decisions. Add to it whenever one is made.
   (`features.py`). Leaves are held by the canopy over their trunk, and edge
   leaves hold only what is above them, so touching trees stand and fall
   apart.
+- **The span is 5:** chosen from the feature lab's structures; a roof of 8
+  between walls holds, a ledge reaches 5 from its wall, and a crossing needs
+  a pillar every 10 tiles (`support.GAME_SPAN`).

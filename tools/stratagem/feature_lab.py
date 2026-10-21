@@ -34,7 +34,7 @@ from stratagem.world import HEIGHTS, WORLD_SIZE, generate_tile
 
 W, H = 8, 16                # a tile's pixels and lines
 VIEW_COLUMNS = 16           # tiles across a view
-SPANS = (3, 5)
+SPANS = (3, support.GAME_SPAN)     # the game's, and a shorter one to compare
 PER_FRAME = 2               # pieces falling a frame
 
 

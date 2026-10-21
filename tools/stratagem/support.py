@@ -34,6 +34,7 @@ import numpy as np
 from stratagem.tiles import PASSABLE
 
 BELOW, ABOVE, SPAN, ANY = "below", "above", "span", "any"
+GAME_SPAN = 5               # the game's span (decided by the feature lab)
 ALL, FAMILY, UP, NOTHING = "all", "family", "up", "nothing"
 
 

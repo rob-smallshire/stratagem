@@ -113,8 +113,9 @@ Each piece has a strength: terrain is an anchor, at full strength; a piece
 held from below or above takes its holder's; one held only from the side
 takes its neighbour's less one; at zero it isn't held, and falls (and
 drops its item). So a roof reaches SPAN tiles from a wall and no further,
-and a canopy wider than that needs branches. SPAN is a number in the
-tables, to choose by playing (3 to 5, say).
+and a canopy wider than that needs branches. The span is 5 (decided from
+the feature lab, 2026-10-21: a hut's roof spans 8 between its walls, and a
+bridge needs a pillar every 10 tiles); it is a number in the tables.
 
 - Strength is worked out from the neighbours when something nearby
   changes, never stored, and the span bounds the search.
