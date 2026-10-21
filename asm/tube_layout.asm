@@ -21,9 +21,13 @@ LIST_BYTES = &500
 MAILBOX_INPUT = &8E
 MAILBOX_FRAME = &8F
 MAILBOX_BYTES = 2
+MAILBOX_FETCHED = &8D           \ Set by the host when it has copied a chunk
+                                \ asked for at once (COMMAND_FETCH)
 
 \ Commands, by OSWRCH from the parasite to the host
 COMMAND_FRAME = 128             \ Then the buffer: 0 or 1
+COMMAND_FETCH = 129             \ Then a slot of the host's store, and the
+                                \ parasite address to copy its chunk to
 
 \ The packet's first part
 PACKET_FLAGS = 0                \ PACKET_REDRAW if the view must be redrawn
@@ -56,6 +60,7 @@ LIST_MAX = 255
 \ store's bank (n - 1) DIV 128. A packet's changes to it follow its changed
 \ tiles: a count, then each change's slot and offset, then a tile's
 \ material and shape, or (offset STORE_CHUNK) the whole chunk.
+\ The store has 255 slots: the directory holds a slot in a byte.
 CHUNK_SIZE = 8
 CHUNK_TILES = CHUNK_SIZE * CHUNK_SIZE
 SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
@@ -63,6 +68,8 @@ STORE_BANKS = 2
 STORE_CHUNK = &FF
 STORE_TILE_BYTES = 4
 STORE_CHUNK_BYTES = 2 + SLOT_BYTES
+FETCH_BYTES = 3                 \ Then a chunk to fetch: its slot, and the
+                                \ parasite address to copy it to; or a 0
 
 \ Host addresses the parasite puts into draw lists (asserted in render.asm)
 HOST_MATERIAL_PAGES = &8100

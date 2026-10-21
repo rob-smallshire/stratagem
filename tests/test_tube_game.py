@@ -123,37 +123,73 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
 
 
 STORE_SLOT_BYTES = 128      # asm/tube_layout.asm
+CHUNK_SIZE, CHUNKS_ACROSS = 8, 32
 STORE_SCRIPT = [(150, ["M", "L"]), (60, ["X", "L"]), (2, ["T"]), (30, ["Z", "L"]), (10, [])]
 
 
-def test_host_keeps_a_copy_of_the_store(tube_bbc, tube_machine, game_build):
-    """Every changed chunk the parasite holds, the host holds in its store's
-    banks, byte for byte, once the packets have carried the changes."""
-    bbc = tube_bbc
-    labels = game_build.labels["HOST"]
-    parasite_labels = game_build.labels["PARASITE"]
-    peek = bbc.memory.address.peek
-    bbc.disc.set_spin_up_delay(False)
-    bbc.boot_disc(str(game_build.disc_filepath))
-    started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
-    assert started, "the game did not start"
-    for count, keys in STORE_SCRIPT:
+def play(bbc, labels, script):
+    for count, keys in script:
         for key in keys:
             bbc.keyboard.key_down(key)
         for _ in range(count):
             bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
         for key in keys:
             bbc.keyboard.key_up(key)
-    parasite = bbc.connect_coprocessor().memory.address.peek
+
+
+def test_host_keeps_the_store(tube_bbc, tube_machine, game_build):
+    """The host holds every changed chunk, and the parasite a cache of them:
+    each cached chunk is the host's, byte for byte, once the packets have
+    carried the changes; and a chunk dropped from the cache is fetched again
+    at once (COMMAND_FETCH) when a tile of it is changed."""
+    bbc = tube_bbc
+    labels = game_build.labels["HOST"]
+    plabels = game_build.labels["PARASITE"]
+    peek = bbc.memory.address.peek
+    bbc.disc.set_spin_up_delay(False)
+    bbc.boot_disc(str(game_build.disc_filepath))
+    started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
+    assert started, "the game did not start"
+    parasite = bbc.connect_coprocessor().memory.address
+    play(bbc, labels, STORE_SCRIPT)
+    assert parasite.peek[plabels["cache_misses"]] == 0, "a chunk was needed before it was fetched"
+
+    # Drop the chunks around the miner from the cache, spoiling
+    # their slots, and dig down: the dig asks for the chunk before the view
+    # moves, so before anything fetches it ahead.
+    x = word(parasite.peek, plabels["zp_player_x"]) // 16 // 8         # sixteenths; tiles are 8 pixels
+    y = word(parasite.peek, plabels["zp_player_y"]) // 16 // 16        # ... by 16 lines
+    dropped = 0
+    chunks = {(tx // CHUNK_SIZE, ty // CHUNK_SIZE) for tx in (x - 1, x, x + 1) for ty in (y, y + 1, y + 2)}
+    for chunk_x, chunk_y in chunks:     # (y is the top of the miner's box)
+        slot = parasite.peek[plabels["world_directory"] + chunk_y * CHUNKS_ACROSS + chunk_x]
+        cache_slot = parasite.peek[plabels["cache_of"] + slot] if slot else 0
+        if cache_slot:
+            parasite.bus[plabels["cache_of"] + slot] = 0
+            parasite.bus[plabels["cache_holds"] + cache_slot] = 0
+            base = plabels["world_slots"] + (cache_slot - 1) * STORE_SLOT_BYTES
+            for i in range(STORE_SLOT_BYTES):
+                parasite.bus[base + i] = 0xEE
+            dropped += 1
+    assert dropped, "the miner's chunk isn't cached"
+    play(bbc, labels, [(8, ["M", "L"]), (10, [])])
+    assert parasite.peek[plabels["cache_misses"]] >= 1, "the dropped chunk wasn't fetched at once"
+
     for _ in range(4):          # until the queue is sent
         bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
-    assert parasite[parasite_labels["store_head"]] == parasite[parasite_labels["store_tail"]]
-    used = parasite[parasite_labels["world_slots_used"]]
+    assert parasite.peek[plabels["store_head"]] == parasite.peek[plabels["store_tail"]]
+    used = parasite.peek[plabels["world_slots_used"]]
     assert used >= 3, "too few chunks changed to test"
     banks = [peek[labels["host_store_banks"] + i] for i in range(2)]
-    slots = parasite_labels["world_slots"]
+    cached = 0
     for slot in range(1, used + 1):
+        cache_slot = parasite.peek[plabels["cache_of"] + slot]
+        if not cache_slot:
+            continue
         bank = bbc.memory.region(f"bank_{banks[(slot - 1) // 128]}").peek
         address = 0x8000 + (slot - 1) % 128 * STORE_SLOT_BYTES
-        held = parasite[slots + (slot - 1) * STORE_SLOT_BYTES:slots + slot * STORE_SLOT_BYTES]
+        base = plabels["world_slots"] + (cache_slot - 1) * STORE_SLOT_BYTES
+        held = parasite.peek[base:base + STORE_SLOT_BYTES]
         assert bank[address:address + STORE_SLOT_BYTES] == held, f"slot {slot}"
+        cached += 1
+    assert cached >= 2

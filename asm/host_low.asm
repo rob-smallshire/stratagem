@@ -36,34 +36,56 @@ ENDMACRO
 .call_render_clear      RENDER_CALL render_clear
 .call_render_light      RENDER_CALL render_light
 
-\ OSWRCH: COMMAND_FRAME and its buffer from the parasite, or an ordinary
-\ character. A frame is drawn with ROMSEL's bit 7 clear (program RAM at
+\ OSWRCH: a command from the parasite and its arguments (COMMAND_FRAME and
+\ its buffer, or COMMAND_FETCH, a slot and an address), or an ordinary
+\ character. A command runs with ROMSEL's bit 7 clear (program RAM at
 \ &3000-&7FFF on the Integra-B), and ROMSEL as it was afterwards.
 .host_wrch
 {
     STA host_a
     STX host_x
     STY host_y
-    LDX host_expect_buffer
-    BNE buffer
+    LDX host_expect
+    BNE argument
+    LDX #1
     CMP #COMMAND_FRAME
+    BEQ command
+    LDX #3
+    CMP #COMMAND_FETCH
     BEQ command
     LDX host_x
     JMP (host_old_wrchv)
 .command
-    LDA #&FF
-    STA host_expect_buffer
+    STA host_command
+    STX host_expect
+    JMP return
+.argument                       \ (The last argument goes first in host_args)
+    DEX
+    STA host_args,X
+    STX host_expect
     BNE return
-.buffer
-    STA host_buffer
-    LDA #0
-    STA host_expect_buffer
     LDA ROMSEL_COPY
     PHA
     AND #&7F
     STA zp_romsel_game
     SELECT_ROMSEL
+    LDA host_command
+    CMP #COMMAND_FRAME
+    BNE fetch
+    LDA host_args
+    STA host_buffer
     JSR host_frame
+    JMP done
+.fetch
+    LDA host_args + 2
+    STA host_fetch_slot
+    LDA host_args + 1
+    STA host_fetch_to
+    LDA host_args
+    STA host_fetch_to + 1
+    JSR host_fetch
+    JSR host_fetched
+.done
     PLA
     SELECT_ROMSEL
 .return
@@ -100,7 +122,9 @@ ENDMACRO
 .host_a             EQUB 0
 .host_x             EQUB 0
 .host_y             EQUB 0
-.host_expect_buffer EQUB 0      \ Non-zero after COMMAND_FRAME
+.host_expect        EQUB 0      \ A command's arguments still to come...
+.host_command       EQUB 0      \ ... for this command
+.host_args          SKIP 3      \ ... last first
 .host_buffer        EQUB 0      \ The packet's buffer
 .host_frames        EQUB 0      \ Packets read
 .host_old_wrchv     EQUW 0
@@ -120,6 +144,9 @@ ENDMACRO
 .host_slot_pair     SKIP SLOT_COUNT \ Each slot's pair, piece * 2 + backdrop
 .host_store_banks   SKIP STORE_BANKS    \ The store's banks (host_store)
 .host_store_count   EQUB 0
+.host_chunk         EQUW 0      \ A chunk in the store (host_chunk_at)
+.host_fetch_slot    EQUB 0      \ A chunk to copy to the parasite, or 0...
+.host_fetch_to      EQUW 0      \ ... to here
 
 \ ---------------------------------------------------------------------------
 \ Loader

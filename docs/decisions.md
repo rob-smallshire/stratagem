@@ -158,3 +158,10 @@ A running log of design decisions. Add to it whenever one is made.
   Changes go to both copies, so the parasite never writes a chunk back. A
   first step keeps the parasite's whole store and checks the host's copy
   against it. Packing chunks, if needed, belongs between the two.
+- **The parasite caches the store's chunks, fetched ahead:** 40 slots for
+  the at most 36 chunks within a chunk of the tile cache, one fetched a
+  frame through the packet as the view nears it; the view needs 20 frames
+  to cross a chunk, so even margins all round need no prediction of where
+  the miner goes. Chunks are dropped in turn from beyond the wanted ones,
+  with nothing queued for them; a chunk wanted at once is fetched by
+  `COMMAND_FETCH`, counted, and never needed in the tests.

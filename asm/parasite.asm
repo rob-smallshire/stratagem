@@ -4,13 +4,13 @@
 \ saved as three files, which the host's loader loads into the parasite:
 \
 \   PGAME   the game (&4300), run at pgame_start
-\   PWORLD  the world: generator and changed-chunk store (&8000)
+\   PWORLD  the world: generator and a cache of changed chunks (&8000)
 \   PLIGHT  the light's radial table (&C100), daylight and torches
 \
 \ The parasite's memory:
 \
-\   &0000-&0062  the game's zero page (zeropage.asm; &63-&8D free)
-\   &008E-&008F  the mailbox the host writes
+\   &0000-&0064  the game's zero page (zeropage.asm; &65-&8C free)
+\   &008D-&008F  the mailbox the host writes
 \   &0090-&00E5  the light's zero page
 \   &00E6-&00ED  the packet's pointers (&EE upwards is the parasite OS's)
 \   &0400-&07FF  the game's variables, then more
@@ -20,7 +20,8 @@
 \   &2800-&37FF  the light's plane
 \   &3800-&42FF  the light's grid of excess
 \   &4300-&7FFF  PGAME, then pieces' slots
-\   &8000-&BCFF  PWORLD and its store
+\   &8000-&A07A  PWORLD and its cache of the store of changed chunks
+\   &A07B-&BCFF  free
 \   &BD00-&C0FF  daylight's tables: sky depths and reaches (daylight.asm)
 \   &C100-&F7FF  PLIGHT, then tables the light sets up each pass
 
@@ -148,7 +149,7 @@ ASSERT sl_plane = &2800 AND sl_grid = &3800
 INCLUDE "asm/world.asm"
 SAVE "PWORLD", world_start, world_end, world_start
 
-ASSERT world_slots + WORLD_SLOT_COUNT * SLOT_BYTES <= sun_depth
+ASSERT world_tables_end <= sun_depth
 
 ASSERT sun_reach_3 + &100 <= sl_radial
 

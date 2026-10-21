@@ -1,10 +1,10 @@
-\ The parasite's zero page, below the mailbox at &8E (the light's follows it:
+\ The parasite's zero page, below the mailbox at &8D (the light's follows it:
 \ miner_light_zp.asm). Variables are declared with ORG/SKIP rather than as
 \ constants so that beebasm exports them as labels, which the tests look up
 \ by name. The host has its own (host_zeropage.asm).
 
 ORG &00
-GUARD &8E
+GUARD MAILBOX_FETCHED
 
 .zp_ptr             SKIP 2      \ General purpose pointer
 

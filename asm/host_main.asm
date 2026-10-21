@@ -30,7 +30,7 @@ INKEY_T = &100 - 36
     STA redraw_tile
     STA host_changes
     STA host_frames
-    STA host_expect_buffer
+    STA host_expect
     STA host_frame_count
     LDA #LO(SCREEN_START)
     STA zp_screen_start
@@ -123,7 +123,20 @@ INKEY_T = &100 - 36
 .changes_done
     JSR host_store
 .*host_stored                   \ (For timing)
+    READ_BYTE                   \ A chunk to fetch
+    STA host_fetch_slot
+    BEQ no_fetch
+    READ_BYTE
+    STA host_fetch_to
+    READ_BYTE
+    STA host_fetch_to + 1
+.no_fetch
     JSR host_release
+    LDA host_fetch_slot         \ Copied before the mailbox, so it is there
+    BEQ fetched                 \ when the parasite's next frame starts
+    JSR host_fetch
+.fetched
+.*host_fetch_done               \ (For timing)
 
     JSR read_input              \ The input, to the parasite's mailbox
     INC host_frames
@@ -197,31 +210,17 @@ INKEY_T = &100 - 36
     BNE change
     RTS
 .change
-    READ_BYTE                   \ The slot: page its bank in and point at it
-    SEC
-    SBC #1
-    TAY
-    LSR A
-    STA chunk_to + 2
-    LDA #0
-    ROR A
+    READ_BYTE                   \ The slot
+    JSR host_chunk_at
+    LDA host_chunk
     STA chunk_to + 1
     STA material_to + 1
     ORA #CHUNK_TILES
     STA shape_to + 1
-    LDA chunk_to + 2
-    AND #&3F
-    ORA #&80
+    LDA host_chunk + 1
     STA chunk_to + 2
     STA material_to + 2
     STA shape_to + 2
-    TYA
-    ASL A
-    LDA #0
-    ROL A
-    TAX
-    LDA host_store_banks,X
-    SELECT_ROMSEL
     READ_BYTE                   \ The offset
     CMP #STORE_CHUNK
     BEQ chunk
@@ -250,6 +249,78 @@ INKEY_T = &100 - 36
     LDA zp_romsel_game
     SELECT_ROMSEL
     RTS
+}
+
+\ Page in the bank of slot A of the store (from 1), and point host_chunk at
+\ its chunk.
+.host_chunk_at
+{
+    SEC
+    SBC #1
+    TAY
+    LSR A
+    AND #&3F
+    ORA #&80
+    STA host_chunk + 1
+    LDA #0
+    ROR A
+    STA host_chunk
+    TYA
+    ASL A
+    LDA #0
+    ROL A
+    TAX
+    LDA host_store_banks,X
+    SELECT_ROMSEL
+    RTS
+}
+
+\ Copy chunk host_fetch_slot of the store to the parasite, at host_fetch_to.
+.host_fetch
+{
+    JSR host_claim
+    LDA host_fetch_to
+    STA host_transfer
+    LDA host_fetch_to + 1
+    STA host_transfer + 1
+    LDA #TUBE_BYTES_TO_PARASITE
+    LDX #LO(host_transfer)
+    LDY #HI(host_transfer)
+    JSR TUBE_ENTRY
+    LDA host_fetch_slot
+    JSR host_chunk_at
+    LDA host_chunk
+    STA from + 1
+    LDA host_chunk + 1
+    STA from + 2
+    LDY #0
+.loop
+.from
+    LDA &8000,Y
+    JSR host_write_byte
+    INY
+    CPY #SLOT_BYTES
+    BNE loop
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    JMP host_release
+}
+
+\ Tell the parasite that the chunk it asked for at once is there.
+.host_fetched
+{
+    JSR host_claim
+    LDA #MAILBOX_FETCHED
+    STA host_transfer
+    LDA #0
+    STA host_transfer + 1
+    LDA #TUBE_BYTES_TO_PARASITE
+    LDX #LO(host_transfer)
+    LDY #HI(host_transfer)
+    JSR TUBE_ENTRY
+    LDA #&FF
+    JSR host_write_byte
+    JMP host_release
 }
 
 \ Redraw the changed tiles.

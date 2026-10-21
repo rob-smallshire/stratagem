@@ -1,6 +1,15 @@
 \ PWORLD, the parasite's world: the placeholder generator, which
-\ tools/stratagem/world.py models exactly, and the store of changed chunks.
-\ A tile is a material and a shape (see tools/stratagem/tiles.py).
+\ tools/stratagem/world.py models exactly, and a cache of the store of
+\ changed chunks, which the host holds (docs/tube-game.md). A tile is a
+\ material and a shape (see tools/stratagem/tiles.py).
+\
+\ The directory gives each changed chunk's slot in the host's store (from
+\ 1). The cache holds CACHE_SLOTS of them: those within a chunk of the tile
+\ cache, fetched ahead of need a chunk a frame (cache_prefetch), and any
+\ other a tile is asked of, fetched at once (cache_miss). Changes go to the
+\ cached chunk and, by the queue (store_emit), to the host's, so a chunk is
+\ dropped from the cache without writing it back, once nothing is queued
+\ for it.
 
 CLEAR BANK_START, BANK_END
 ORG BANK_START
@@ -10,6 +19,8 @@ GUARD BANK_END
     EQUB 0, 0, 0, 0, 0, 0, 0, 0 \ Not a ROM header: &8007 = 0 and &8001 <> "("
 
 STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
+CACHE_SLOTS = 40                \ Chunks the cache holds: at least the 6 x 6
+                                \ within a chunk of the tile cache, and more
 
 \ Return the tile at world (X, Y), y increasing downwards, as changed by the
 \ player: the material in A and the shape in zp_world_shape. Preserves X
@@ -24,6 +35,7 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     LDY zp_world_y
     JMP generate_tile
 .changed
+    JSR cache_slot_of
     JSR point_at_slot
     JSR offset_in_chunk
     TYA
@@ -41,9 +53,9 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
 }
 
 \ Change the tile at world (X, Y) to material A and shape zp_world_new_shape,
-\ and queue the change for the host's copy of the store (store_emit). Return
-\ with carry clear, or carry set if the chunk is unchanged so far and there
-\ is no free slot for it, or the queue is full. Preserves X and Y.
+\ and queue the change for the host's store (store_emit). Return with carry
+\ clear, or carry set if the chunk is unchanged so far and the store has no
+\ free slot for it, or the queue is full. Preserves X and Y.
 .set_tile
 {
     STA zp_world_tile
@@ -65,6 +77,10 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     INC world_slots_used
     LDA world_slots_used
     STA (zp_world_pointer),Y    \ Y = 0
+    STA cache_h                 \ A cache slot for it, filled as generated
+    JSR cache_chunk_here
+    JSR cache_take
+    JSR cache_link
     JSR fill_slot
     LDA world_slots_used        \ The host copies it whole
     LDX #STORE_CHUNK
@@ -76,6 +92,7 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     JSR find_chunk
 .have_slot
     PHA
+    JSR cache_slot_of
     JSR point_at_slot
     JSR offset_in_chunk
     LDA zp_world_tile
@@ -115,6 +132,257 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     RTS
 }
 
+\ The cache slot of host slot A, fetching it if it isn't cached.
+.cache_slot_of
+{
+    TAX
+    LDA cache_of,X
+    BNE cached
+    TXA
+    JMP cache_miss
+.cached
+    RTS
+}
+
+\ Host slot A, of the chunk holding (zp_world_x, zp_world_y), isn't cached:
+\ fetch it now (the host answers once it has drawn the frame it is drawing,
+\ if any). Return its cache slot in A.
+.cache_miss
+{
+    STA cache_h
+    JSR cache_chunk_here
+    JSR cache_take
+    JSR cache_link
+    LDA cache_p
+    JSR point_at_slot
+    LDA #0
+    STA MAILBOX_FETCHED
+    LDA #COMMAND_FETCH
+    JSR OSWRCH
+    LDA cache_h
+    JSR OSWRCH
+    LDA zp_world_pointer
+    JSR OSWRCH
+    LDA zp_world_pointer + 1
+    JSR OSWRCH
+.wait
+    LDA MAILBOX_FETCHED
+    BEQ wait
+    INC cache_misses            \ Counted, for tests: it shouldn't happen in play
+    BNE counted
+    DEC cache_misses
+.counted
+    LDA cache_p
+    RTS
+}
+
+\ Set cache_cx and cache_cy to the chunk holding (zp_world_x, zp_world_y).
+.cache_chunk_here
+{
+    LDA zp_world_x
+    LSR A
+    LSR A
+    LSR A
+    STA cache_cx
+    LDA zp_world_y
+    LSR A
+    LSR A
+    LSR A
+    STA cache_cy
+    RTS
+}
+
+\ Cache slot A now holds host slot cache_h, of chunk (cache_cx, cache_cy).
+\ Returns A unchanged, in cache_p too.
+.cache_link
+{
+    STA cache_p
+    TAY
+    LDX cache_h
+    STA cache_of,X
+    TXA
+    STA cache_holds,Y
+    LDA cache_cx
+    STA cache_chunk_x,Y
+    LDA cache_cy
+    STA cache_chunk_y,Y
+    LDA cache_p
+    RTS
+}
+
+\ Return in A a cache slot to use: a free one, or else one whose chunk is
+\ beyond the wanted chunks (cache_want_*) and has nothing queued for the
+\ host, taken in turn; or else (never, with enough slots) any with nothing
+\ queued. Its chunk is dropped from the cache.
+.cache_take
+{
+    LDY #CACHE_SLOTS
+.free
+    LDA cache_holds,Y
+    BEQ found
+    DEY
+    BNE free
+    LDA #&FF                    \ First pass: only unwanted chunks
+    STA cache_pass
+.pass
+    LDA #CACHE_SLOTS
+    STA cache_tries
+    LDY cache_victim
+.try
+    DEY
+    BNE in_range
+    LDY #CACHE_SLOTS
+.in_range
+    LDA cache_pass
+    BEQ any
+    LDA cache_chunk_x,Y
+    CMP cache_want_l
+    BCC unwanted
+    CMP cache_want_r
+    BEQ across
+    BCS unwanted
+.across
+    LDA cache_chunk_y,Y
+    CMP cache_want_t
+    BCC unwanted
+    CMP cache_want_b
+    BEQ next                    \ Wanted
+    BCC next
+.unwanted
+.any
+    LDA cache_holds,Y           \ Nothing queued for it?
+    LDX store_head
+.queued
+    CPX store_tail
+    BEQ evict
+    CMP store_queue_slot,X
+    BEQ next
+    INX
+    TXA
+    AND #STORE_QUEUE - 1
+    TAX
+    LDA cache_holds,Y
+    JMP queued
+.next
+    DEC cache_tries
+    BNE try
+    LDA #0                      \ Second pass: any
+    STA cache_pass
+    JMP pass
+.evict
+    STY cache_victim
+    TAX
+    LDA #0
+    STA cache_of,X
+    LDA #&FF                    \ It may be wanted again
+    STA cache_scan
+.found
+    TYA
+    RTS
+}
+
+\ Bring the wanted chunks (those within a chunk of the tile cache) up to
+\ date, and fetch the first changed one that isn't cached: write to the
+\ packet at para_write its host slot and the address to copy it to, or 0
+\ if there is none to fetch. The host copies it before it writes the
+\ mailbox, so it is there when the next frame starts.
+.cache_prefetch
+{
+    LDX #3                      \ The wanted chunks: left, right, top, bottom
+.edge
+    LDA cached_left,X
+    LSR A
+    LSR A
+    LSR A
+    TAY
+    TXA
+    LSR A                       \ Carry set for right and bottom
+    TYA
+    BCS far
+    BEQ edge_set                \ Left and top: one less, from 0
+    SEC
+    SBC #1
+    JMP edge_set
+.far
+    CMP #CHUNKS_ACROSS - 1      \ Right and bottom: one more, to the last
+    BCS edge_set
+    ADC #1
+.edge_set
+    CMP cache_want_l,X
+    BEQ same
+    STA cache_want_l,X
+    LDA #&FF
+    STA cache_scan
+.same
+    DEX
+    BPL edge
+    LDA cache_scan              \ Look only when something may be missing
+    BEQ none
+    LDA cache_want_t
+    STA cache_cy
+.row
+    LDA cache_cy                \ The directory's row: cy * 32 + l
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC #HI(world_directory)
+    STA zp_world_pointer + 1
+    LDA cache_cy
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA cache_want_l
+    STA zp_world_pointer
+    LDA cache_want_l
+    STA cache_cx
+    LDY #0
+.chunk
+    LDA (zp_world_pointer),Y
+    BEQ unchanged
+    TAX
+    LDA cache_of,X
+    BEQ fetch
+.unchanged
+    INY
+    INC cache_cx
+    LDA cache_cx
+    CMP cache_want_r
+    BEQ chunk
+    BCC chunk
+    INC cache_cy
+    LDA cache_cy
+    CMP cache_want_b
+    BEQ row
+    BCC row
+    LDA #0                      \ All there
+    STA cache_scan
+.none
+    LDY #0
+    STA (para_write),Y
+    RTS
+.fetch
+    STX cache_h
+    JSR cache_take
+    JSR cache_link
+    JSR point_at_slot
+    LDY #0
+    LDA cache_h
+    STA (para_write),Y
+    INY
+    LDA zp_world_pointer
+    STA (para_write),Y
+    INY
+    LDA zp_world_pointer + 1
+    STA (para_write),Y
+    RTS
+}
+CHUNKS_ACROSS = 256 / CHUNK_SIZE
+ASSERT cached_right = cached_left + 1 AND cached_top = cached_left + 2 AND cached_bottom = cached_left + 3
+ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND cache_want_b = cache_want_l + 3
+
 \ Point zp_world_pointer at the directory entry of the chunk holding
 \ (zp_world_x, zp_world_y), and return it in A, with Y = 0 and Z set if the
 \ chunk is unchanged.
@@ -146,7 +414,7 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     RTS
 }
 
-\ Point zp_world_pointer at slot A (1-based).
+\ Point zp_world_pointer at cache slot A (1-based).
 .point_at_slot
 {
     SEC
@@ -177,8 +445,8 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     RTS
 }
 
-\ Fill the slot just allocated, slot A, with the generated tiles of the
-\ chunk holding (zp_world_target_x, zp_world_target_y).
+\ Fill cache slot A with the generated tiles of the chunk holding
+\ (zp_world_target_x, zp_world_target_y).
 .fill_slot
 {
     JSR point_at_slot
@@ -216,13 +484,29 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
     RTS
 }
 
-\ Forget every change: clear the directory.
+\ Forget every change: clear the directory and the cache.
 .world_reset
 {
     LDA #0
     STA world_slots_used
     STA store_head
     STA store_tail
+    STA cache_misses
+    TAX
+.cache
+    STA cache_of,X
+    INX
+    BNE cache
+    LDX #CACHE_SLOTS
+.slots
+    STA cache_holds,X
+    DEX
+    BPL slots
+    STX cache_want_l            \ (&FF) No tile cache yet
+    STX cache_scan
+    LDA #CACHE_SLOTS
+    STA cache_victim
+    LDA #0
     TAY
     LDX #HI(world_directory)
     STX zp_world_pointer + 1
@@ -528,7 +812,20 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
 .world_perm
     WORLD_PERM
 
-.world_slots_used   EQUB 0
+.world_slots_used   EQUB 0      \ Slots used in the host's store
+.cache_want_l       EQUB 0      \ The wanted chunks, inclusive (in the order of
+.cache_want_r       EQUB 0      \ cached_left, cached_right, cached_top and
+.cache_want_t       EQUB 0      \ cached_bottom)
+.cache_want_b       EQUB 0
+.cache_scan         EQUB 0      \ Non-zero if a wanted chunk may be uncached
+.cache_misses       EQUB 0      \ Chunks fetched at once (at most 255)
+.cache_victim       EQUB CACHE_SLOTS    \ Where cache_take looks next
+.cache_pass         EQUB 0
+.cache_tries        EQUB 0
+.cache_h            EQUB 0      \ A host slot...
+.cache_p            EQUB 0      \ ... its cache slot
+.cache_cx           EQUB 0      \ ... and its chunk
+.cache_cy           EQUB 0
 
 .world_end
 
@@ -536,5 +833,10 @@ STORE_QUEUE = 32                \ Changes queued for the host (a power of 2)
 \ each 8 x 8 chunk (zero if unchanged, otherwise its slot), then the slots.
 ALIGN &100
 .world_directory    SKIP (256 / CHUNK_SIZE) * (256 / CHUNK_SIZE)
-.world_slots        SKIP WORLD_SLOT_COUNT * SLOT_BYTES
+.cache_of           SKIP 256    \ Each host slot's cache slot, or 0
+.world_slots        SKIP CACHE_SLOTS * SLOT_BYTES   \ The cache's slots
+.cache_holds        SKIP CACHE_SLOTS + 1    \ Each cache slot's host slot, or 0
+.cache_chunk_x      SKIP CACHE_SLOTS + 1    \ ... and its chunk
+.cache_chunk_y      SKIP CACHE_SLOTS + 1
+.world_tables_end
 

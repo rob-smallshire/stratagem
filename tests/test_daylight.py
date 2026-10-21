@@ -7,16 +7,15 @@ parasite's frames cost."""
 
 import numpy as np
 
+from conftest import FakeHost
 from mos6502 import Machine6502
 from stratagem import lighting
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.world import CHUNK_SIZE, CHUNKS_ACROSS, HEIGHTS, generate_tile
+from stratagem.world import HEIGHTS
 
 TILE_CACHE_SIZE = 32
 SUN_DEPTH = 0xBD00              # asm/parasite.asm
-SLOT_BYTES = 2 * CHUNK_SIZE * CHUNK_SIZE
-OSWRCH = 0xFFEE
 MAILBOX_INPUT, MAILBOX_FRAME = 0x8E, 0x8F
 
 KEYS = {"Z": INPUT_LEFT, "X": INPUT_RIGHT, "K": INPUT_UP, "M": INPUT_DOWN, "L": INPUT_ACTION}
@@ -25,6 +24,9 @@ SCRIPT = [(200, "ML"), (60, "XL"), (40, "ZL"), (30, ""), (60, "Z"), (60, "ZK"), 
 
 
 class ParasiteGame:
+    """The parasite's game in py65, the host playing only its part in the
+    store of changed chunks (FakeHost), taken from each packet."""
+
     def __init__(self, game_build):
         self.machine = Machine6502(cmos=True)
         for name in ("PGAME", "PWORLD", "PLIGHT"):
@@ -32,7 +34,8 @@ class ParasiteGame:
         self.labels = game_build.labels["PARASITE"]
         self.mpu = self.machine.mpu
         self.memory = self.mpu.memory
-        self.memory[OSWRCH] = 0x60      # RTS: the host reads nothing
+        self.host = FakeHost(self.machine, self.labels)
+        self.machine.hooks[self.labels["para_send"]] = self.host.take_packet
         self.mpu.pc = self.labels["pgame_start"]
         self.run_to(self.labels["para_loop"])
 
@@ -40,7 +43,7 @@ class ParasiteGame:
         for _ in range(max_steps):
             if self.mpu.pc == address:
                 return
-            self.mpu.step()
+            self.machine.step()
         raise TimeoutError(f"&{address:04X} not reached")
 
     def frame(self, inputs: int) -> int:
@@ -49,7 +52,7 @@ class ParasiteGame:
         labels = self.labels
         self.memory[MAILBOX_INPUT] = inputs
         self.memory[MAILBOX_FRAME] = self.memory[labels["para_sent"]]
-        self.mpu.step()
+        self.machine.step()
         self.run_to(labels["para_input"])
         before = self.mpu.processorCycles
         self.run_to(labels["para_send"])
@@ -57,18 +60,20 @@ class ParasiteGame:
         self.run_to(labels["para_loop"])
         return cycles
 
+    def call(self, name: str, a: int = 0, x: int = 0, y: int = 0) -> None:
+        """Call a routine between frames, leaving the game as it was."""
+        mpu = self.mpu
+        saved = mpu.pc, mpu.sp, mpu.a, mpu.x, mpu.y, mpu.p, list(self.memory[0x100:0x200])
+        self.machine.call(self.labels[name], a=a, x=x, y=y)
+        mpu.pc, mpu.sp, mpu.a, mpu.x, mpu.y, mpu.p, stack = saved
+        self.memory[0x100:0x200] = stack
+
     def byte(self, name: str) -> int:
         return self.memory[self.labels[name]]
 
     def tile_at(self, x: int, y: int):
-        """The world as the parasite holds it."""
-        index = (y // CHUNK_SIZE) * CHUNKS_ACROSS + x // CHUNK_SIZE
-        slot = self.memory[self.labels["world_directory"] + index]
-        if not slot:
-            return generate_tile(x, y)
-        base = self.labels["world_slots"] + (slot - 1) * SLOT_BYTES
-        offset = (y % CHUNK_SIZE) * CHUNK_SIZE + x % CHUNK_SIZE
-        return self.memory[base + offset], self.memory[base + SLOT_BYTES // 2 + offset]
+        """The world as the parasite and the host hold it."""
+        return self.host.tile_at(x, y)
 
     def cache_light(self, x: int, y: int) -> int:
         index = (y % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + x % TILE_CACHE_SIZE
@@ -106,6 +111,7 @@ def test_daylight_matches_the_model(game_build):
     for count, keys in SCRIPT:
         for _ in range(count):
             cycles.append(game.frame(sum(KEYS[k] for k in keys)))
+            game.host.check_cache()
             idle = not game.byte("sun_busy") and game.byte("torch_queue_head") == game.byte("torch_queue_tail")
             if idle:
                 beyond, deep = check_daylight(game)

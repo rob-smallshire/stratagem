@@ -122,12 +122,12 @@ tile_at = generate_tile   # the world as generated, before any changes
 
 CHUNK_SIZE = 8                              # tiles square
 CHUNKS_ACROSS = WORLD_SIZE // CHUNK_SIZE    # 32
-SLOT_COUNT = 104                            # changed chunks the world bank holds
+SLOT_COUNT = 255                            # changed chunks the host's store holds
 
 
 class World:
-    """The world with the player's changes, modelling the world bank: a
-    directory of chunks, and SLOT_COUNT slots that hold changed chunks. The
+    """The world with the player's changes, modelling the store of changed
+    chunks: a directory of chunks, and SLOT_COUNT slots that hold them. The
     first change to a chunk copies its generated tiles into the next free
     slot; when none is free, the change is refused."""
 

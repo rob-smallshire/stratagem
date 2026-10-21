@@ -5,7 +5,7 @@
 Plays the Python models (player.step, actions.act) for long sessions of
 digging, tunnelling and placing, with the world store unlimited, then
 encodes every changed chunk several ways against the tiles the generator
-makes, and reports what each would hold in the world bank's 13K
+makes, and reports what each would hold in the host's store
 (SLOT_COUNT chunks of 128 bytes today).
 
 Encodings (bytes per chunk):

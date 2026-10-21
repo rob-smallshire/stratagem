@@ -162,20 +162,34 @@ index also reads the grid of excess, which doesn't fold.
 
 ### The store of changed chunks
 
-The parasite holds every changed chunk (104 slots of 128 bytes, in
-PWORLD), and the host keeps a copy in its two spare sideways banks (room
-for 255). `set_tile` queues each change (`world.asm`): the slot and the
-tile's offset, material and shape, or, for a chunk's first change, the
-whole chunk. Each packet carries as many queued changes as fit after its
-changed tiles, and the host copies them into its banks as it reads the
-packet (`host_store`), paging each bank in at `&8000` from its program RAM.
-If the queue fills (32 changes), `set_tile` refuses, as when the store is
-full.
+The host holds the store, in its two spare sideways banks: 255 changed
+chunks of 128 bytes, a quarter of the world. The parasite's directory
+gives each changed chunk's slot there, and the parasite caches 40 of them
+(5K in PWORLD), as `world.asm` describes:
 
-This is the first step to the parasite holding only a cache of the chunks
-near the view, fetched from the host ahead of need, which frees most of
-PWORLD's 13K and lets the store grow to 255 chunks (a quarter of the
-world). Chunks could also be packed there, on their way between the two.
+- **Changes go to both.** `set_tile` changes the cached chunk and queues the
+  change (the slot and the tile's offset, material and shape, or for a
+  chunk's first change the whole chunk), and each packet carries as many
+  queued changes as fit after its changed tiles; the host copies them into
+  its banks as it reads the packet (`host_store`). So a cached chunk is
+  dropped without writing it back, once nothing is queued for it. If the
+  queue fills (32 changes), `set_tile` refuses, as when the store is full.
+- **Fetched ahead.** The wanted chunks are those within a chunk of the tile
+  cache, at most 6 x 6. Whenever they change, or a chunk is dropped, the
+  parasite looks for a changed one that isn't cached, and asks for one a
+  frame at the end of the packet (`cache_prefetch`): the host copies it into
+  the parasite (`host_fetch`) before it writes the mailbox, so it is there
+  when the next frame starts. The view moves a chunk in 20 frames at the
+  fastest, so a new edge of 6 is fetched long before it is reached.
+- **Dropped in turn.** A slot is taken free, or else from a chunk beyond the
+  wanted ones with nothing queued for it.
+- **Fetched at once** if a tile is asked of a chunk that isn't cached
+  (`cache_miss`): `COMMAND_FETCH`, the slot and the address, over OSWRCH;
+  the host copies the chunk once it has drawn the frame it is drawing, and
+  sets `MAILBOX_FETCHED`. It shouldn't happen in play; `cache_misses`
+  counts it, and the tests require none while fetching ahead.
+
+Chunks could be packed between the two, at no cost to `tile_at`.
 
 ## Checking it
 
@@ -186,10 +200,17 @@ tiles, lit by the brighter of daylight (and torchlight) and the model's
 light, with the sprite. One script drops torches, and checks they are in
 view and light tiles beyond daylight.
 
-`test_host_keeps_a_copy_of_the_store` (in the same file) digs and drops a
-torch on both machines, then checks each slot in the host's banks against
-the parasite's, byte for byte; `tests/test_world.py` checks in py65 that
-the queued changes, applied as the host applies them, reproduce the store.
+`test_host_keeps_the_store` (in the same file) digs and drops a torch on
+both machines, checks that nothing was fetched at once, then drops the
+chunks round the miner from the cache, spoils them and digs on, so that the
+dig fetches at once; then checks each cached chunk against the host's banks,
+byte for byte. In py65, with `FakeHost` (`tests/conftest.py`) playing the
+host's part: `tests/test_store.py` changes three times as many chunks round
+the start as the cache holds, and plays along the surface and down a shaft,
+checking every frame that the tile cache holds the world's tiles, that
+every cached chunk is the host's, and at the end that every chunk came
+ahead of need; `tests/test_world.py` fills the store and reads chunks back
+through misses; `tests/test_daylight.py` checks the cache each frame too.
 
 `tests/test_pieces.py` checks slots in py65: given, shown, their
 visibility copied and freed by a sweep on the parasite, and composed on the
@@ -232,13 +253,17 @@ Packing the radial table costs about 140 cycles a frame (17,455 against
 frees 8.3K. Every read over those frames where the excess isn't FAR reads
 the model's value.
 
-Keeping the host's copy of the store costs the host about 100 cycles a
-frame on average while digging (Beebium, 300 frames on the B+), and about
-3,700 in a frame that carries a whole chunk (4,600 at most, with tiles):
-reading a byte over the Tube takes about 28 host cycles. The parasite pays
-about 150 cycles a frame on average and 2,600 in a frame that copies a
-chunk (py65, which doesn't count the Tube's interrupts for each byte the
-host reads).
+The store: taking the changes costs the host about 100 cycles a frame on
+average while digging (Beebium, 300 frames on the B+), and about 3,700 in a
+frame that carries a whole chunk (4,600 at most, with tiles); copying a
+chunk to the parasite about 4,800, at most one a frame. The parasite pays
+about 150 cycles a frame for the changes (2,600 in a frame that sends a
+chunk), and for the cache about 230 a frame on average and 1,750 in a frame
+that fetches (2,500 at most), with 121 changed chunks round the start
+(py65, which doesn't count the Tube's interrupts for each byte moved). Over
+test_daylight's 490 frames the mean frame is 17,836 (17,455 before the
+store moved), the worst unchanged. PWORLD's tables end at `&A07B`, leaving
+7.1K free below daylight's.
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the

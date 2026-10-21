@@ -215,6 +215,7 @@
     LDA para_changes
     STA (para_write),Y
     JSR store_emit
+    JSR cache_prefetch
     LDY #PACKET_STRIPS
     LDA para_strips
     STA (para_packet),Y
@@ -338,11 +339,11 @@
     INC para_write + 1
 .room
     LDA para_packet             \ Room: the packet's end less para_write
-    CLC
-    ADC #LO(PACKET_BYTES)
+    CLC                         \ (and the chunk to fetch)
+    ADC #LO(PACKET_BYTES - FETCH_BYTES)
     STA store_room
     LDA para_packet + 1
-    ADC #HI(PACKET_BYTES)
+    ADC #HI(PACKET_BYTES - FETCH_BYTES)
     STA store_room + 1
     LDA store_room
     SEC
@@ -375,7 +376,8 @@
     LDA #STORE_CHUNK_BYTES      \ A whole chunk
     JSR store_take
     BCS done
-    LDA store_queue_slot,X
+    LDY store_queue_slot,X      \ From its cache slot (not dropped while
+    LDA cache_of,Y              \ anything is queued for it)
     JSR point_at_slot
     LDA para_write              \ Its bytes after the slot and offset
     CLC
