@@ -549,7 +549,12 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
     LDA world_heights,X
     CMP zp_generate_y
     BNE underground
-    \ On the surface: slope down towards one lower neighbouring column.
+    \ On the surface: slope down towards one lower neighbouring column,
+    \ unless a tree grows here (a terrace: its root stands on flat ground).
+    LDA world_cover,X
+    AND #3
+    CMP #2                      \ The trunk's column
+    BEQ background
     LDA zp_generate_y
     CMP world_heights - 1,X     \ Carry clear if the left column is lower
     ROL zp_generate_open        \ Bit 1: left not lower

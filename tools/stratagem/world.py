@@ -8,7 +8,8 @@ exactly as the 6502 does it:
 - PERM, a permutation of 0-255 used as a hash.
 
 The shape smooths the terrain: a surface tile with a lower neighbouring
-column on one side (only) slopes down towards it, and an underground tile
+column on one side (only) slopes down towards it, unless a tree grows on it
+(a terrace, so that the root stands on flat ground), and an underground tile
 with open space above or below it and to one side (only) has that corner
 rounded off by a ramp.
 """
@@ -105,6 +106,8 @@ def _generate_shaped(x: int, y: int) -> Tile:
     if material not in DIGGABLE:
         return material, SHAPE_FULL
     if y == HEIGHTS[x]:
+        if x in TRUNKS:
+            return material, SHAPE_FULL     # a terrace for the tree
         left_lower = HEIGHTS[x - 1] > y
         right_lower = HEIGHTS[x + 1] > y
         if left_lower and not right_lower:

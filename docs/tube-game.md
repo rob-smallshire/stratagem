@@ -122,7 +122,9 @@ covering tree's trunk offset + 1, 0 for none, and its height). So
 subtraction from the trunk's surface height. A tree part's shape byte holds
 its strength (`support.py`: the span on the trunk's column, and beside it
 where the canopy rests on the ground, else one less). Trees are passable
-and clear to light.
+and clear to light. The grass under a trunk is always flat, never a slope:
+a tree on a hillside stands on a terrace a tile wide, rooted, not floating
+over the slope.
 
 A straight dig (ahead, up or down) breaks a tree's part whole, at one dig,
 for a piece of wood (`wood`, up to 99): in aiming, a part counts as whole,
