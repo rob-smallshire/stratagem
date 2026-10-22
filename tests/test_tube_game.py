@@ -91,12 +91,12 @@ def expected_screen(bbc, labels):
                 i = l * sprites.SPRITE_COLUMNS + c
                 image[address] = image[address] & frame[i] | frame[frame_bytes + i]
 
-    for i in range(peek[labels["host_items"]]):
+    draw(FRAMES[peek[labels["zp_player_frame"]]], sprites.SPRITE_BYTES, player.PLAYER_HEIGHT,
+         (hero.px >> 1) - camera_x, hero.py - camera_y * 8)
+    for i in range(peek[labels["host_items"]]):        # drawn after the sprite
         column, line = peek[labels["host_item_column"] + i], peek[labels["host_item_line"] + i]
         frame = ITEM_FRAMES[peek[labels["host_item_frame"] + i] - len(FRAMES)]
         draw(frame, sprites.ITEM_BYTES, items.ITEM_HEIGHT, column, line)
-    draw(FRAMES[peek[labels["zp_player_frame"]]], sprites.SPRITE_BYTES, player.PLAYER_HEIGHT,
-         (hero.px >> 1) - camera_x, hero.py - camera_y * 8)
     return image
 
 

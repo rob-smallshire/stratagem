@@ -165,9 +165,9 @@ view column, line and frame (the item frames follow the player's in
 `render.asm`). Only those clear of the outer `MAX_STEP_X` columns and
 wholly in view are sent, so that no new column or row is ever drawn where
 an item was drawn, which would be restored over it. The host draws them as
-the sprite is drawn, saving the screen under each, after the light's list
-and before the sprite, and restores them, last first, before the changed
-tiles. If nothing is redrawn under them (no list, no changed tiles: the
+the sprite is drawn, saving the screen under each, last of all (after the
+sprite and the new columns, so as not to delay the columns past the beam),
+and restores them, last first, before the sprite and the changed tiles. If nothing is redrawn under them (no list, no changed tiles: the
 count's `ITEMS_UNTOUCHED`), the items at the start of the list drawn where
 and as they will be drawn again are left as they are: on the surface,
 where daylight outshines the miner's light, logs lying still cost the host
@@ -354,9 +354,9 @@ host can miss a frame then.
 ## Not yet
 
 - Picking torches up; torches that flicker; more than 24.
-- Items redrawn are drawn after the light's list, so near the top of the
-  view the beam may pass one between its restoring and its drawing, and it
-  flickers, in frames that redraw under it. Items vanish a few columns
+- Items redrawn are drawn last, so near the top of the view the beam may
+  pass one between its restoring and its drawing, and it flickers, in
+  frames that redraw under it. A falling log is drawn over the miner. Items vanish a few columns
   inside the view's sides. Wood isn't shown or spent yet.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.

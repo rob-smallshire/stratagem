@@ -3,8 +3,8 @@
 \ the host reads it, writes the input it reads into the parasite's mailbox,
 \ and draws: a new row into the hidden row, then
 \ at vertical sync the flip, the new columns ahead of the beam, the changed
-\ tile, the light's draw list (read from the Tube as it draws), the items
-\ and the sprite.
+\ tile, the light's draw list (read from the Tube as it draws), the sprite
+\ and the items.
 
 CLEAR USER_START, USER_END
 ORG USER_START
@@ -196,19 +196,19 @@ INKEY_T = &100 - 36
 .*host_after_vsync
     \ After vertical sync, staying ahead of the beam: the new start address;
     \ the new columns' rows above the sprite, which the beam reaches first;
-    \ the changed tile and the light's list, with the sprite and the items
-    \ off; the items, then the sprite; then the rest of the new columns.
-    \ (Items are never drawn where new columns or rows go: items.asm.)
+    \ the changed tile and the light's list, with the items and the sprite
+    \ off; the sprite; the rest of the new columns; then the items, last so
+    \ as not to delay the columns (they are never drawn where new columns
+    \ or rows go: items.asm).
     JSR set_crtc_start
     JSR sprite_split_row
     LDA #0
     LDX zp_split_row
     JSR draw_column_rows
-    JSR restore_sprite
     JSR call_restore_items
+    JSR restore_sprite
     JSR host_redraw_changes
     JSR host_light
-    JSR call_render_items
     JSR draw_sprite
     LDA #VIEW_ROWS
     SEC
@@ -216,6 +216,7 @@ INKEY_T = &100 - 36
     TAX
     LDA zp_split_row
     JSR draw_column_rows
+    JSR call_render_items
     LDA #0
     STA zp_columns_width
     INC host_frame_count
