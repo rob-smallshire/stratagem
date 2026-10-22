@@ -162,6 +162,7 @@ ENDMACRO
 .host_item_drawn_frame  SKIP ITEM_MAX   \ ... these frames
 .host_items_kept    EQUB 0      \ The first of them left as they are
 .host_item_index    EQUB 0
+.host_sprite_address EQUW 0     \ The player's sprite's, kept while items are drawn
 
 \ ---------------------------------------------------------------------------
 \ Loader

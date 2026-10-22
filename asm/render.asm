@@ -448,9 +448,11 @@ ENDMACRO
 \ but leave as they are those at the start of the list drawn where and as
 \ they are to be drawn again, if nothing is redrawn under them this frame
 \ (host_items_untouched), so that items lying still cost nothing. Work out
-\ where each item the packet carried goes on the screen first.
+\ where each item the packet carried goes on the screen first. Preserves
+\ zp_sprite_address, the player's sprite's.
 .restore_items
 {
+    JSR keep_sprite_address
     LDX #0                      \ Where each goes
 .address
     CPX host_items
@@ -524,13 +526,14 @@ ENDMACRO
     JMP loop
 .done
     STX host_items_drawn
-    RTS
+    JMP put_sprite_address
 }
 
 \ Draw the items the packet carried, but those left as they are, saving
-\ the screen under each.
+\ the screen under each. Preserves zp_sprite_address.
 .render_items
 {
+    JSR keep_sprite_address
     LDX host_items_kept
 .loop
     CPX host_items
@@ -555,6 +558,24 @@ ENDMACRO
     BNE loop
 .done
     STX host_items_drawn
+    JMP put_sprite_address
+}
+
+\ Keep zp_sprite_address while items are drawn or restored, and put it back.
+.keep_sprite_address
+{
+    LDA zp_sprite_address
+    STA host_sprite_address
+    LDA zp_sprite_address + 1
+    STA host_sprite_address + 1
+    RTS
+}
+.put_sprite_address
+{
+    LDA host_sprite_address
+    STA zp_sprite_address
+    LDA host_sprite_address + 1
+    STA zp_sprite_address + 1
     RTS
 }
 
