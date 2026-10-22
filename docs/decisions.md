@@ -192,3 +192,11 @@ A running log of design decisions. Add to it whenever one is made.
   rather than wood going straight into the inventory, or logs as tiles
   (coarse, and costly in changed tiles). The sprites' machinery will serve
   later dropped items and creatures.
+- **Dropped items burst out and are gathered in, not piled up:** a broken
+  trunk's logs spray out ballistically, bounce, rest half a second, then
+  fly to the miner and are his (the loot burst and magnet of many games).
+  They show how many there are, then are gone in about a second, so few
+  items are out at once and the sprites' cost and flicker are brief. Logs
+  that piled up (sand-like) and were picked up with a key looked good, but
+  kept many sprites on screen, flickering as the miner walked, and cost
+  more to move.

@@ -89,10 +89,6 @@ INCLUDE "build/generated/smooth.asm"
 \ checked for support (support.asm).
 .call_set_tile
     JSR set_tile
-    PHA                         \ Items may move (items.asm)
-    LDA #&FF
-    STA items_moving
-    PLA
     JMP support_note
 
 \ The renderer's table of each cell's graphic in its material's page, which
@@ -234,48 +230,43 @@ GUARD &0800
 .support_wait       SKIP 1      \ Frames until the next piece may fall
 .support_drops      SKIP 1      \ The material that fell
 .support_tmp        SKIP 1
-.item_count         SKIP 1      \ Items lying in the world (items.asm)...
-.item_x_low         SKIP ITEM_MAX   \ ... in pixels
+.item_count         SKIP 1      \ Items thrown out (items.asm)...
+.item_x_low         SKIP ITEM_MAX   \ ... in sixteenths of a pixel
 .item_x_high        SKIP ITEM_MAX
 .item_y_low         SKIP ITEM_MAX   \ ... in sixteenths of a line
 .item_y_high        SKIP ITEM_MAX
-.item_top_low       SKIP ITEM_MAX   \ ... their tops, in lines (y >> 4)
-.item_top_high      SKIP ITEM_MAX
-.item_vy            SKIP ITEM_MAX   \ ... falling, sixteenths a frame
+.item_vx            SKIP ITEM_MAX   \ ... sixteenths a frame (gathering: speed)
+.item_vy            SKIP ITEM_MAX
+.item_state         SKIP ITEM_MAX   \ ... FLYING, RESTING or GATHERING
+.item_timer         SKIP ITEM_MAX   \ ... frames flown, or to rest
 .item_kind          SKIP ITEM_MAX
-.items_moving       SKIP 1      \ Non-zero when a tile has changed
-.item_i             SKIP 1      \ The item being moved...
-.item_tx            SKIP 1
-.item_left          SKIP 2      \ ... its corners' pixels
-.item_right         SKIP 2
-.item_top           SKIP 2      \ ... its top line
-.item_old_top       SKIP 2
-.item_old_below     SKIP 2      \ ... the line under it, and after falling
-.item_below         SKIP 2
-.item_new_x_low     SKIP 1      \ ... where it goes
-.item_new_x_high    SKIP 1
+.item_px_low        SKIP ITEM_MAX   \ ... their pixels (x >> 4)
+.item_px_high       SKIP ITEM_MAX
+.item_top_low       SKIP ITEM_MAX   \ ... and top lines (y >> 4)
+.item_top_high      SKIP ITEM_MAX
+.item_thrown        SKIP 1      \ Items thrown, picking each one's spray
+.item_i             SKIP 1      \ The item moving...
+.item_tx            SKIP 1      \ ... the tile thrown from
+.item_ty            SKIP 1
+.item_new_x         SKIP 2      \ ... where it goes, how fast
 .item_new_y         SKIP 2
+.item_new_vx        SKIP 1
 .item_new_vy        SKIP 1
-.item_px            SKIP 2      \ A corner's or an edge's pixel
-.item_line          SKIP 2      \ What holds a corner: the line...
-.item_what          SKIP 1      \ ... and what (ITEM_NONE, ITEM_TERRAIN, an item)
-.item_held_left     SKIP 2      \ ... the left corner's
-.item_what_left     SKIP 1
-.item_held_right    SKIP 2      \ ... the right's line
-.item_holds         SKIP 1      \ Which corners hold: 2 left, 1 right
-.item_overs         SKIP 1      \ Which corners an item is under: 2 left, 1 right
-.item_least_left    SKIP 2      \ The bounds within which an item's tiles
-.item_most_right    SKIP 2      \ are in the tile cache (item_bounds)
-.item_least_top     SKIP 2
-.item_most_below    SKIP 2
+.item_new_timer     SKIP 1
+.item_new_px        SKIP 2      \ ... its pixel and top line then
+.item_new_top       SKIP 2
+.item_carry         SKIP 1      \ ... bit 7: y + vy didn't pass the world's top
+.item_least_x       SKIP 2      \ The tile cache's bounds, in pixels and
+.item_most_x        SKIP 2      \ lines (item_bounds)
+.item_least_y       SKIP 2
+.item_most_y        SKIP 2
 .item_bounded       SKIP 1      \ Non-zero once they are worked out this frame
-.item_miner_column  SKIP 2      \ The miner's sprite last frame: byte column
-.item_miner_line    SKIP 2      \ ... and line
+.item_miner_x       SKIP 2      \ The miner last frame, in sixteenths
+.item_miner_y       SKIP 2
 .item_box_left      SKIP 2      \ The box it covers, this frame or last
 .item_box_right     SKIP 2
 .item_box_top       SKIP 2
 .item_box_bottom    SKIP 2
-.item_step          SKIP 1      \ A slide: SLIDE or -SLIDE
 .item_tmp           SKIP 2
 .item_bit           SKIP 1
 .item_camera_line   SKIP 2      \ items_emit: the view's top line

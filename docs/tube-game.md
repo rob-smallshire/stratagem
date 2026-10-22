@@ -26,7 +26,6 @@ The keys are those of `implementation-record.md`, and T:
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
 | SPACE | Place a soil block |
 | T | Drop a torch where the miner stands (in air: up to 24) |
-| P | Hold to pick up the items the miner touches (the logs a felled tree drops, which otherwise pile up where they fall) |
 
 Dig down a few tiles to leave the daylight: the miner's light shows below,
 and daylight follows down the shaft.
@@ -152,21 +151,22 @@ did would have to leave the torches' list).
 ### Items
 
 `items.py`, done exactly by `asm/items.asm`. The root and each part of a
-trunk drop a log as they break, dug or fallen (`items.DROPS`; the canopy
-drops nothing): an item, 6 pixels by 5 lines, at the bottom of its tile.
-Items fall, under gravity and at most a quarter-cell a frame, until
-something holds a bottom corner: a solid quarter-cell, or another item's
-top. They pile up as sand does: an item lies still only if both corners
-are held at the same height, and not both by one item; otherwise it slides
-2 pixels towards the side not held and falls again, unless the slide runs
-into ground or another item. So logs dropped on one spot pile into a cone
-(three, then two on them, then one), and slide down slopes. Only items over
-the tile cache move. While P is held the miner picks up each one he
-touches, into `wood`; otherwise he passes them by. At
-most 8 lie in the world (more go straight into `wood`). An item whose fall
-left it as it was is marked still (`ITEM_STILL`) and not moved again until
-a tile changes, an item is picked up, or an item it rested on or was
-blocked by moves, since it would stay where it is.
+trunk throw out a log as they break, dug or fallen (`items.DROPS`; the
+canopy drops nothing): an item, 6 pixels by 5 lines, sprayed from its tile
+upwards and to one side (`SPRAY_VX`, `SPRAY_VY`, by a count of items
+thrown). A log flies under gravity, at most a quarter-cell a frame each
+way; it bounces back off a solid quarter-cell beside it at half speed,
+and off one under it at half speed (losing half its speed across), or
+comes to rest if landing slower than `BOUNCE_MIN`; one still flying after
+`FLY_FRAMES` (40) is gathered. It rests for `REST_FRAMES` (25), then is
+gathered: it flies to the miner through anything, faster each frame (to
+`GATHER_MAX`, 4 pixels and lines), and is his, into `wood`, when it touches
+him. Items pass through each other. So a felled tree's logs burst out, show
+how many there are, and are gone in about a second; at most 8 are out at
+once (more go straight into `wood`). One flying where the tile it would
+look at isn't in the tile cache is gathered at once. This is the loot
+burst and magnet of many games (Exile's objects have velocities and
+bounce too, but by angle and magnitude: `apply_tile_collision_to_position_and_velocity`).
 
 The packet carries the items in view, after the chunk to fetch: each one's
 view column, line and frame (the item frames follow the player's in
@@ -349,15 +349,12 @@ paced (now 35); checking cost the parasite about 1,400 cycles a frame
 while it fell (3,100 at most), and the busiest frame of the fall,
 relighting what fell, about 52,500 (py65).
 
-Items (py65, a felled tree's 5 logs falling, piling up and picked up, 123
-frames): moving them costs the parasite about 2,000 cycles a frame (8,000
-at most, while 4 fall at once: each falling log about 1,500), and sending
-them about 590; still logs cost nothing to move, and with no items, both
-together about 130. Each item's top line is kept (`item_top_low/high`),
-both corners are found in one pass over the items, and the tile cache's
-bounds are worked out once a frame, in pixels and lines. Over those frames
-the mean frame is 22,300 (21,300 before piling), the worst 86,900 (84,900),
-and 9 frames take over 60,000 (8). On the host (Beebium, the B+), 3 logs lying still with
+Items (py65, a felled tree's 5 logs thrown out and gathered in, 123 frames,
+the miner standing by): while any are out (59 frames), moving them costs
+the parasite about 4,000 cycles a frame (5,800 at most: a flying log about
+1,000, a gathering one about 500), and sending them about 1,400; with none
+out, both together about 120. Over those frames the mean frame is 9,500,
+the worst 86,100 (the felling's first frame). On the host (Beebium, the B+), 3 logs lying still with
 nothing redrawn under them cost about 580 cycles a frame; when they must
 be redrawn, about 1,800 each (restoring 600, drawing 1,200), so 8 would
 cost about 14,000.
@@ -371,8 +368,9 @@ host can miss a frame then.
 - Picking torches up; torches that flicker; more than 24.
 - Items redrawn are drawn last, so near the top of the view the beam may
   pass one between its restoring and its drawing, and it flickers, in
-  frames that redraw under it. A falling log is drawn over the miner. Items vanish a few columns
-  inside the view's sides. Wood isn't shown or spent yet.
+  frames that redraw under it; they are out for only a second or so. Items
+  are drawn over the miner, and vanish a few columns inside the view's
+  sides. Wood isn't shown or spent yet.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.

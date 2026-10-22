@@ -24,9 +24,9 @@ SCRIPTS = {
     "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
     "drop-torches": DIG_DEEP + [(60, ["X", "L"]), (3, ["T"]), (20, []), (80, ["X", "L"]), (3, ["T"]), (20, []),
                                 (60, ["Z"]), (30, ["M", "L"]), (20, [])],
-    # The tree beside the start (column 127): its root dug, it falls, its
-    # logs pile up about the miner, and he walks over them holding P.
-    "fell-a-tree": [(4, ["Z", "L"]), (60, []), (10, ["X", "P"]), (30, ["Z", "P"]), (10, [])],
+    # The tree beside the start (column 127): its root dug, it falls, and
+    # the logs it throws out are gathered in to the miner.
+    "fell-a-tree": [(4, ["Z", "L"]), (100, [])],
 }
 
 
@@ -129,7 +129,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
         assert items_shown >= 2, "the felled tree's logs weren't drawn"
         parasite = bbc.connect_coprocessor().memory.address
         plabels = game_build.labels["PARASITE"]
-        assert parasite.peek[plabels["wood"]] >= 2, "the logs weren't picked up"
+        assert parasite.peek[plabels["wood"]] >= 2, "the logs weren't gathered in"
     if any("T" in keys for _, keys in script):
         # Torches were dropped, and they light the tiles around them.
         camera_x, camera_y = word(peek, labels["zp_camera_x"]), word(peek, labels["zp_camera_y"])

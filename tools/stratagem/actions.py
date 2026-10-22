@@ -27,7 +27,7 @@ in one dig and stone in four, and you see it go. When nothing is left the
 tile is empty (sky or cave, by its background), and a block goes into the
 inventory (up to INVENTORY_MAX). A tree's part breaks whole, at one dig,
 leaving it empty, and a trunk's part drops a piece of wood (items.py) for
-the miner to pick up; what it held falls (support.py). Only straight digs break parts: digging diagonally
+the miner to gather in; what it held falls (support.py). Only straight digs break parts: digging diagonally
 passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
 falls. Each dig starts a cooldown. Placing puts
@@ -62,7 +62,7 @@ NONE, DIG, PLACE = 0, 1, 2
 class Hands:
     inventory: int = 0
     cooldown: int = 0
-    wood: int = 0           # picked up (items.py)
+    wood: int = 0           # gathered in (items.py)
 
 
 def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:

@@ -1,31 +1,34 @@
-"""Items lying in the world: what a felled tree drops, a model of
+"""Items thrown out into the world: what a felled tree drops, a model of
 asm/items.asm, exactly as the 6502 does it.
 
-Each part of a tree's trunk that breaks, dug or fallen (actions.CHOPPABLE
-less the canopy), drops a piece of wood: an item, ITEM_WIDTH x ITEM_HEIGHT
-(pixels x lines), at the bottom of the tile it broke from.
+Each part of a tree's trunk that breaks, dug or fallen (DROPS), throws out
+a piece of wood: an item, ITEM_WIDTH x ITEM_HEIGHT (pixels x lines),
+sprayed from the tile it broke from, upwards and to one side by the next
+of SPRAY_VX and SPRAY_VY (a count of items thrown picks them). An item
+lives through three states, so that the miner sees how many there are,
+and then they are gone:
 
-Items fall, under GRAVITY, at most ITEM_MAX_FALL a frame (a quarter-cell,
-so nothing is passed through), until something holds one of an item's
-bottom corners: a solid quarter-cell under it, or the top of another item.
-Items pile up, as sand does: an item lies still only if both its corners
-are held, at the same height, and not both by the same item (the ground
-holds both, or two items between them). Otherwise it comes to that height
-and slides SLIDE pixels towards the side not held (off a single item it
-lies squarely on, the way it overhangs it, or by its place in the list),
-and falls again: so logs dropped on one spot pile up into a cone, and slide
-down slopes. A slide into solid ground or another item is not made; the
-item lies still.
-Only items over the tile cache move (the 6502 looks at the tile cache);
-others wait. While P is held (INPUT_PICK), the miner picks up each item
-he touches (their boxes overlap): it goes into the inventory; otherwise he
-passes them by, so that they pile up where they fall. At most ITEM_MAX lie in the world:
-more go straight into the inventory.
+- FLYING: under GRAVITY, at most ITEM_MAX_FALL a frame (a quarter-cell, so
+  nothing is passed through), and at most a quarter-cell across. Moving
+  across into a solid quarter-cell (at the item's middle line), it bounces
+  back at half speed; moving down onto one (under its bottom's middle), it
+  lands on it, and bounces up at half speed, losing half its speed across,
+  or, if slower than BOUNCE_MIN, comes to rest; moving up into one (at its
+  top's middle), it stops rising. Items pass through each other. One still
+  flying after FLY_FRAMES frames (bouncing down a slope) is gathered.
+- RESTING: it lies still for REST_FRAMES frames.
+- GATHERING: it flies to the miner, through anything, faster each frame
+  (to GATHER_MAX pixels and lines a frame, on each axis), towards the
+  middle of his box; when it touches him, he has it: it goes into the
+  inventory.
 
-Each frame, after the miner moves and acts, every item falls, in the
-list's order (each against the others as they are by then), and then is
-picked up if touched while picking; an item picked up is replaced in the list by the
-last, which is then dealt with in its turn.
+The 6502 looks at the tile cache: an item flying where the tile it would
+look at isn't in the tile cache is gathered at once. At most ITEM_MAX are
+out at once: more go straight into the inventory.
+
+Each frame, after the miner moves and acts, every item moves, in the
+list's order; an item gathered in is replaced in the list by the last,
+which then moves in its turn.
 
 The host draws the items in view as sprites: each at a view column and
 line, if it lies wholly within the view, clear of the columns the camera
@@ -46,40 +49,55 @@ from stratagem.tiles import CANOPY_LEFT, QUARTER_LINES, QUARTER_PIXELS, QUARTERS
 ITEM_MAX = 8
 ITEM_WIDTH = 6              # pixels: three bytes of MODE 2
 ITEM_HEIGHT = 5             # lines
+ITEM_OFFSET_X = 1           # from its tile's left: in its middle
 ITEM_MAX_FALL = QUARTER_LINES * 16      # sixteenths of a line a frame
-ITEM_OFFSET_X = 2           # from its tile's left, so that it is byte aligned
-SLIDE = 2                   # pixels a frame, sideways: a byte of MODE 2
-TERRAIN = -1                # what holds a corner: the ground, or an item's index
+SPRAY_VX = (-12, 8, -4, 14, -8, 4, 12, -14)     # sixteenths of a pixel a frame
+SPRAY_VY = (-40, -52, -34, -46)                 # sixteenths of a line a frame
+assert all(abs(vx) <= QUARTER_PIXELS * 16 for vx in SPRAY_VX)
+BOUNCE_MIN = 32             # a landing slower than this comes to rest
+FLY_FRAMES = 40             # flying, at most
+REST_FRAMES = 25            # half a second
+GATHER_MAX = 4              # pixels and lines a frame
+FLYING, RESTING, GATHERING = 0, 1, 2
 WOOD = 0                    # the kinds of item
 DROPS = {ROOT: WOOD, TRUNK: WOOD, TRUNK_KNOT: WOOD}     # what each material drops
 assert CANOPY_LEFT not in DROPS
 VIEW_LINES = VIEW_ROWS * 8
 
 TileAt = Callable[[int, int], tuple[int, int]]
+InCache = Callable[[int, int], bool]
 
 
 @dataclass(frozen=True)
 class Item:
-    x: int                  # pixels
+    x: int                  # sixteenths of a pixel
     y: int                  # sixteenths of a line
-    vy: int = 0             # sixteenths of a line a frame, downwards
+    vx: int = 0             # sixteenths a frame; gathering, its speed in pixels
+    vy: int = 0
+    state: int = FLYING
+    timer: int = 0          # flying: frames flown; resting: frames left
     kind: int = WOOD
+
+    @property
+    def px(self) -> int:
+        return self.x >> 4
 
     @property
     def py(self) -> int:
         return self.y >> 4
 
 
-def dropped(tx: int, ty: int, kind: int = WOOD) -> Item:
-    """The item dropped from tile (tx, ty): at the bottom of the tile."""
-    return Item(tx * TILE_WIDTH + ITEM_OFFSET_X, ((ty + 1) * TILE_HEIGHT - ITEM_HEIGHT) << 4, 0, kind)
+def thrown(tx: int, ty: int, count: int, kind: int = WOOD) -> Item:
+    """The item thrown from tile (tx, ty), the count'th thrown (mod 256)."""
+    return Item((tx * TILE_WIDTH + ITEM_OFFSET_X) << 4, ((ty + 1) * TILE_HEIGHT - ITEM_HEIGHT) << 4,
+                SPRAY_VX[count % len(SPRAY_VX)], SPRAY_VY[count % len(SPRAY_VY)], FLYING, 0, kind)
 
 
-def drop(items: list[Item], tx: int, ty: int, kind: int = WOOD) -> tuple[list[Item], int]:
-    """Drop an item from tile (tx, ty); returns the items and how many went
+def drop(items: list[Item], tx: int, ty: int, count: int, kind: int = WOOD) -> tuple[list[Item], int]:
+    """Throw an item from tile (tx, ty); returns the items and how many went
     straight into the inventory instead (the list being full)."""
     if len(items) < ITEM_MAX:
-        return items + [dropped(tx, ty, kind)], 0
+        return items + [thrown(tx, ty, count, kind)], 0
     return items, 1
 
 
@@ -89,95 +107,94 @@ def solid_at(tile_at: TileAt, px: int, line: int) -> bool:
     return (row, column) in solid_quarter_cells(*tile_at(px // TILE_WIDTH, line // TILE_HEIGHT))
 
 
-def _held(items: list[Item], i: int, px: int, old_below: int, below: int,
-          tile_at: TileAt) -> tuple[int, int] | None:
-    """What holds item i's corner over pixel px, moving its bottom from line
-    old_below to line below: (the line its bottom comes to, TERRAIN or the
-    holding item's index), the highest; or None. The ground wins a tie, and
-    of items the first."""
-    held = None
-    if solid_at(tile_at, px, below):
-        held = below & -QUARTER_LINES, TERRAIN
-    for j, other in enumerate(items):
-        if j != i and other.x <= px < other.x + ITEM_WIDTH and old_below <= other.py <= below:
-            if held is None or other.py < held[0]:
-                held = other.py, j
-    return held
+def _gathered(item: Item) -> Item:
+    return replace(item, vx=0, vy=0, state=GATHERING, timer=0)
 
 
-def _blocked(items: list[Item], i: int, tile_at: TileAt, px: int, top: int) -> bool:
-    """Whether item i, with its top at line `top`, would overlap solid ground
-    or another item in pixel column px."""
-    if any(solid_at(tile_at, px, line) for line in (top, top + QUARTER_LINES, top + ITEM_HEIGHT - 1)):
-        return True
-    return any(j != i and other.x <= px < other.x + ITEM_WIDTH and top - ITEM_HEIGHT < other.py < top + ITEM_HEIGHT
-               for j, other in enumerate(items))
-
-
-def fall(items: list[Item], i: int, tile_at: TileAt, in_cache: Callable[[int, int], bool]) -> Item:
-    """Item i's frame: it falls, comes to rest or slides; or it waits, if
-    the tiles around it aren't all in the tile cache."""
-    item = items[i]
+def fly(item: Item, tile_at: TileAt, in_cache: InCache) -> Item:
+    """A flying item's frame."""
+    if item.timer + 1 >= FLY_FRAMES:
+        return _gathered(item)
+    x, vx = item.x + item.vx, item.vx
+    middle_line = item.py + ITEM_HEIGHT // 2
+    if vx:
+        edge = (x >> 4) + (ITEM_WIDTH - 1 if vx > 0 else 0)
+        if not in_cache(edge // TILE_WIDTH, middle_line // TILE_HEIGHT):
+            return _gathered(item)
+        if solid_at(tile_at, edge, middle_line):
+            x, vx = item.x, -(vx >> 1)
     vy = min(item.vy + GRAVITY, ITEM_MAX_FALL)
     y = item.y + vy
-    old_below, below = item.py + ITEM_HEIGHT, (y >> 4) + ITEM_HEIGHT
-    left, right = item.x, item.x + ITEM_WIDTH - 1
-    if not (in_cache((left - SLIDE) // TILE_WIDTH, (item.py - QUARTER_LINES) // TILE_HEIGHT)
-            and in_cache((right + SLIDE) // TILE_WIDTH, below // TILE_HEIGHT)):
-        return item
-    held_left = _held(items, i, left, old_below, below, tile_at)
-    held_right = _held(items, i, right, old_below, below, tile_at)
-    if held_left is None and held_right is None:
-        return replace(item, y=y, vy=vy)
-    line = min(held[0] for held in (held_left, held_right) if held is not None)
-    top = line - ITEM_HEIGHT
-    lying = replace(item, y=top << 4, vy=0)
-    left_holds = held_left is not None and held_left[0] == line
-    right_holds = held_right is not None and held_right[0] == line
-    if left_holds and right_holds:
-        under = held_left[1]
-        if under == TERRAIN or held_right[1] != under:
-            return lying                                    # held at both corners
-        # Squarely on a single item: off it, the way it overhangs it.
-        other = items[under].x
-        step = SLIDE if item.x > other or (item.x == other and i & 1) else -SLIDE
-    else:
-        step = SLIDE if left_holds else -SLIDE
-    edge = right + step if step > 0 else left + step
-    if _blocked(items, i, tile_at, edge, top):
-        return lying
-    return replace(lying, x=item.x + step)
+    middle = (x >> 4) + ITEM_WIDTH // 2
+    if vy > 0:
+        below = (y >> 4) + ITEM_HEIGHT
+        if not in_cache(middle // TILE_WIDTH, below // TILE_HEIGHT):
+            return _gathered(item)
+        if solid_at(tile_at, middle, below):
+            y = ((below & -QUARTER_LINES) - ITEM_HEIGHT) << 4
+            if vy < BOUNCE_MIN:
+                return Item(x, y, 0, 0, RESTING, REST_FRAMES, item.kind)
+            vy, vx = -(vy >> 1), vx >> 1
+    elif vy < 0:
+        top = y >> 4
+        if top < 0 or not in_cache(middle // TILE_WIDTH, top // TILE_HEIGHT):
+            return _gathered(item)
+        if solid_at(tile_at, middle, top):
+            y, vy = item.y, 0
+    return Item(x, y, vx, vy, FLYING, item.timer + 1, item.kind)
+
+
+def _towards(position: int, target: int, speed: int) -> int:
+    if position < target:
+        return min(position + speed, target)
+    return max(position - speed, target)
+
+
+def gather(item: Item, player: Player) -> Item:
+    """A gathering item's frame: towards the middle of the miner's box."""
+    speed = min(item.vx + 1, GATHER_MAX)
+    px = _towards(item.px, player.px + (PLAYER_WIDTH - ITEM_WIDTH) // 2, speed)
+    py = _towards(item.py, player.py + (PLAYER_HEIGHT - ITEM_HEIGHT) // 2, speed)
+    return replace(item, x=px << 4, y=py << 4, vx=speed)
 
 
 def touches(item: Item, player: Player) -> bool:
-    return (item.x < player.px + PLAYER_WIDTH and player.px < item.x + ITEM_WIDTH
+    return (item.px < player.px + PLAYER_WIDTH and player.px < item.px + ITEM_WIDTH
             and item.py < player.py + PLAYER_HEIGHT and player.py < item.py + ITEM_HEIGHT)
 
 
-def step(items: list[Item], player: Player, tile_at: TileAt,
-         in_cache: Callable[[int, int], bool], picking: bool) -> tuple[list[Item], int]:
-    """One frame: every item falls, and is picked up if the player touches
-    it while picking. Returns the items left and how many were picked up."""
+def move(item: Item, player: Player, tile_at: TileAt, in_cache: InCache) -> Item:
+    """An item's frame, by its state."""
+    if item.state == FLYING:
+        return fly(item, tile_at, in_cache)
+    if item.state == RESTING:
+        return replace(item, timer=item.timer - 1) if item.timer > 1 else _gathered(item)
+    return gather(item, player)
+
+
+def step(items: list[Item], player: Player, tile_at: TileAt, in_cache: InCache) -> tuple[list[Item], int]:
+    """One frame: every item moves; those gathering that touch the miner are
+    his. Returns the items left and how many he has gathered in."""
     items = list(items)
-    picked = 0
+    gathered = 0
     i = 0
     while i < len(items):
-        item = fall(items, i, tile_at, in_cache)
-        if picking and touches(item, player):
-            picked += 1
+        item = move(items[i], player, tile_at, in_cache)
+        if item.state == GATHERING and touches(item, player):
+            gathered += 1
             items[i] = items[-1]
             items.pop()
             continue
         items[i] = item
         i += 1
-    return items, picked
+    return items, gathered
 
 
 def shown(items: list[Item], camera_x: int, camera_y: int) -> list[tuple[int, int, int]]:
     """The items the host draws, in order: (view column, view line, kind)."""
     result = []
     for item in items:
-        column = (item.x >> 1) - camera_x
+        column = (item.px >> 1) - camera_x
         line = item.py - camera_y * 8
         if MAX_STEP_X <= column <= VIEW_COLUMNS - MAX_STEP_X - ITEM_WIDTH // 2 and 0 <= line <= VIEW_LINES - ITEM_HEIGHT:
             result.append((column, line, item.kind))
