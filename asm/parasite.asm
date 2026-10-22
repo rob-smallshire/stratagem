@@ -89,9 +89,9 @@ INCLUDE "build/generated/smooth.asm"
 \ checked for support (support.asm).
 .call_set_tile
     JSR set_tile
-    PHA                         \ Items at rest may move (items.asm)
+    PHA                         \ Items may move (items.asm)
     LDA #&FF
-    STA items_woken
+    STA items_moving
     PLA
     JMP support_note
 
@@ -241,15 +241,31 @@ GUARD &0800
 .item_y_high        SKIP ITEM_MAX
 .item_vy            SKIP ITEM_MAX   \ ... falling, sixteenths a frame
 .item_kind          SKIP ITEM_MAX
-.item_i             SKIP 1      \ The item being moved
+.items_moving       SKIP 1      \ Non-zero when a tile has changed
+.item_i             SKIP 1      \ The item being moved...
 .item_tx            SKIP 1
-.item_new_vy        SKIP 1
+.item_left          SKIP 2      \ ... its corners' pixels
+.item_right         SKIP 2
+.item_top           SKIP 2      \ ... its top line
+.item_old_top       SKIP 2
+.item_old_below     SKIP 2      \ ... the line under it, and after falling
+.item_below         SKIP 2
+.item_new_x_low     SKIP 1      \ ... where it goes
+.item_new_x_high    SKIP 1
 .item_new_y         SKIP 2
-.item_below         SKIP 2      \ ... the line below it
-.item_middle        SKIP 2      \ ... its middle pixel
+.item_new_vy        SKIP 1
+.item_px            SKIP 2      \ A corner's or an edge's pixel
+.item_line          SKIP 2      \ What holds a corner: the line...
+.item_what          SKIP 1      \ ... and what (ITEM_NONE, ITEM_TERRAIN, an item)
+.item_held_left     SKIP 2      \ ... the left corner's
+.item_what_left     SKIP 1
+.item_held_right    SKIP 2      \ ... the right's line
+.item_holds         SKIP 1      \ Which corners hold: 2 left, 1 right
+.item_step          SKIP 1      \ A slide: SLIDE or -SLIDE
+.item_tmp           SKIP 2
+.item_bit           SKIP 1
 .item_camera_line   SKIP 2      \ items_emit: the view's top line
 .item_sent          SKIP 1
-.items_woken        SKIP 1      \ Non-zero when a tile has changed
 
 \ And tables the light sets up afresh each pass, above daylight's window
 ORG plight_end

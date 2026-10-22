@@ -1,21 +1,30 @@
 \ Items lying in the world (tools/stratagem/items.py, which this does
 \ exactly): what a felled tree drops. A trunk's part that breaks, dug or
-\ fallen, drops a piece of wood at the bottom of its tile; items fall until
-\ the quarter-cell under the middle of their bottom is solid, at most a
-\ quarter-cell a frame, over the tile cache (elsewhere they wait); and the
-\ miner picks up an item by touching it. At most ITEM_MAX lie in the world:
-\ more go straight into the inventory. The packet carries those in view,
-\ for the host to draw as sprites (items_emit).
+\ fallen, drops a piece of wood at the bottom of its tile. Items fall, at
+\ most a quarter-cell a frame, until something holds a bottom corner: a
+\ solid quarter-cell, or another item's top. An item lies still only if
+\ both corners are held at the same height, and not both by one item;
+\ otherwise it slides SLIDE pixels to the side not held and falls again,
+\ unless the slide is blocked: so items pile up, as sand does. Only items
+\ over the tile cache move (elsewhere they wait). The miner picks up an
+\ item by touching it. At most ITEM_MAX lie in the world: more go straight
+\ into the inventory. The packet carries those in view, for the host to
+\ draw as sprites (items_emit).
 \
-\ An item lying on the ground is marked at rest (ITEM_RESTING in its vy) and
-\ not moved, as it would land where it is, until a tile changes
-\ (call_set_tile sets items_woken).
+\ An item that stayed as it was in its frame's fall would again in the
+\ next, unless a tile changes, an item is picked up, or an item it rested on
+\ or was blocked by moves: so it is marked still (ITEM_STILL in its vy) and
+\ not moved, until one of those wakes it (a changed tile sets
+\ items_moving, which wakes them all; a move wakes those touching the
+\ moving item where it was).
 
-ITEM_RESTING = &80
-ASSERT ITEM_MAX_FALL < ITEM_RESTING
+ITEM_STILL = &80
+ASSERT ITEM_MAX_FALL < ITEM_STILL
 
 ASSERT ITEM_MAX_FALL <= 4 * 16  \ A quarter-cell a frame, at most
 ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
+ITEM_NONE = &FF                 \ What holds a corner: nothing,
+ITEM_TERRAIN = &80              \ the ground, or an item's index
 
 \ Material A broke at tile (X, Y): drop what it drops, if anything.
 .item_drop
@@ -66,21 +75,15 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
     RTS
 }
 
-\ Each item falls, and is picked up if the miner touches it.
+\ Each item falls, unless it is still, and is picked up if the miner
+\ touches it.
 .items_step
 {
-    LDA items_woken             \ A tile changed: nothing is at rest
+    LDA items_moving            \ A tile changed: none is still
     BEQ awake
     LDA #0
-    STA items_woken
-    LDX item_count
-    BEQ awake
-.wake
-    LDA item_vy - 1,X
-    AND #&FF - ITEM_RESTING
-    STA item_vy - 1,X
-    DEX
-    BNE wake
+    STA items_moving
+    JSR items_wake
 .awake
     JSR player_pixels           \ The miner's box: zp_box_x, zp_box_y
     LDX #0
@@ -89,13 +92,15 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
     BEQ done
     STX item_i
     LDA item_vy,X
-    BMI rests
+    BMI fallen                  \ Still
     JSR item_fall
     LDX item_i
-.rests
+.fallen
     JSR item_touches
     BCS next
-    JSR item_gained             \ Picked up: the last takes its place
+    JSR item_gained             \ Picked up: the last takes its place, and
+    JSR items_wake              \ none is still
+    LDX item_i
     DEC item_count
     LDY item_count
     LDX item_i
@@ -119,9 +124,51 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
     RTS
 }
 
-\ Item X falls a frame, if the tile under its middle is in the tile cache.
+\ No item is still. Preserves X.
+.items_wake
+{
+    LDY item_count
+    BEQ done
+.loop
+    LDA item_vy - 1,Y
+    AND #&FF - ITEM_STILL
+    STA item_vy - 1,Y
+    DEY
+    BNE loop
+.done
+    RTS
+}
+
+\ Item item_i's frame (items.fall): it falls, comes to rest or slides; or
+\ it waits, if the tiles around it aren't all in the tile cache. Marks it
+\ still if it stays as it was (and didn't wait); if it moves, wakes the
+\ items touching it where it was.
 .item_fall
 {
+    LDX item_i
+    LDA item_x_low,X            \ Its corners' pixels
+    STA item_left
+    CLC
+    ADC #ITEM_WIDTH - 1
+    STA item_right
+    LDA item_x_high,X
+    STA item_left + 1
+    ADC #0
+    STA item_right + 1
+    LDA item_y_high,X           \ Its top, and the line under it
+    STA zp_temp + 1
+    LDA item_y_low,X
+    JSR lines_of
+    STA item_top
+    STA item_old_top
+    CLC
+    ADC #ITEM_HEIGHT
+    STA item_old_below
+    LDA zp_temp + 1
+    STA item_top + 1
+    STA item_old_top + 1
+    ADC #0
+    STA item_old_below + 1
     LDA item_vy,X               \ vy = min(vy + GRAVITY, ITEM_MAX_FALL)
     CLC
     ADC #GRAVITY
@@ -130,67 +177,514 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
     LDA #ITEM_MAX_FALL
 .vy_set
     STA item_new_vy
-    CLC                         \ y + vy
+    CLC                         \ y + vy, and the line under it then
     ADC item_y_low,X
     STA item_new_y
     LDA item_y_high,X
     ADC #0
     STA item_new_y + 1
-    STA item_below + 1          \ The line below it: (y >> 4) + ITEM_HEIGHT
+    STA zp_temp + 1
     LDA item_new_y
-    LSR item_below + 1
-    ROR A
-    LSR item_below + 1
-    ROR A
-    LSR item_below + 1
-    ROR A
-    LSR item_below + 1
-    ROR A
+    JSR lines_of
     CLC
     ADC #ITEM_HEIGHT
     STA item_below
-    BCC below_set
-    INC item_below + 1
-.below_set
-    LDA item_x_low,X            \ Its middle: x + ITEM_WIDTH / 2
-    CLC
-    ADC #ITEM_WIDTH DIV 2
-    STA item_middle
-    LDA item_x_high,X
+    LDA zp_temp + 1
     ADC #0
-    STA item_middle + 1
-    STA zp_temp                 \ The tile there
-    LDA item_middle
-    LSR zp_temp
-    ROR A
-    LSR zp_temp
-    ROR A
-    LSR zp_temp
-    ROR A
-    STA zp_fill_x
-    ASSERT TILE_WIDTH = 8 AND TILE_HEIGHT = 16
-    LDA item_below + 1
+    STA item_below + 1
+    \ Wait unless the tiles from (left - SLIDE, top - a quarter-cell) to
+    \ (right + SLIDE, below) are in the tile cache.
+    LDA item_left
+    SEC
+    SBC #SLIDE
     STA zp_temp
+    LDA item_left + 1
+    SBC #0
+    JSR tile_of_pixel
+    STA zp_fill_x
+    LDA item_top
+    SEC
+    SBC #4
+    STA zp_temp
+    LDA item_top + 1
+    SBC #0
+    BMI waits
+    JSR tile_of_line
+    STA zp_fill_y
+    JSR in_tile_cache
+    BCC waits
+    LDA item_right
+    CLC
+    ADC #SLIDE
+    STA zp_temp
+    LDA item_right + 1
+    ADC #0
+    JSR tile_of_pixel
+    STA zp_fill_x
     LDA item_below
-    LSR zp_temp
-    ROR A
-    LSR zp_temp
-    ROR A
-    LSR zp_temp
-    ROR A
-    LSR zp_temp
-    ROR A
+    STA zp_temp
+    LDA item_below + 1
+    JSR tile_of_line
     STA zp_fill_y
     JSR in_tile_cache
     BCS cached
-    RTS                         \ It waits
+.waits
+    RTS
 .cached
+    LDA item_left               \ What holds each corner
+    STA item_px
+    LDA item_left + 1
+    STA item_px + 1
+    JSR item_held
+    LDA item_line
+    STA item_held_left
+    LDA item_line + 1
+    STA item_held_left + 1
+    LDA item_what
+    STA item_what_left
+    LDA item_right
+    STA item_px
+    LDA item_right + 1
+    STA item_px + 1
+    JSR item_held
+    LDA item_line
+    STA item_held_right
+    LDA item_line + 1
+    STA item_held_right + 1
+    LDX item_i
+    LDA item_x_low,X            \ Where it goes: x as it is, unless it slides
+    STA item_new_x_low
+    LDA item_x_high,X
+    STA item_new_x_high
+    LDA item_what_left
+    AND item_what
+    CMP #ITEM_NONE
+    BNE held
+    JMP set                     \ Neither held: it falls
+.held
+    LDA item_what_left          \ The higher held: line (left's, unless
+    CMP #ITEM_NONE              \ none or the right's is higher)
+    BEQ right_line
+    LDA item_what
+    CMP #ITEM_NONE
+    BEQ left_line
+    LDA item_line
+    CMP item_held_left
+    LDA item_line + 1
+    SBC item_held_left + 1
+    BCC right_line
+.left_line
+    LDA item_held_left
+    STA item_line
+    LDA item_held_left + 1
+    STA item_line + 1
+.right_line
+    LDA item_line               \ Lying there: top = line - ITEM_HEIGHT
+    SEC
+    SBC #ITEM_HEIGHT
+    STA item_top
+    LDA item_line + 1
+    SBC #0
+    STA item_top + 1
+    STA zp_temp                 \ y = top << 4, vy = 0
+    LDA item_top
+    ASL A
+    ROL zp_temp
+    ASL A
+    ROL zp_temp
+    ASL A
+    ROL zp_temp
+    ASL A
+    ROL zp_temp
+    STA item_new_y
+    LDA zp_temp
+    STA item_new_y + 1
+    LDA #0
+    STA item_new_vy
+    LDA #0                      \ Which corners are held there: bit 1 the
+    STA item_holds              \ left, bit 0 the right
+    LDA item_what_left
+    CMP #ITEM_NONE
+    BEQ left_free
+    LDA item_held_left
+    CMP item_line
+    BNE left_free
+    LDA item_held_left + 1
+    CMP item_line + 1
+    BNE left_free
+    LDA #2
+    STA item_holds
+.left_free
+    LDA item_what
+    CMP #ITEM_NONE
+    BEQ right_free
+    LDA item_held_right
+    CMP item_line
+    BNE right_free
+    LDA item_held_right + 1
+    CMP item_line + 1
+    BNE right_free
+    LDA item_holds
+    ORA #1
+    STA item_holds
+.right_free
+    LDA item_holds
+    CMP #3
+    BNE one_side
+    LDA item_what_left          \ Held at both corners: lies still, unless
+    CMP #ITEM_TERRAIN           \ squarely on one item
+    BEQ set
+    CMP item_what
+    BNE set
+    TAY                         \ Off it, the way it overhangs it
+    LDA item_x_low,Y
+    CMP item_x_low,X
+    LDA item_x_high,Y
+    SBC item_x_high,X
+    BCC slide_right             \ It overhangs to the right
+    LDA item_x_low,Y
+    CMP item_x_low,X
+    BNE slide_left
+    LDA item_x_high,Y
+    CMP item_x_high,X
+    BNE slide_left
+    TXA                         \ Squarely: by its place in the list
+    LSR A
+    BCS slide_right
+.slide_left
+    LDA #&100 - SLIDE
+    BNE step_set
+.one_side
+    CMP #2                      \ Towards the side not held
+    BEQ slide_right
+    BNE slide_left
+.slide_right
+    LDA #SLIDE
+.step_set
+    STA item_step
+    BMI edge_left
+    LDA item_right              \ The edge it slides: right + SLIDE...
+    CLC
+    ADC #SLIDE
+    STA item_px
+    LDA item_right + 1
+    ADC #0
+    STA item_px + 1
+    JMP edge_set
+.edge_left
+    LDA item_left               \ ... or left - SLIDE
+    SEC
+    SBC #SLIDE
+    STA item_px
+    LDA item_left + 1
+    SBC #0
+    STA item_px + 1
+.edge_set
+    JSR item_blocked
+    BCS set                     \ Blocked: it lies still
+    LDX item_i
+    LDA item_step               \ x + step
+    CLC
+    ADC item_x_low,X
+    STA item_new_x_low
+    LDA item_step
+    AND #&80                    \ (the step's sign, extended)
+    BEQ positive
+    LDA #&FF
+.positive
+    ADC item_x_high,X
+    STA item_new_x_high
+.set
+    LDX item_i                  \ Moved?
+    LDA item_new_x_low
+    CMP item_x_low,X
+    BNE moved
+    LDA item_new_x_high
+    CMP item_x_high,X
+    BNE moved
+    LDA item_new_y
+    CMP item_y_low,X
+    BNE moved
+    LDA item_new_y + 1
+    CMP item_y_high,X
+    BNE moved
+    LDA item_new_vy
+    CMP item_vy,X
+    BEQ stayed
+.moved
+    JSR item_wake_touching
+    LDX item_i
+    LDA item_new_x_low
+    STA item_x_low,X
+    LDA item_new_x_high
+    STA item_x_high,X
+    LDA item_new_y
+    STA item_y_low,X
+    LDA item_new_y + 1
+    STA item_y_high,X
+    LDA item_new_vy
+    STA item_vy,X
+    RTS
+.stayed
+    LDA item_vy,X
+    ORA #ITEM_STILL
+    STA item_vy,X
+    RTS
+}
+
+\ Item item_i is moving from (item_left, item_old_top): wake the items
+\ touching it there, that rested on it (their bottom on its top) or were
+\ blocked by it (within SLIDE of its sides), whose fall it may change:
+\ those whose box, widened by SLIDE each way and a line downwards, meets
+\ its.
+.item_wake_touching
+{
+    LDX #0
+.loop
+    CPX item_count
+    BEQ done
+    CPX item_i
+    BEQ next
+    LDA item_x_low,X            \ x - left + ITEM_WIDTH + SLIDE - 1 <
+    SEC                         \ 2 * (ITEM_WIDTH + SLIDE) - 1
+    SBC item_left
+    TAY
+    LDA item_x_high,X
+    SBC item_left + 1
+    STA item_tmp + 1
+    TYA
+    CLC
+    ADC #ITEM_WIDTH + SLIDE - 1
+    TAY
+    LDA item_tmp + 1
+    ADC #0
+    BNE next
+    CPY #2 * (ITEM_WIDTH + SLIDE) - 1
+    BCS next
+    LDA item_y_high,X           \ top - old_top + ITEM_HEIGHT < 2 *
+    STA zp_temp + 1             \ ITEM_HEIGHT + 1
+    LDA item_y_low,X
+    JSR lines_of
+    SEC
+    SBC item_old_top
+    TAY
+    LDA zp_temp + 1
+    SBC item_old_top + 1
+    STA item_tmp + 1
+    TYA
+    CLC
+    ADC #ITEM_HEIGHT
+    TAY
+    LDA item_tmp + 1
+    ADC #0
+    BNE next
+    CPY #2 * ITEM_HEIGHT + 1
+    BCS next
+    LDA item_vy,X               \ Woken
+    AND #&FF - ITEM_STILL
+    STA item_vy,X
+.next
+    INX
+    BNE loop
+.done
+    RTS
+}
+
+\ What holds item item_i's corner over pixel item_px, its bottom moving from
+\ line item_old_below to item_below (items._held): in item_line the line its
+\ bottom comes to, and in item_what ITEM_TERRAIN or the holding item, the
+\ highest (the ground winning a tie, then the first item); or ITEM_NONE.
+.item_held
+{
+    LDA #ITEM_NONE
+    STA item_what
+    LDA item_px
+    STA zp_temp
+    LDA item_px + 1
+    STA zp_temp + 1
+    LDA item_below
+    STA zp_temp2
+    LDA item_below + 1
+    STA zp_temp2 + 1
+    JSR solid_at
+    BCC items
+    LDA item_below              \ The quarter-cell's top
+    AND #&FC
+    STA item_line
+    LDA item_below + 1
+    STA item_line + 1
+    LDA #ITEM_TERRAIN
+    STA item_what
+.items
+    LDX #0
+.loop
+    CPX item_count
+    BEQ done
+    CPX item_i
+    BEQ next
+    JSR item_over_px            \ Over px?
+    BCS next
+    LDA item_y_high,X           \ Its top, between old_below and below?
+    STA zp_temp + 1
+    LDA item_y_low,X
+    JSR lines_of
+    STA item_tmp
+    LDA zp_temp + 1
+    STA item_tmp + 1
+    LDA item_tmp
+    CMP item_old_below
+    LDA item_tmp + 1
+    SBC item_old_below + 1
+    BCC next
+    LDA item_below
+    CMP item_tmp
+    LDA item_below + 1
+    SBC item_tmp + 1
+    BCC next
+    LDA item_what               \ Higher than what holds it so far?
+    CMP #ITEM_NONE
+    BEQ higher
+    LDA item_tmp
+    CMP item_line
+    LDA item_tmp + 1
+    SBC item_line + 1
+    BCS next
+.higher
+    LDA item_tmp
+    STA item_line
+    LDA item_tmp + 1
+    STA item_line + 1
+    STX item_what
+.next
+    INX
+    BNE loop
+.done
+    RTS
+}
+
+\ Carry clear if item X lies over pixel column item_px: x <= px < x +
+\ ITEM_WIDTH. Preserves X.
+.item_over_px
+{
+    LDA item_px
+    SEC
+    SBC item_x_low,X
+    TAY
+    LDA item_px + 1
+    SBC item_x_high,X
+    BNE over_not
+    CPY #ITEM_WIDTH
+    RTS                         \ Carry clear if px - x < ITEM_WIDTH
+.over_not
+    SEC
+    RTS
+}
+
+\ Carry set if item item_i, with its top at line item_top, would overlap
+\ solid ground or another item in pixel column item_px (items._blocked).
+.item_blocked
+{
+    LDA item_px
+    STA zp_temp
+    LDA item_px + 1
+    STA zp_temp + 1
+    LDA item_top                \ Lines top, top + 4 and top + ITEM_HEIGHT - 1
+    STA zp_temp2
+    LDA item_top + 1
+    STA zp_temp2 + 1
+    JSR solid_at
+    BCS done
+    LDA item_top
+    CLC
+    ADC #4
+    STA zp_temp2
+    LDA item_top + 1
+    ADC #0
+    STA zp_temp2 + 1
+    JSR solid_at
+    BCS done
+    LDA item_top
+    CLC
+    ADC #ITEM_HEIGHT - 1
+    STA zp_temp2
+    LDA item_top + 1
+    ADC #0
+    STA zp_temp2 + 1
+    JSR solid_at
+    BCS done
+    LDX #0                      \ Another item there: over px, and its top
+.loop                           \ within ITEM_HEIGHT - 1 of top
+    CPX item_count
+    BEQ clear
+    CPX item_i
+    BEQ next
+    JSR item_over_px
+    BCS next
+    LDA item_y_high,X
+    STA zp_temp + 1
+    LDA item_y_low,X
+    JSR lines_of
+    CLC                         \ other - top + ITEM_HEIGHT - 1 < 2 *
+    ADC #ITEM_HEIGHT - 1        \ ITEM_HEIGHT - 1
+    STA item_tmp
+    LDA zp_temp + 1
+    ADC #0
+    STA item_tmp + 1
+    LDA item_tmp
+    SEC
+    SBC item_top
+    TAY
+    LDA item_tmp + 1
+    SBC item_top + 1
+    BNE next
+    CPY #2 * ITEM_HEIGHT - 1
+    BCC done                    \ (Carry clear: overlaps)
+.next
+    INX
+    BNE loop
+.clear
+    CLC
+    RTS
+.done
+    BCC overlaps
+    RTS                         \ Carry set: solid ground
+.overlaps
+    SEC
+    RTS
+}
+
+\ Carry set if the quarter-cell holding pixel zp_temp (16 bits) of line
+\ zp_temp2 (16 bits) is solid, from the tile cache (which must hold it).
+.solid_at
+{
+    LDA zp_temp + 1             \ The tile: (px >> 3, line >> 4)
+    STA zp_fill_x
+    LDA zp_temp
+    LSR zp_fill_x
+    ROR A
+    LSR zp_fill_x
+    ROR A
+    LSR zp_fill_x
+    ROR A
+    STA zp_fill_x
+    LDA zp_temp2 + 1
+    STA zp_fill_y
+    LDA zp_temp2
+    LSR zp_fill_y
+    ROR A
+    LSR zp_fill_y
+    ROR A
+    LSR zp_fill_y
+    ROR A
+    LSR zp_fill_y
+    ROR A
+    STA zp_fill_y
     JSR para_cache_pointer
     LDY #0
     LDA (para_cache),Y          \ Passable: not solid
     TAY
     LDA material_passable,Y
-    BNE falls
+    BNE not_solid
     LDA para_cache + 1          \ The quarter-cell's bit in its shape's mask
     CLC
     ADC #HI(tile_cache_shapes - tile_cache)
@@ -199,20 +693,20 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
     LDA (para_cache),Y
     AND #SHAPE_BITS
     TAY
-    LDA item_middle             \ Column: (middle >> 1) AND 3
+    LDA zp_temp                 \ Column: (px >> 1) AND 3
     LSR A
     AND #3
-    STA zp_temp
-    LDA item_below              \ Row: (below >> 2) AND 3
-    LSR A
+    STA item_bit
+    LDA zp_temp2                \ Row: (line >> 2) AND 3; rows 0-1 in the
+    LSR A                       \ low byte, 2-3 the high
     LSR A
     AND #3
-    LSR A                       \ Rows 0-1 in the low byte, 2-3 the high
+    LSR A
     BCC even_row
     PHA
-    LDA zp_temp
+    LDA item_bit
     ORA #4
-    STA zp_temp
+    STA item_bit
     PLA
 .even_row
     CMP #0
@@ -222,41 +716,50 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
 .high_rows
     LDA shape_mask_high,Y
 .mask_set
-    LDY zp_temp
+    LDY item_bit
     AND bit_of,Y
-    BNE lands
-.falls
-    LDX item_i
-    LDA item_new_y
-    STA item_y_low,X
-    LDA item_new_y + 1
-    STA item_y_high,X
-    LDA item_new_vy
-    STA item_vy,X
-    RTS
-.lands
-    LDX item_i                  \ On the quarter-cell's top:
-    LDA item_below              \ y = ((below AND NOT 3) - ITEM_HEIGHT) << 4
-    AND #&FC
+    BEQ not_solid
     SEC
-    SBC #ITEM_HEIGHT
-    STA zp_temp
-    LDA item_below + 1
-    SBC #0
-    ASL zp_temp
-    ROL A
-    ASL zp_temp
-    ROL A
-    ASL zp_temp
-    ROL A
-    ASL zp_temp
-    ROL A
-    STA item_y_high,X
-    LDA zp_temp
-    STA item_y_low,X
-    LDA #ITEM_RESTING
-    STA item_vy,X
     RTS
+.not_solid
+    CLC
+    RTS
+}
+
+\ A, the low byte of y (sixteenths of a line), with zp_temp + 1 its high:
+\ return y >> 4's low byte in A, and its high in zp_temp + 1.
+.lines_of
+{
+    LSR zp_temp + 1
+    ROR A
+    LSR zp_temp + 1
+    ROR A
+    LSR zp_temp + 1
+    ROR A
+    LSR zp_temp + 1
+    ROR A
+    RTS
+}
+
+\ The tile column of pixel (A high, zp_temp low), in A.
+.tile_of_pixel
+{
+    LSR A
+    ROR zp_temp
+    LSR A
+    ROR zp_temp
+    LSR A
+    ROR zp_temp
+    LDA zp_temp
+    RTS
+}
+
+\ The tile row of line (A high, zp_temp low), in A.
+.tile_of_line
+{
+    LSR A
+    ROR zp_temp
+    JMP tile_of_pixel
 }
 
 \ Carry clear if item X touches the miner's box (zp_box_x, zp_box_y): their

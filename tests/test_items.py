@@ -3,15 +3,17 @@ and is picked up exactly as items.py says, and each packet carries the
 items in view (items.shown). The game runs in py65, the host's part played
 by FakeHost (test_daylight.ParasiteGame)."""
 
+import pytest
+
 from stratagem import items, sprites
 from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_RIGHT
 from stratagem.player import Player
-from stratagem.tiles import PIECES
-from stratagem.world import HEIGHTS, TRUNKS
+from stratagem.tiles import PIECES, ROOT
+from stratagem.world import HEIGHTS, TRUNKS, generate_tile
 from test_daylight import ParasiteGame
 
 TILE_CACHE_SIZE = 32
-ITEM_RESTING = 0x80         # asm/items.asm: an item lying where it would land
+ITEM_STILL = 0x80           # asm/items.asm: in vy, an item that would stay as it is
 ITEMS_UNTOUCHED = 0x80      # in the packet's count of items: nothing redrawn under them
 
 
@@ -23,7 +25,7 @@ def held_items(game) -> list[items.Item]:
     memory, labels = game.memory, game.labels
     return [items.Item(memory[labels["item_x_low"] + i] | memory[labels["item_x_high"] + i] << 8,
                        memory[labels["item_y_low"] + i] | memory[labels["item_y_high"] + i] << 8,
-                       memory[labels["item_vy"] + i] & ~ITEM_RESTING, memory[labels["item_kind"] + i])
+                       memory[labels["item_vy"] + i] & ~ITEM_STILL, memory[labels["item_kind"] + i])
             for i in range(game.byte("item_count"))]
 
 
@@ -86,7 +88,7 @@ def check_packet(game):
 
 def test_felled_wood_falls_and_is_picked_up():
     """Dig at the tree beside the start, and step back: its root and each
-    part of its trunk drop a log as they break, which fall to the ground,
+    part of its trunk drop a log as they break, which fall and pile up,
     where the miner, walking left over them, picks them up."""
     from stratagem.build import build
     game = ParasiteGame(build())
@@ -112,11 +114,42 @@ def test_felled_wood_falls_and_is_picked_up():
     ground = HEIGHTS[trunk]
     assert watch.dropped == 1 + TRUNKS[trunk], "the root and each part of the trunk"
     lying = held_items(game)
-    assert len(lying) == watch.dropped
-    assert all(item.py + items.ITEM_HEIGHT == ground * 16 and item.vy == 0 for item in lying), \
-        "they lie on the ground"
-    assert shown == watch.dropped, "they were in view"
+    assert len(lying) + watch.picked == watch.dropped
+    assert all(item.vy == 0 for item in lying), "they lie still"
+    assert any(item.py + items.ITEM_HEIGHT == ground * 16 for item in lying), "on the ground"
+    assert any(item.py + items.ITEM_HEIGHT < ground * 16 for item in lying), "piled up"
+    assert not any(a.x < b.x + items.ITEM_WIDTH and b.x < a.x + items.ITEM_WIDTH
+                   and a.py < b.py + items.ITEM_HEIGHT and b.py < a.py + items.ITEM_HEIGHT
+                   for n, a in enumerate(lying) for b in lying[n + 1:]), "none overlap"
+    assert shown == len(lying), "they were in view"
     play(40, INPUT_LEFT)
     assert game.byte("item_count") == 0, "not all picked up"
     assert watch.picked == watch.dropped
     assert game.byte("wood") == watch.dropped
+
+
+@pytest.mark.parametrize("seed", [1988, 1, 2, 3])
+def test_logs_dropped_about_pile_and_slide_as_the_model_says(seed):
+    """Logs dropped on the slopes round the start, some on one spot, fall,
+    pile up and slide exactly as items.py says, the miner standing by."""
+    import random
+    from stratagem.build import build
+    game = ParasiteGame(build())
+    watch = ItemWatch(game)
+    rng = random.Random(seed)
+    left, right = game.byte("cached_left") + 2, game.byte("cached_right") - 2
+    open_columns = [tx for tx in range(left, right + 1) if generate_tile(tx, HEIGHTS[tx] - 4)[0] not in PIECES]
+    spots = [rng.choice(open_columns) for _ in range(3)]
+    slides = 0
+    for frame in range(240):
+        if frame % 6 == 0 and game.byte("item_count") < items.ITEM_MAX:
+            tx = rng.choice(spots) if rng.random() < 0.7 else rng.choice(open_columns)
+            game.call("item_drop", a=ROOT, x=tx, y=HEIGHTS[tx] - 4)
+        before = held_items(game)
+        game.frame(0)
+        after = held_items(game)
+        slides += sum(1 for a, b in zip(before, after) if a.x != b.x)
+    lying = held_items(game)
+    assert len(lying) == items.ITEM_MAX
+    assert slides >= 4, "too few slides to test"
+    assert all(item.vy == 0 for item in lying), "they come to rest"

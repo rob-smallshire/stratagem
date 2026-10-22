@@ -80,7 +80,6 @@ RR..RR
 # showing its rings.
 _ITEMS = {
     WOOD: """
-......
 RRRRY.
 RRRYYY
 RRRYRY

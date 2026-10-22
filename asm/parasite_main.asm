@@ -34,7 +34,7 @@
     STA support_head
     STA support_wait
     STA item_count
-    STA items_woken
+    STA items_moving
     STA support_tail
     STA support_lost
     LDA #STARTING_ABILITIES

@@ -152,13 +152,19 @@ did would have to leave the torches' list).
 
 `items.py`, done exactly by `asm/items.asm`. The root and each part of a
 trunk drop a log as they break, dug or fallen (`items.DROPS`; the canopy
-drops nothing): an item, 6 pixels by 6 lines, at the bottom of its tile.
-Items fall, under gravity and at most a quarter-cell a frame, until the
-quarter-cell under their middle is solid, but only over the tile cache;
-the miner picks one up by touching it, into `wood`. At most 8 lie in the
-world (more go straight into `wood`). A log at rest is marked so
-(`ITEM_RESTING`) and not moved until a tile changes, since it would land
-where it is.
+drops nothing): an item, 6 pixels by 5 lines, at the bottom of its tile.
+Items fall, under gravity and at most a quarter-cell a frame, until
+something holds a bottom corner: a solid quarter-cell, or another item's
+top. They pile up as sand does: an item lies still only if both corners
+are held at the same height, and not both by one item; otherwise it slides
+2 pixels towards the side not held and falls again, unless the slide runs
+into ground or another item. So logs dropped on one spot pile into a cone
+(three, then two on them, then one), and slide down slopes. Only items over
+the tile cache move. The miner picks one up by touching it, into `wood`. At
+most 8 lie in the world (more go straight into `wood`). An item whose fall
+left it as it was is marked still (`ITEM_STILL`) and not moved again until
+a tile changes, an item is picked up, or an item it rested on or was
+blocked by moves, since it would stay where it is.
 
 The packet carries the items in view, after the chunk to fetch: each one's
 view column, line and frame (the item frames follow the player's in
@@ -339,10 +345,13 @@ paced (now 35); checking cost the parasite about 1,400 cycles a frame
 while it fell (3,100 at most), and the busiest frame of the fall,
 relighting what fell, about 52,500 (py65).
 
-Items (py65, a felled tree's 5 logs falling, lying and picked up, 123
-frames): moving them costs the parasite about 770 cycles a frame (2,900 at
-most), and sending them about 850 (1,000 at most); with no items, both
-together about 230. On the host (Beebium, the B+), 3 logs lying still with
+Items (py65, a felled tree's 5 logs falling, piling up and picked up, 123
+frames): moving them costs the parasite about 2,700 cycles a frame (11,800
+at most, while 4 fall at once: each falling log about 2,400), and sending
+them about 700; still logs cost nothing to move, and with no items, both
+together about 230. Over those frames the mean frame is 23,100 (21,300
+before piling), the worst 88,300 (84,900), and 10 frames take over 60,000
+(8). On the host (Beebium, the B+), 3 logs lying still with
 nothing redrawn under them cost about 580 cycles a frame; when they must
 be redrawn, about 1,800 each (restoring 600, drawing 1,200), so 8 would
 cost about 14,000.
