@@ -55,6 +55,18 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     TYA
     STA item_y_high,X
     ASSERT ITEM_HEIGHT * 16 <= 256
+    ASL A                       \ Its top: ty * 16 + 16 - ITEM_HEIGHT
+    ASL A
+    ASL A
+    ASL A
+    ORA #16 - ITEM_HEIGHT
+    STA item_top_low,X
+    TYA
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA item_top_high,X
     LDA #0
     STA item_vy,X
     INC item_count
@@ -85,6 +97,10 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     STA items_moving
     JSR items_wake
 .awake
+    LDA item_count
+    BEQ done
+    LDA #0                      \ The bounds, when an item first falls
+    STA item_bounded
     JSR player_pixels           \ The miner's box: zp_box_x, zp_box_y
     LDX #0
 .loop
@@ -112,6 +128,10 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     STA item_y_low,X
     LDA item_y_high,Y
     STA item_y_high,X
+    LDA item_top_low,Y
+    STA item_top_low,X
+    LDA item_top_high,Y
+    STA item_top_high,X
     LDA item_vy,Y
     STA item_vy,X
     LDA item_kind,Y
@@ -123,6 +143,64 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
 .done
     RTS
 }
+
+\ The bounds within which an item's tiles are all in the tile cache, for
+\ item_fall: its left at least cached_left * 8 + SLIDE, its right at most
+\ cached_right * 8 + 7 - SLIDE, its top at least cached_top * 16 + 4, the
+\ line under it at most cached_bottom * 16 + 15.
+.item_bounds
+{
+    LDA #0
+    STA item_least_left + 1
+    LDA cached_left
+    ASL A
+    ROL item_least_left + 1
+    ASL A
+    ROL item_least_left + 1
+    ASL A
+    ROL item_least_left + 1
+    ORA #SLIDE                  \ (Its low three bits are clear)
+    STA item_least_left
+    LDA #0
+    STA item_most_right + 1
+    LDA cached_right
+    ASL A
+    ROL item_most_right + 1
+    ASL A
+    ROL item_most_right + 1
+    ASL A
+    ROL item_most_right + 1
+    ORA #7 - SLIDE
+    STA item_most_right
+    LDA #0
+    STA item_least_top + 1
+    LDA cached_top
+    ASL A
+    ROL item_least_top + 1
+    ASL A
+    ROL item_least_top + 1
+    ASL A
+    ROL item_least_top + 1
+    ASL A
+    ROL item_least_top + 1
+    ORA #4
+    STA item_least_top
+    LDA #0
+    STA item_most_below + 1
+    LDA cached_bottom
+    ASL A
+    ROL item_most_below + 1
+    ASL A
+    ROL item_most_below + 1
+    ASL A
+    ROL item_most_below + 1
+    ASL A
+    ROL item_most_below + 1
+    ORA #15
+    STA item_most_below
+    RTS
+}
+ASSERT SLIDE < 8
 
 \ No item is still. Preserves X.
 .items_wake
@@ -155,16 +233,13 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     STA item_left + 1
     ADC #0
     STA item_right + 1
-    LDA item_y_high,X           \ Its top, and the line under it
-    STA zp_temp + 1
-    LDA item_y_low,X
-    JSR lines_of
+    LDA item_top_low,X          \ Its top, and the line under it
     STA item_top
     STA item_old_top
     CLC
     ADC #ITEM_HEIGHT
     STA item_old_below
-    LDA zp_temp + 1
+    LDA item_top_high,X
     STA item_top + 1
     STA item_old_top + 1
     ADC #0
@@ -193,60 +268,37 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     ADC #0
     STA item_below + 1
     \ Wait unless the tiles from (left - SLIDE, top - a quarter-cell) to
-    \ (right + SLIDE, below) are in the tile cache.
+    \ (right + SLIDE, below) are in the tile cache: within the bounds
+    \ (item_bounds).
+    LDA item_bounded
+    BNE bounded
+    JSR item_bounds
+    DEC item_bounded
+.bounded
     LDA item_left
-    SEC
-    SBC #SLIDE
-    STA zp_temp
+    CMP item_least_left
     LDA item_left + 1
-    SBC #0
-    JSR tile_of_pixel
-    STA zp_fill_x
-    LDA item_top
-    SEC
-    SBC #4
-    STA zp_temp
-    LDA item_top + 1
-    SBC #0
-    BMI waits
-    JSR tile_of_line
-    STA zp_fill_y
-    JSR in_tile_cache
+    SBC item_least_left + 1
     BCC waits
-    LDA item_right
-    CLC
-    ADC #SLIDE
-    STA zp_temp
-    LDA item_right + 1
-    ADC #0
-    JSR tile_of_pixel
-    STA zp_fill_x
-    LDA item_below
-    STA zp_temp
-    LDA item_below + 1
-    JSR tile_of_line
-    STA zp_fill_y
-    JSR in_tile_cache
+    LDA item_most_right
+    CMP item_right
+    LDA item_most_right + 1
+    SBC item_right + 1
+    BCC waits
+    LDA item_top
+    CMP item_least_top
+    LDA item_top + 1
+    SBC item_least_top + 1
+    BCC waits
+    LDA item_most_below
+    CMP item_below
+    LDA item_most_below + 1
+    SBC item_below + 1
     BCS cached
 .waits
     RTS
 .cached
-    LDA item_left               \ What holds each corner
-    STA item_px
-    LDA item_left + 1
-    STA item_px + 1
-    JSR item_held
-    LDA item_line
-    STA item_held_left
-    LDA item_line + 1
-    STA item_held_left + 1
-    LDA item_what
-    STA item_what_left
-    LDA item_right
-    STA item_px
-    LDA item_right + 1
-    STA item_px + 1
-    JSR item_held
+    JSR item_held               \ What holds each corner
     LDA item_line
     STA item_held_right
     LDA item_line + 1
@@ -422,6 +474,12 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     STA item_y_low,X
     LDA item_new_y + 1
     STA item_y_high,X
+    STA zp_temp + 1             \ ... and its top
+    LDA item_new_y
+    JSR lines_of
+    STA item_top_low,X
+    LDA zp_temp + 1
+    STA item_top_high,X
     LDA item_new_vy
     STA item_vy,X
     RTS
@@ -461,14 +519,11 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     BNE next
     CPY #2 * (ITEM_WIDTH + SLIDE) - 1
     BCS next
-    LDA item_y_high,X           \ top - old_top + ITEM_HEIGHT < 2 *
-    STA zp_temp + 1             \ ITEM_HEIGHT + 1
-    LDA item_y_low,X
-    JSR lines_of
-    SEC
+    LDA item_top_low,X          \ top - old_top + ITEM_HEIGHT < 2 *
+    SEC                         \ ITEM_HEIGHT + 1
     SBC item_old_top
     TAY
-    LDA zp_temp + 1
+    LDA item_top_high,X
     SBC item_old_top + 1
     STA item_tmp + 1
     TYA
@@ -490,75 +545,137 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     RTS
 }
 
-\ What holds item item_i's corner over pixel item_px, its bottom moving from
-\ line item_old_below to item_below (items._held): in item_line the line its
-\ bottom comes to, and in item_what ITEM_TERRAIN or the holding item, the
-\ highest (the ground winning a tie, then the first item); or ITEM_NONE.
+\ What holds each of item item_i's corners, its bottom moving from line
+\ item_old_below to item_below (items._held): the line its bottom comes to
+\ and what holds it there (ITEM_TERRAIN or the holding item), the highest
+\ (the ground winning a tie, then the first item); or ITEM_NONE. The left
+\ corner's in item_held_left and item_what_left, the right's in item_line
+\ and item_what. Both corners in one pass over the items.
 .item_held
 {
     LDA #ITEM_NONE
+    STA item_what_left
     STA item_what
-    LDA item_px
-    STA zp_temp
-    LDA item_px + 1
-    STA zp_temp + 1
-    LDA item_below
+    LDA item_below              \ The ground under each corner
     STA zp_temp2
     LDA item_below + 1
     STA zp_temp2 + 1
+    LDA item_left
+    STA zp_temp
+    LDA item_left + 1
+    STA zp_temp + 1
     JSR solid_at
-    BCC items
+    BCC left_open
     LDA item_below              \ The quarter-cell's top
+    AND #&FC
+    STA item_held_left
+    LDA item_below + 1
+    STA item_held_left + 1
+    LDA #ITEM_TERRAIN
+    STA item_what_left
+.left_open
+    LDA item_right
+    STA zp_temp
+    LDA item_right + 1
+    STA zp_temp + 1
+    JSR solid_at
+    BCC right_open
+    LDA item_below
     AND #&FC
     STA item_line
     LDA item_below + 1
     STA item_line + 1
     LDA #ITEM_TERRAIN
     STA item_what
-.items
-    LDX #0
+.right_open
+    LDX #0                      \ The items under each corner
 .loop
     CPX item_count
     BEQ done
     CPX item_i
     BEQ next
-    JSR item_over_px            \ Over px?
-    BCS next
-    LDA item_y_high,X           \ Its top, between old_below and below?
-    STA zp_temp + 1
-    LDA item_y_low,X
-    JSR lines_of
-    STA item_tmp
-    LDA zp_temp + 1
-    STA item_tmp + 1
-    LDA item_tmp
-    CMP item_old_below
-    LDA item_tmp + 1
-    SBC item_old_below + 1
-    BCC next
-    LDA item_below
-    CMP item_tmp
-    LDA item_below + 1
-    SBC item_tmp + 1
-    BCC next
-    LDA item_what               \ Higher than what holds it so far?
-    CMP #ITEM_NONE
-    BEQ higher
-    LDA item_tmp
-    CMP item_line
-    LDA item_tmp + 1
-    SBC item_line + 1
-    BCS next
-.higher
-    LDA item_tmp
-    STA item_line
-    LDA item_tmp + 1
-    STA item_line + 1
-    STX item_what
+    JSR item_under
 .next
     INX
     BNE loop
 .done
+    RTS
+}
+
+\ For item_held: whether item X is under either corner, and higher than
+\ what holds it so far. Preserves X.
+.item_under
+{
+    LDA item_left               \ d = left - x: the left corner is over it
+    SEC                         \ if 0 <= d < ITEM_WIDTH, the right if
+    SBC item_x_low,X            \ -(ITEM_WIDTH - 1) <= d <= 0
+    TAY
+    LDA item_left + 1
+    SBC item_x_high,X
+    BEQ ahead
+    CMP #&FF
+    BNE out
+    CPY #&100 - (ITEM_WIDTH - 1)
+    BCC out
+    LDA #1                      \ The right
+    BNE over
+.out
+    RTS
+.ahead
+    TYA
+    BEQ both
+    CMP #ITEM_WIDTH
+    BCS out
+    LDA #2                      \ The left
+    BNE over
+.both
+    LDA #3
+.over
+    STA item_overs
+    LDA item_top_low,X          \ Its top, between old_below and below?
+    CMP item_old_below
+    LDA item_top_high,X
+    SBC item_old_below + 1
+    BCC next
+    LDA item_below
+    CMP item_top_low,X
+    LDA item_below + 1
+    SBC item_top_high,X
+    BCC next
+    LSR item_overs
+    BCC left
+    LDA item_what               \ The right: higher than its holder so far?
+    CMP #ITEM_NONE
+    BEQ right_higher
+    LDA item_top_low,X
+    CMP item_line
+    LDA item_top_high,X
+    SBC item_line + 1
+    BCS left
+.right_higher
+    LDA item_top_low,X
+    STA item_line
+    LDA item_top_high,X
+    STA item_line + 1
+    STX item_what
+.left
+    LSR item_overs
+    BCC next
+    LDA item_what_left          \ The left: higher than its holder so far?
+    CMP #ITEM_NONE
+    BEQ left_higher
+    LDA item_top_low,X
+    CMP item_held_left
+    LDA item_top_high,X
+    SBC item_held_left + 1
+    BCS next
+.left_higher
+    LDA item_top_low,X
+    STA item_held_left
+    LDA item_top_high,X
+    STA item_held_left + 1
+    STX item_what_left
+.next
     RTS
 }
 
@@ -620,14 +737,11 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     BEQ next
     JSR item_over_px
     BCS next
-    LDA item_y_high,X
-    STA zp_temp + 1
-    LDA item_y_low,X
-    JSR lines_of
-    CLC                         \ other - top + ITEM_HEIGHT - 1 < 2 *
-    ADC #ITEM_HEIGHT - 1        \ ITEM_HEIGHT - 1
+    LDA item_top_low,X          \ other - top + ITEM_HEIGHT - 1 < 2 *
+    CLC                         \ ITEM_HEIGHT - 1
+    ADC #ITEM_HEIGHT - 1
     STA item_tmp
-    LDA zp_temp + 1
+    LDA item_top_high,X
     ADC #0
     STA item_tmp + 1
     LDA item_tmp
@@ -741,27 +855,6 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     RTS
 }
 
-\ The tile column of pixel (A high, zp_temp low), in A.
-.tile_of_pixel
-{
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LDA zp_temp
-    RTS
-}
-
-\ The tile row of line (A high, zp_temp low), in A.
-.tile_of_line
-{
-    LSR A
-    ROR zp_temp
-    JMP tile_of_pixel
-}
-
 \ Carry clear if item X touches the miner's box (zp_box_x, zp_box_y): their
 \ boxes overlap. Preserves X.
 .item_touches
@@ -783,21 +876,11 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     LDA zp_temp
     CMP #PLAYER_WIDTH + ITEM_WIDTH - 1
     BCS apart
-    LDA item_y_high,X           \ Its top: y >> 4
-    STA zp_temp + 1
-    LDA item_y_low,X
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
-    SEC                         \ top - py + ITEM_HEIGHT - 1 < PLAYER_HEIGHT +
-    SBC zp_box_y                \ ITEM_HEIGHT - 1
+    LDA item_top_low,X          \ top - py + ITEM_HEIGHT - 1 < PLAYER_HEIGHT +
+    SEC                         \ ITEM_HEIGHT - 1
+    SBC zp_box_y
     STA zp_temp
-    LDA zp_temp + 1
+    LDA item_top_high,X
     SBC zp_box_y + 1
     STA zp_temp + 1
     LDA zp_temp
@@ -878,21 +961,11 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     BCS next
     ADC #MAX_STEP_X             \ (Carry clear)
     STA zp_temp
-    LDA item_y_high,X           \ Line: (y >> 4) - camera_y * 8
-    STA zp_temp + 1
-    LDA item_y_low,X
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
-    LSR zp_temp + 1
-    ROR A
+    LDA item_top_low,X          \ Line: top - camera_y * 8
     SEC
     SBC item_camera_line
     STA zp_temp2
-    LDA zp_temp + 1
+    LDA item_top_high,X
     SBC item_camera_line + 1
     BNE next
     LDA zp_temp2

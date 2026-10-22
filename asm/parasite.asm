@@ -239,6 +239,8 @@ GUARD &0800
 .item_x_high        SKIP ITEM_MAX
 .item_y_low         SKIP ITEM_MAX   \ ... in sixteenths of a line
 .item_y_high        SKIP ITEM_MAX
+.item_top_low       SKIP ITEM_MAX   \ ... their tops, in lines (y >> 4)
+.item_top_high      SKIP ITEM_MAX
 .item_vy            SKIP ITEM_MAX   \ ... falling, sixteenths a frame
 .item_kind          SKIP ITEM_MAX
 .items_moving       SKIP 1      \ Non-zero when a tile has changed
@@ -261,6 +263,12 @@ GUARD &0800
 .item_what_left     SKIP 1
 .item_held_right    SKIP 2      \ ... the right's line
 .item_holds         SKIP 1      \ Which corners hold: 2 left, 1 right
+.item_overs         SKIP 1      \ Which corners an item is under: 2 left, 1 right
+.item_least_left    SKIP 2      \ The bounds within which an item's tiles
+.item_most_right    SKIP 2      \ are in the tile cache (item_bounds)
+.item_least_top     SKIP 2
+.item_most_below    SKIP 2
+.item_bounded       SKIP 1      \ Non-zero once they are worked out this frame
 .item_step          SKIP 1      \ A slide: SLIDE or -SLIDE
 .item_tmp           SKIP 2
 .item_bit           SKIP 1

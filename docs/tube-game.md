@@ -346,12 +346,14 @@ while it fell (3,100 at most), and the busiest frame of the fall,
 relighting what fell, about 52,500 (py65).
 
 Items (py65, a felled tree's 5 logs falling, piling up and picked up, 123
-frames): moving them costs the parasite about 2,700 cycles a frame (11,800
-at most, while 4 fall at once: each falling log about 2,400), and sending
-them about 700; still logs cost nothing to move, and with no items, both
-together about 230. Over those frames the mean frame is 23,100 (21,300
-before piling), the worst 88,300 (84,900), and 10 frames take over 60,000
-(8). On the host (Beebium, the B+), 3 logs lying still with
+frames): moving them costs the parasite about 2,000 cycles a frame (8,000
+at most, while 4 fall at once: each falling log about 1,500), and sending
+them about 590; still logs cost nothing to move, and with no items, both
+together about 130. Each item's top line is kept (`item_top_low/high`),
+both corners are found in one pass over the items, and the tile cache's
+bounds are worked out once a frame, in pixels and lines. Over those frames
+the mean frame is 22,300 (21,300 before piling), the worst 86,900 (84,900),
+and 9 frames take over 60,000 (8). On the host (Beebium, the B+), 3 logs lying still with
 nothing redrawn under them cost about 580 cycles a frame; when they must
 be redrawn, about 1,800 each (restoring 600, drawing 1,200), so 8 would
 cost about 14,000.
