@@ -1,5 +1,6 @@
-"""The player's sprite frames: placeholder pixel art, in the sprite colour
-group (logical colours 0-7), where colour 0 is transparent.
+"""The sprites' frames, the player's and the items' (items.py):
+placeholder pixel art, in the sprite colour group (logical colours 0-7),
+where colour 0 is transparent.
 
 Each frame is PLAYER_WIDTH x PLAYER_HEIGHT pixels, three bytes wide. It is
 stored as SPRITE_BYTES mask bytes then SPRITE_BYTES data bytes, byte
@@ -9,11 +10,14 @@ stored as SPRITE_BYTES mask bytes then SPRITE_BYTES data bytes, byte
 
 from __future__ import annotations
 
+from stratagem.items import ITEM_HEIGHT, ITEM_WIDTH, WOOD
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, Player
 from stratagem.screen import mode2_byte
 
 SPRITE_COLUMNS = PLAYER_WIDTH // 2
 SPRITE_BYTES = SPRITE_COLUMNS * PLAYER_HEIGHT     # 72
+assert ITEM_WIDTH == PLAYER_WIDTH       # drawn by the same code, three bytes wide
+ITEM_BYTES = SPRITE_COLUMNS * ITEM_HEIGHT       # 18
 LEFT_PIXEL_BITS = 0xAA
 RIGHT_PIXEL_BITS = 0x55
 
@@ -72,6 +76,19 @@ RR..RR
 """,
 }
 
+# Each kind of item (items.py), lying on the ground: a log, its cut end
+# showing its rings.
+_ITEMS = {
+    WOOD: """
+......
+RRRRY.
+RRRYYY
+RRRYRY
+RRRYYY
+RRRRY.
+""",
+}
+
 POSES = ["stand", "walk1", "walk2", "jump"]
 STAND, WALK1, WALK2, JUMP = range(len(POSES))
 LEFT_FACING = len(POSES)    # frames LEFT_FACING onwards face left
@@ -87,6 +104,12 @@ def frame_pixels(pose: str, facing_left: bool) -> list[list[int]]:
     return [row[::-1] for row in rows] if facing_left else rows
 
 
+def item_pixels(kind: int) -> list[list[int]]:
+    rows = [[_COLOURS[c] for c in line] for line in _ITEMS[kind].split()]
+    assert len(rows) == ITEM_HEIGHT and all(len(row) == ITEM_WIDTH for row in rows), kind
+    return rows
+
+
 def encode_frame(pixels: list[list[int]]) -> bytes:
     masks, data = bytearray(), bytearray()
     for row in pixels:
@@ -100,6 +123,11 @@ def encode_frame(pixels: list[list[int]]) -> bytes:
 def sprite_frames() -> list[bytes]:
     """Every frame's mask and data, right-facing poses then left-facing."""
     return [encode_frame(frame_pixels(pose, facing_left)) for facing_left in (False, True) for pose in POSES]
+
+
+def item_frames() -> list[bytes]:
+    """Each kind of item's frame, its mask and data, by kind."""
+    return [encode_frame(item_pixels(kind)) for kind in sorted(_ITEMS)]
 
 
 def frame_for(player: Player) -> int:

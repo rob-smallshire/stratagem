@@ -26,8 +26,8 @@ tiles.dig_shape). So soft ground goes
 in one dig and stone in four, and you see it go. When nothing is left the
 tile is empty (sky or cave, by its background), and a block goes into the
 inventory (up to INVENTORY_MAX). A tree's part breaks whole, at one dig,
-leaving it empty, and gives a piece of wood (up to INVENTORY_MAX); what it
-held falls (support.py). Only straight digs break parts: digging diagonally
+leaving it empty, and a trunk's part drops a piece of wood (items.py) for
+the miner to pick up; what it held falls (support.py). Only straight digs break parts: digging diagonally
 passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
 falls. Each dig starts a cooldown. Placing puts
@@ -62,7 +62,7 @@ NONE, DIG, PLACE = 0, 1, 2
 class Hands:
     inventory: int = 0
     cooldown: int = 0
-    wood: int = 0
+    wood: int = 0           # picked up (items.py)
 
 
 def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
@@ -251,7 +251,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
                 return hands, NONE, None
             if material in CHOPPABLE:
                 if world.set_tile(*target, (background(behind), SHAPE_FULL | behind)):
-                    return Hands(hands.inventory, DIG_FRAMES, min(hands.wood + 1, INVENTORY_MAX)), DIG, target
+                    return Hands(hands.inventory, DIG_FRAMES, hands.wood), DIG, target
                 return hands, NONE, None
             left = dig_shape(shape & SHAPE_BITS, QUARTERS_PER_DIG[material], side)
             tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)

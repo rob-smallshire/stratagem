@@ -145,6 +145,8 @@ SIDE_RIGHT = 3
     BNE changed
     RTS
 .changed
+    LDA #0                      \ Nothing dropped, unless it falls
+    STA support_drops
     LDA support_best
     BEQ fall
     LDA support_shape           \ A new strength
@@ -165,6 +167,8 @@ SIDE_RIGHT = 3
     STA support_checks
     RTS
 .falls
+    LDA support_material        \ It may drop something
+    STA support_drops
     LDA #FALL_FRAMES
     STA support_wait
     LDA support_shape           \ Sky or cave, as its background
@@ -183,6 +187,13 @@ SIDE_RIGHT = 3
     BCC set
     RTS                         \ The store is full: left as it was
 .set
+    LDA support_best            \ Fallen: what it drops, if anything
+    BNE kept
+    LDA support_drops
+    LDX support_x
+    LDY support_y
+    JSR item_drop
+.kept
     LDA support_x               \ In the tile cache too, and sent if it fell
     STA zp_fill_x
     LDA support_y

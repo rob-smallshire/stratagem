@@ -1,6 +1,7 @@
 \ PGAME: the game, on the parasite (docs/tube-game.md). Each frame: wait
 \ until the host has read the last packet (its mailbox count catches up),
-\ take the input it wrote, move the player, dig or place, plan the camera,
+\ take the input it wrote, move the player, dig or place, move the items
+\ lying in the world (picking up those touched), plan the camera,
 \ bring the tile cache up to date, light the miner's surroundings, and send
 \ the host a packet of all it needs to draw the frame.
 
@@ -32,6 +33,8 @@
     STA para_sent
     STA support_head
     STA support_wait
+    STA item_count
+    STA items_woken
     STA support_tail
     STA support_lost
     LDA #STARTING_ABILITIES
@@ -75,6 +78,8 @@
     BNE no_torch
     JSR torch_input
 .no_torch
+    JSR items_step
+.*para_items_moved
     JSR plan_camera
 }
 .first_frame
@@ -222,6 +227,8 @@
     STA (para_write),Y
     JSR store_emit
     JSR cache_prefetch
+    JSR items_emit
+.*para_items_sent
     LDY #PACKET_STRIPS
     LDA para_strips
     STA (para_packet),Y
@@ -345,11 +352,11 @@
     INC para_write + 1
 .room
     LDA para_packet             \ Room: the packet's end less para_write
-    CLC                         \ (and the chunk to fetch)
-    ADC #LO(PACKET_BYTES - FETCH_BYTES)
+    CLC                         \ (and the chunk to fetch, and the items)
+    ADC #LO(PACKET_BYTES - FETCH_BYTES - ITEMS_SENT_MAX)
     STA store_room
     LDA para_packet + 1
-    ADC #HI(PACKET_BYTES - FETCH_BYTES)
+    ADC #HI(PACKET_BYTES - FETCH_BYTES - ITEMS_SENT_MAX)
     STA store_room + 1
     LDA store_room
     SEC

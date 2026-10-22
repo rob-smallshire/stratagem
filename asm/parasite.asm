@@ -23,7 +23,8 @@
 \   &8000-&A07A  PWORLD and its cache of the store of changed chunks
 \   &A07B-&BCFF  free
 \   &BD00-&C0FF  daylight's tables: sky depths and reaches (daylight.asm)
-\   &C100-&F7FF  PLIGHT, then tables the light sets up each pass
+\   &C100-&F7FF  PLIGHT (with support and items), then tables the light
+\                sets up each pass
 
 INCLUDE "asm/os.asm"
 INCLUDE "asm/layout.asm"
@@ -35,6 +36,7 @@ INCLUDE "build/generated/tiles.asm"
 INCLUDE "build/generated/world.asm"
 INCLUDE "build/generated/camera.asm"
 INCLUDE "build/generated/player.asm"
+INCLUDE "build/generated/items.asm"
 
 INCLUDE "asm/miner_light_zp.asm"
 
@@ -87,6 +89,10 @@ INCLUDE "build/generated/smooth.asm"
 \ checked for support (support.asm).
 .call_set_tile
     JSR set_tile
+    PHA                         \ Items at rest may move (items.asm)
+    LDA #&FF
+    STA items_woken
+    PLA
     JMP support_note
 
 \ The renderer's table of each cell's graphic in its material's page, which
@@ -164,6 +170,7 @@ INCLUDE "asm/daylight.asm"
 INCLUDE "asm/torches.asm"
 INCLUDE "build/generated/support.asm"
 INCLUDE "asm/support.asm"
+INCLUDE "asm/items.asm"
 .plight_end
 
 \ Variables that need no starting value: after the game's
@@ -225,7 +232,24 @@ GUARD &0800
 .support_side       SKIP 1
 .support_checks     SKIP 1
 .support_wait       SKIP 1      \ Frames until the next piece may fall
+.support_drops      SKIP 1      \ The material that fell
 .support_tmp        SKIP 1
+.item_count         SKIP 1      \ Items lying in the world (items.asm)...
+.item_x_low         SKIP ITEM_MAX   \ ... in pixels
+.item_x_high        SKIP ITEM_MAX
+.item_y_low         SKIP ITEM_MAX   \ ... in sixteenths of a line
+.item_y_high        SKIP ITEM_MAX
+.item_vy            SKIP ITEM_MAX   \ ... falling, sixteenths a frame
+.item_kind          SKIP ITEM_MAX
+.item_i             SKIP 1      \ The item being moved
+.item_tx            SKIP 1
+.item_new_vy        SKIP 1
+.item_new_y         SKIP 2
+.item_below         SKIP 2      \ ... the line below it
+.item_middle        SKIP 2      \ ... its middle pixel
+.item_camera_line   SKIP 2      \ items_emit: the view's top line
+.item_sent          SKIP 1
+.items_woken        SKIP 1      \ Non-zero when a tile has changed
 
 \ And tables the light sets up afresh each pass, above daylight's window
 ORG plight_end

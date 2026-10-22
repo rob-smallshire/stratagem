@@ -74,6 +74,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     JSR target_tile
     STA action_tile             \ The material, unless nothing is left
     TAX
+    STX chopped_material
     LDA material_chops,X
     STA chopped
     BNE nothing_left
@@ -124,13 +125,12 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     STA cooldown
     LDA #ACTION_DIG
     STA action
-    LDA chopped                 \ A tree's part gives wood
+    LDA chopped                 \ A tree's part may drop wood
     BEQ not_chopped
-    LDA wood
-    CMP #INVENTORY_MAX
-    BCS done
-    INC wood
-    RTS
+    LDX target_x
+    LDY target_y
+    LDA chopped_material
+    JMP item_drop
 .not_chopped
     LDA zp_world_new_shape      \ Only a tile dug away entirely goes into the
     AND #SHAPE_BITS             \ inventory: an empty material, so SHAPE_FULL

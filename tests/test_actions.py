@@ -72,6 +72,7 @@ def test_actions_match_model(machine, game_build):
             memory[labels["inventory"]] = hands.inventory
             memory[labels["cooldown"]] = hands.cooldown
             memory[labels["wood"]] = hands.wood
+            memory[labels["item_count"]] = 0        # wood dropped is items.py's business
             machine.call(labels["update_player"])
             machine.call(labels["player_action"])
             machine.host.take_queue()
@@ -136,6 +137,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
                 memory[labels["inventory"]] = hands.inventory
                 memory[labels["cooldown"]] = hands.cooldown
                 memory[labels["wood"]] = hands.wood
+                memory[labels["item_count"]] = 0
                 machine.call(labels["update_player"])
                 machine.call(labels["player_action"])
                 machine.host.take_queue()

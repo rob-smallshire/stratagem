@@ -99,7 +99,7 @@ def test_generated_trees_hold_their_strengths():
 
 def test_digging_at_a_tree_fells_it():
     """From the start, face the tree beside the miner and dig: its root
-    breaks for wood, and the rest of it falls."""
+    breaks, dropping wood, and the rest of it falls."""
     from stratagem.build import build
     from stratagem.camera import INPUT_ACTION, INPUT_LEFT
     game = ParasiteGame(build())
@@ -108,7 +108,7 @@ def test_digging_at_a_tree_fells_it():
     for _ in range(12):
         game.frame(INPUT_LEFT | INPUT_ACTION)
         game.host.check_cache()
-    assert game.byte("wood") >= 1, "no wood"
+    assert game.byte("wood") + game.byte("item_count") >= 1, "no wood"
     settle(game)
     ground = HEIGHTS[trunk]
     left = [(x, y) for x in range(trunk - 1, trunk + 2) for y in range(ground - 10, ground)
