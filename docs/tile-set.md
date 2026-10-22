@@ -86,7 +86,7 @@ diggable range, the passable table, `torches.asm`'s test for an empty tile).
 | Needs | how it is held up (Support, below) |
 | Toughness | hits to break, and the tool tier needed |
 | Drops | the item it gives |
-| Drawn | behind the miner, or in front |
+| Drawn | behind the miner, or in front (trees: each tree at random, next steps item 1) |
 | Object | a rule for finding its other parts (door, bench, tree) |
 
 Items are separate from tiles: an item may place a tile (planks, a ladder),

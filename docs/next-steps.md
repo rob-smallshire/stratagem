@@ -28,9 +28,13 @@ surface, ladders, later torches and furniture.
   belongs in `tiles.py` (and the generated material pages).
 - Cost: a few cycles per sprite byte; the sprite is drawn after vsync, ahead
   of the beam, so measure the margins again (see Beam safety in the record).
-- Test: the screen model (`expected_screen` in `tests/test_view.py`) applies
-  the same rule; add a scene with the player in front of and behind
+- Test: the screen model (`expected_screen` in `tests/test_tube_game.py`)
+  applies the same rule; add a scene with the player in front of and behind
   foreground pixels.
+- Trees: each tree in front of the miner or behind, at random (from the
+  generator's hash, by trunk column), for a sense of depth. So for trees the
+  choice is per tree, not per material: a bit in the part's shape byte, or
+  a second set of tree materials.
 
 ## 2. An on-screen display (HUD)
 
