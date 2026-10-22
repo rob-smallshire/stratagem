@@ -23,7 +23,7 @@ The keys are those of `implementation-record.md`, and T:
 |---|---|
 | Z, X | Walk left, right |
 | K | Jump; in the air, a fresh press jumps again |
-| L | Dig, ahead; with M, down; with K, up; with both, diagonally |
+| L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
 | SPACE | Place a soil block |
 | T | Drop a torch where the miner stands (in air: up to 24) |
 
@@ -123,6 +123,11 @@ subtraction from the trunk's surface height. A tree part's shape byte holds
 its strength (`support.py`: the span on the trunk's column, and beside it
 where the canopy rests on the ground, else one less). Trees are passable
 and clear to light.
+
+A straight dig (ahead, up or down) breaks a tree's part whole, at one dig,
+for a piece of wood (`wood`, up to 99): in aiming, a part counts as whole,
+so beside a tree its root, the lowest, goes first, and support brings the
+rest down. Digging diagonally passes through trees, as walking does.
 
 ### Support
 
@@ -242,7 +247,9 @@ through misses; `tests/test_daylight.py` checks the cache each frame too.
 
 `tests/test_support.py` cuts a tree's trunk in py65 and plays until
 nothing is left to check, then checks that what fell, and every strength
-left, are what `support.py` says, and the tile cache the world.
+left, are what `support.py` says, and the tile cache the world; and digs at
+the tree beside the start, which must give wood and fall. The Tube game's
+`fell-a-tree` script does the same in Beebium, every frame checked.
 
 `tests/test_pieces.py` checks slots in py65: given, shown, their
 visibility copied and freed by a sweep on the parasite, and composed on the

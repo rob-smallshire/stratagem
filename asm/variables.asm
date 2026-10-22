@@ -7,6 +7,8 @@ GUARD &0800
 
 \ Digging and placing (modelled by tools/stratagem/actions.py)
 .inventory       SKIP 1      \ Blocks carried
+.wood            SKIP 1      \ Wood carried
+.chopped         SKIP 1      \ Non-zero if this dig broke a tree's part
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
 .target_x        SKIP 1      \ The tile aimed at

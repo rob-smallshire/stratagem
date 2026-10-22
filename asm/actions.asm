@@ -31,6 +31,8 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 \ Dig the diggable tile aimed at, if any.
 .dig
 {
+    LDA #0
+    STA chopped
     JSR held_directions         \ Diagonally?
     LDA diagonal_dx
     BEQ straight
@@ -67,10 +69,14 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     BCS exit
     JSR dig_direction
 .erode
-    \ Erode it from dig_side by its material's quarters.
+    \ Erode it from dig_side by its material's quarters; a tree's part
+    \ breaks whole.
     JSR target_tile
     STA action_tile             \ The material, unless nothing is left
     TAX
+    LDA material_chops,X
+    STA chopped
+    BNE nothing_left
     LDA material_quarters,X
     CMP #QUARTERS
     BCS nothing_left
@@ -118,6 +124,14 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     STA cooldown
     LDA #ACTION_DIG
     STA action
+    LDA chopped                 \ A tree's part gives wood
+    BEQ not_chopped
+    LDA wood
+    CMP #INVENTORY_MAX
+    BCS done
+    INC wood
+    RTS
+.not_chopped
     LDA zp_world_new_shape      \ Only a tile dug away entirely goes into the
     AND #SHAPE_BITS             \ inventory: an empty material, so SHAPE_FULL
     BNE done
@@ -321,10 +335,16 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     BCS next_row
     LDA want                    \ Placing: the lowest
     BNE found
-    LDA target_shape            \ Digging: the one with the most left
+    JSR target_tile             \ Digging: the one with the most left (a
+    TAX                         \ tree's part counts as whole)
+    LDA #QUARTERS * QUARTERS
+    LDY material_chops,X
+    BNE counted
+    LDA target_shape
     AND #SHAPE_BITS
     TAX
     LDA shape_solid_count,X
+.counted
     CMP best_left
     BCC next_row
     BEQ next_row
@@ -1085,7 +1105,8 @@ SCAN_HIGHEST = 2                \ The highest in the way
 }
 
 \ Return carry clear if the tile at target_x/y is what want wants:
-\ something diggable, or an empty tile clear of the player.
+\ something diggable (a tree's part too), or an empty tile clear of the
+\ player.
 .wanted_here
 {
     JSR target_tile
@@ -1093,6 +1114,8 @@ SCAN_HIGHEST = 2                \ The highest in the way
     LDA want
     BNE want_empty
     LDA material_quarters,X
+    BNE yes
+    LDA material_chops,X
     BNE yes
 .no
     SEC

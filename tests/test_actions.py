@@ -71,6 +71,7 @@ def test_actions_match_model(machine, game_build):
             harness.write(state, inputs)
             memory[labels["inventory"]] = hands.inventory
             memory[labels["cooldown"]] = hands.cooldown
+            memory[labels["wood"]] = hands.wood
             machine.call(labels["update_player"])
             machine.call(labels["player_action"])
             machine.host.take_queue()
@@ -78,7 +79,8 @@ def test_actions_match_model(machine, game_build):
             expected = player.step(state, inputs, world.tile_at)
             assert actual == expected, f"from {state} with inputs {inputs}"
             hands, action, target = actions.act(hands, expected, inputs, world)
-            assert (memory[labels["inventory"]], memory[labels["cooldown"]]) == (hands.inventory, hands.cooldown)
+            assert (memory[labels["inventory"]], memory[labels["cooldown"]], memory[labels["wood"]]) == \
+                (hands.inventory, hands.cooldown, hands.wood)
             assert memory[labels["action"]] == action, f"at {expected} with inputs {inputs}"
             if target is not None:
                 assert (memory[labels["target_x"]], memory[labels["target_y"]]) == target
@@ -133,6 +135,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
                 harness.write(state, keys)
                 memory[labels["inventory"]] = hands.inventory
                 memory[labels["cooldown"]] = hands.cooldown
+                memory[labels["wood"]] = hands.wood
                 machine.call(labels["update_player"])
                 machine.call(labels["player_action"])
                 machine.host.take_queue()

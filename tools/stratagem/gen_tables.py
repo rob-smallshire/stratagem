@@ -175,6 +175,8 @@ def shapes_source() -> str:
     lines += _bytes_lines([0xFF if m in actions.EMPTY else 0 for m in materials])
     lines.append(".material_quarters")   # quarters a dig removes; 0 if not diggable
     lines += _bytes_lines([actions.QUARTERS_PER_DIG.get(m, 0) for m in materials])
+    lines.append(".material_chops")      # broken whole by a straight dig, for wood
+    lines += _bytes_lines([0xFF if m in actions.CHOPPABLE else 0 for m in materials])
     # Solid quarter-cells of each shape, bit row * 4 + column.
     lines += _words("shape_mask", [tiles.SHAPES[s].mask if s < tiles.SHAPE_COUNT else 0 for s in shapes])
     lines.append(".shape_solid_count")    # quarter-cells solid in each shape

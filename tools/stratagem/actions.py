@@ -25,7 +25,12 @@ QUARTERS_PER_DIG of them, by how hard the material is (see
 tiles.dig_shape). So soft ground goes
 in one dig and stone in four, and you see it go. When nothing is left the
 tile is empty (sky or cave, by its background), and a block goes into the
-inventory (up to INVENTORY_MAX). Each dig starts a cooldown. Placing puts
+inventory (up to INVENTORY_MAX). A tree's part breaks whole, at one dig,
+leaving it empty, and gives a piece of wood (up to INVENTORY_MAX); what it
+held falls (support.py). Only straight digs break parts: digging diagonally
+passes through trees, as walking does. In aiming, a tree's part counts as
+whole, so beside a tree the root, the lowest, goes first, and the tree
+falls. Each dig starts a cooldown. Placing puts
 whole SOIL in an empty tile (AIR or SKY), using a block. If the world has
 no room for a change, nothing happens.
 """
@@ -37,8 +42,8 @@ from dataclasses import dataclass
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, INPUT_RIGHT, INPUT_UP
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
-                             QUARTER_LINES, QUARTER_PIXELS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE, background,
-                             cut_to, dig_shape, solid_count, solid_quarter_cells)
+                             QUARTER_LINES, QUARTER_PIXELS, QUARTERS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE,
+                             TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
 QUARTERS_PER_DIG = {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1}
@@ -46,6 +51,7 @@ assert set(QUARTERS_PER_DIG) == set(DIGGABLE)
 DIG_FRAMES = 8
 PLACE_FRAMES = 6
 EMPTY = frozenset({AIR, SKY})
+CHOPPABLE = frozenset(TREE_PARTS)       # broken whole by a dig, for wood
 PLACED_TILE = SOIL
 INVENTORY_MAX = 99
 
@@ -56,6 +62,7 @@ NONE, DIG, PLACE = 0, 1, 2
 class Hands:
     inventory: int = 0
     cooldown: int = 0
+    wood: int = 0
 
 
 def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
@@ -69,10 +76,15 @@ def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
         if wanted(column, row):
             if most_left_of is None:
                 return column, row
-            left = solid_count(*most_left_of(column, row))
+            left = _solid_left(most_left_of(column, row))
             if left > best_left:
                 best, best_left = (column, row), left
     return best
+
+
+def _solid_left(tile: tuple[int, int]) -> int:
+    """Quarter-cells left in a tile, for aiming: a tree's part counts as whole."""
+    return QUARTERS * QUARTERS if tile[0] in CHOPPABLE else solid_count(*tile)
 
 
 def aim(player: Player, inputs: int, wanted, most_left_of=None) -> tuple[int, int] | None:
@@ -206,14 +218,15 @@ def near_side(player: Player, target: tuple[int, int], dx: int) -> int:
 
 
 def diggable(tile: tuple[int, int]) -> bool:
-    return tile[0] in QUARTERS_PER_DIG
+    """What a straight dig takes: terrain to erode, or a tree's part."""
+    return tile[0] in QUARTERS_PER_DIG or tile[0] in CHOPPABLE
 
 
 def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands, int, tuple[int, int] | None]:
     """One frame's digging or placing. Returns the new hands, what was done
     and where, changing the world."""
     if hands.cooldown:
-        return Hands(hands.inventory, hands.cooldown - 1), NONE, None
+        return Hands(hands.inventory, hands.cooldown - 1, hands.wood), NONE, None
 
     in_world = _in_world
     if inputs & INPUT_ACTION:
@@ -234,16 +247,20 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
                 tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
                 if world.set_tile(*target, tile):
                     inventory = min(hands.inventory + 1, INVENTORY_MAX) if left is None else hands.inventory
-                    return Hands(inventory, DIG_FRAMES), DIG, target
+                    return Hands(inventory, DIG_FRAMES, hands.wood), DIG, target
+                return hands, NONE, None
+            if material in CHOPPABLE:
+                if world.set_tile(*target, (background(behind), SHAPE_FULL | behind)):
+                    return Hands(hands.inventory, DIG_FRAMES, min(hands.wood + 1, INVENTORY_MAX)), DIG, target
                 return hands, NONE, None
             left = dig_shape(shape & SHAPE_BITS, QUARTERS_PER_DIG[material], side)
             tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
             if world.set_tile(*target, tile):
                 inventory = min(hands.inventory + 1, INVENTORY_MAX) if left is None else hands.inventory
-                return Hands(inventory, DIG_FRAMES), DIG, target
+                return Hands(inventory, DIG_FRAMES, hands.wood), DIG, target
     elif inputs & INPUT_PLACE and hands.inventory:
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
                      and not overlaps_player(player, x, y))
         if target is not None and world.set_tile(*target, (PLACED_TILE, SHAPE_FULL | background_bits(*target))):
-            return Hands(hands.inventory - 1, PLACE_FRAMES), PLACE, target
+            return Hands(hands.inventory - 1, PLACE_FRAMES, hands.wood), PLACE, target
     return hands, NONE, None

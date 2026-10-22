@@ -22,6 +22,7 @@
     STA zp_player_vy
     STA zp_player_on_ground
     STA inventory
+    STA wood
     STA cooldown
     STA zp_player_jump_held
     STA zp_player_air_jumps

@@ -95,3 +95,28 @@ def test_generated_trees_hold_their_strengths():
                 material, shape = generate_tile(x, y)
                 if material in PIECES:
                     assert shape & STRENGTH_BITS == strength[y - y0, x - x0], (trunk, x, y)
+
+
+def test_digging_at_a_tree_fells_it():
+    """From the start, face the tree beside the miner and dig: its root
+    breaks for wood, and the rest of it falls."""
+    from stratagem.build import build
+    from stratagem.camera import INPUT_ACTION, INPUT_LEFT
+    game = ParasiteGame(build())
+    labels, memory = game.labels, game.memory
+    trunk = 127
+    for _ in range(12):
+        game.frame(INPUT_LEFT | INPUT_ACTION)
+        game.host.check_cache()
+    assert game.byte("wood") >= 1, "no wood"
+    settle(game)
+    ground = HEIGHTS[trunk]
+    left = [(x, y) for x in range(trunk - 1, trunk + 2) for y in range(ground - 10, ground)
+            if game.tile_at(x, y)[0] in PIECES]
+    assert left == [], "part of the tree is still standing"
+    for y in range(game.byte("cached_top"), game.byte("cached_bottom") + 1):
+        for x in range(game.byte("cached_left"), game.byte("cached_right") + 1):
+            index = (y % TILE_CACHE_SIZE) * TILE_CACHE_SIZE + x % TILE_CACHE_SIZE
+            held = memory[labels["tile_cache"] + index], memory[labels["tile_cache_shapes"] + index]
+            assert held == game.tile_at(x, y), (x, y)
+    assert game.byte("support_lost") == 0
