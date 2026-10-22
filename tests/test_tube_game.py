@@ -1,12 +1,13 @@
 """The Tube game (docs/tube-game.md): every frame, the host shows exactly
 what the models say it should, given the tiles it holds: each cell lit by
 the brighter of its tile's daylight and the parasite's smooth miner's light
-(lighting.smooth_miner_light, soft shadows), and the player's sprite."""
+(lighting.smooth_miner_light, soft shadows), the items lying in view
+(items.py), and the player's sprite."""
 
 import pytest
 
 from conftest import RUN_TIMEOUT_EMULATED_SECONDS
-from stratagem import camera, lighting, player, sprites
+from stratagem import camera, items, lighting, player, sprites
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
 from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, SHAPE_FULL, SLOT_COUNT, TORCH, slot_of,
@@ -14,6 +15,7 @@ from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, SHAPE_FULL, SLOT_COUNT
 
 TILE_CACHE_SIZE = 32       # asm/layout.asm
 FRAMES = sprites.sprite_frames()
+ITEM_FRAMES = sprites.item_frames()
 # Each digs deep first: near the surface, daylight outshines the miner's light.
 DIG_DEEP = [(300, ["M", "L"])]
 SCRIPTS = {
@@ -22,8 +24,9 @@ SCRIPTS = {
     "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
     "drop-torches": DIG_DEEP + [(60, ["X", "L"]), (3, ["T"]), (20, []), (80, ["X", "L"]), (3, ["T"]), (20, []),
                                 (60, ["Z"]), (30, ["M", "L"]), (20, [])],
-    # The tree beside the start (column 127): its root dug, it falls.
-    "fell-a-tree": [(12, ["Z", "L"]), (60, [])],
+    # The tree beside the start (column 127): its root dug, it falls, and
+    # the miner, having stepped back, walks over the logs it dropped.
+    "fell-a-tree": [(4, ["Z", "L"]), (16, ["X"]), (50, []), (30, ["Z"]), (10, [])],
 }
 
 
@@ -80,14 +83,20 @@ def expected_screen(bbc, labels):
         return lighting.mask_byte(level(u, v), u % 2, line)
 
     image = render_view(screen_start, camera_x, camera_y, lambda x, y: tiles(x, y)[0], tile_bytes, mask_at)
-    frame = FRAMES[peek[labels["zp_player_frame"]]]
-    column = (hero.px >> 1) - camera_x
-    line = hero.py - camera_y * 8
-    for l in range(player.PLAYER_HEIGHT):
-        for c in range(sprites.SPRITE_COLUMNS):
-            address = wrap(screen_start + ((line + l) >> 3) * 512 + (column + c) * CELL_BYTES) + ((line + l) & 7)
-            i = l * sprites.SPRITE_COLUMNS + c
-            image[address] = image[address] & frame[i] | frame[sprites.SPRITE_BYTES + i]
+
+    def draw(frame, frame_bytes, height, column, line):
+        for l in range(height):
+            for c in range(sprites.SPRITE_COLUMNS):
+                address = wrap(screen_start + ((line + l) >> 3) * 512 + (column + c) * CELL_BYTES) + ((line + l) & 7)
+                i = l * sprites.SPRITE_COLUMNS + c
+                image[address] = image[address] & frame[i] | frame[frame_bytes + i]
+
+    for i in range(peek[labels["host_items"]]):
+        column, line = peek[labels["host_item_column"] + i], peek[labels["host_item_line"] + i]
+        frame = ITEM_FRAMES[peek[labels["host_item_frame"] + i] - len(FRAMES)]
+        draw(frame, sprites.ITEM_BYTES, items.ITEM_HEIGHT, column, line)
+    draw(FRAMES[peek[labels["zp_player_frame"]]], sprites.SPRITE_BYTES, player.PLAYER_HEIGHT,
+         (hero.px >> 1) - camera_x, hero.py - camera_y * 8)
     return image
 
 
@@ -102,6 +111,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
     started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
     assert started, "the game did not start"
     frames = 0
+    items_shown = 0
     for count, keys in script:
         for key in keys:
             bbc.keyboard.key_down(key)
@@ -111,9 +121,15 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
             actual = bbc.memory.region(tube_machine.screen_region).peek[SCREEN_START:SCREEN_END]
             differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
             assert differences[:8] == [], f"frame {frames}: {len(differences)} screen bytes differ"
+            items_shown = max(items_shown, peek[labels["host_items"]])
             frames += 1
         for key in keys:
             bbc.keyboard.key_up(key)
+    if script is SCRIPTS["fell-a-tree"]:
+        assert items_shown >= 2, "the felled tree's logs weren't drawn"
+        parasite = bbc.connect_coprocessor().memory.address
+        plabels = game_build.labels["PARASITE"]
+        assert parasite.peek[plabels["wood"]] >= 2, "the logs weren't picked up"
     if any("T" in keys for _, keys in script):
         # Torches were dropped, and they light the tiles around them.
         camera_x, camera_y = word(peek, labels["zp_camera_x"]), word(peek, labels["zp_camera_y"])

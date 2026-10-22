@@ -12,6 +12,7 @@ from test_daylight import ParasiteGame
 
 TILE_CACHE_SIZE = 32
 ITEM_RESTING = 0x80         # asm/items.asm: an item lying where it would land
+ITEMS_UNTOUCHED = 0x80      # in the packet's count of items: nothing redrawn under them
 
 
 def word(memory, address: int) -> int:
@@ -68,10 +69,14 @@ class ItemWatch:
 
 
 def check_packet(game):
-    """The packet's items, after the chunk to fetch: those in view."""
+    """The packet's items, after the chunk to fetch: those in view; their
+    count marked if nothing is redrawn under them."""
     memory = game.memory
     at = word(memory, game.labels["para_write"])
-    sent = [tuple(memory[at + 1 + 3 * i:at + 4 + 3 * i]) for i in range(memory[at])]
+    count = memory[at] & ~ITEMS_UNTOUCHED
+    sent = [tuple(memory[at + 1 + 3 * i:at + 4 + 3 * i]) for i in range(count)]
+    redrawn = game.byte("zp_redraw") or game.byte("para_changes") or game.byte("sl_list_count")
+    assert bool(memory[at] & ITEMS_UNTOUCHED) == (not redrawn)
     camera_x, camera_y = word(memory, game.labels["zp_camera_x"]), word(memory, game.labels["zp_camera_y"])
     first = len(sprites.sprite_frames())
     shown = [(column, line, first + kind) for column, line, kind in items.shown(held_items(game), camera_x, camera_y)]

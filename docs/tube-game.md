@@ -66,9 +66,10 @@ While the host draws a frame, the parasite works out the next.
 | `asm/torches.asm` | parasite | torches |
 | `asm/daylight.asm` | parasite | daylight: sky depths, sunlight by columns, the glow |
 | `asm/pieces.asm` | parasite | pieces' slots: giving, sweeping, showing |
+| `asm/support.asm`, `items.asm` | parasite | support (what falls), items (the wood that drops) |
 | `asm/host_main.asm` | host | reading packets, the mailbox, drawing |
 | `asm/camera.asm`, `cache.asm`, `scroll.asm`, `pixels.asm` | parasite | the camera, the tile cache, scrolling |
-| `asm/view.asm`, `render.asm` | host | drawing rows, columns and the sprite |
+| `asm/view.asm`, `render.asm` | host | drawing rows, columns, the items and the sprite |
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs
@@ -146,6 +147,31 @@ due to fall sooner is checked again next frame. So a felled tree is seen to
 come apart, from the cut upwards, over most of a second. Pieces are clear to light and passable, so a fall changes
 neither daylight nor the miner's light. Torches don't fall yet (one that
 did would have to leave the torches' list).
+
+### Items
+
+`items.py`, done exactly by `asm/items.asm`. The root and each part of a
+trunk drop a log as they break, dug or fallen (`items.DROPS`; the canopy
+drops nothing): an item, 6 pixels by 6 lines, at the bottom of its tile.
+Items fall, under gravity and at most a quarter-cell a frame, until the
+quarter-cell under their middle is solid, but only over the tile cache;
+the miner picks one up by touching it, into `wood`. At most 8 lie in the
+world (more go straight into `wood`). A log at rest is marked so
+(`ITEM_RESTING`) and not moved until a tile changes, since it would land
+where it is.
+
+The packet carries the items in view, after the chunk to fetch: each one's
+view column, line and frame (the item frames follow the player's in
+`render.asm`). Only those clear of the outer `MAX_STEP_X` columns and
+wholly in view are sent, so that no new column or row is ever drawn where
+an item was drawn, which would be restored over it. The host draws them as
+the sprite is drawn, saving the screen under each, after the light's list
+and before the sprite, and restores them, last first, before the changed
+tiles. If nothing is redrawn under them (no list, no changed tiles: the
+count's `ITEMS_UNTOUCHED`), the items at the start of the list drawn where
+and as they will be drawn again are left as they are: on the surface,
+where daylight outshines the miner's light, logs lying still cost the host
+almost nothing.
 
 ### Daylight
 
@@ -313,6 +339,14 @@ paced (now 35); checking cost the parasite about 1,400 cycles a frame
 while it fell (3,100 at most), and the busiest frame of the fall,
 relighting what fell, about 52,500 (py65).
 
+Items (py65, a felled tree's 5 logs falling, lying and picked up, 123
+frames): moving them costs the parasite about 770 cycles a frame (2,900 at
+most), and sending them about 850 (1,000 at most); with no items, both
+together about 230. On the host (Beebium, the B+), 3 logs lying still with
+nothing redrawn under them cost about 580 cycles a frame; when they must
+be redrawn, about 1,800 each (restoring 600, drawing 1,200), so 8 would
+cost about 14,000.
+
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the
 host can miss a frame then.
@@ -320,6 +354,10 @@ host can miss a frame then.
 ## Not yet
 
 - Picking torches up; torches that flicker; more than 24.
+- Items redrawn are drawn after the light's list, so near the top of the
+  view the beam may pass one between its restoring and its drawing, and it
+  flickers, in frames that redraw under it. Items vanish a few columns
+  inside the view's sides. Wood isn't shown or spent yet.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.

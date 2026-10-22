@@ -13,6 +13,7 @@ INCLUDE "build/generated/light.asm"
 INCLUDE "build/generated/tiles.asm"
 INCLUDE "build/generated/camera.asm"
 INCLUDE "build/generated/player.asm"
+INCLUDE "build/generated/items.asm"
 
 WRCHV = &020E
 HOST_ADDRESS = &30000           \ A DFS load address of &FFFFxxxx: the host

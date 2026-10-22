@@ -176,7 +176,8 @@
 .draw_view
 {
     LDA #0
-    STA zp_sprite_drawn         \ The sprite is drawn over
+    STA zp_sprite_drawn         \ The sprite and the items are drawn over
+    STA host_items_drawn
     STA zp_columns_width
     LDA zp_screen_start
     STA zp_render_base

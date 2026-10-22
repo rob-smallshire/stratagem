@@ -185,3 +185,10 @@ A running log of design decisions. Add to it whenever one is made.
   strength in bits 0-2, so a check needs only its neighbours, and changes
   spread through a queue a few tiles a frame. Torches are left out until
   a falling torch can leave the torches' list.
+- **A felled tree is seen to fall, and drops wood to pick up:** a piece
+  falls only every 4 frames, so a tree comes apart over most of a second;
+  each part of its trunk drops a log, an item drawn as a sprite, which
+  falls to the ground and is picked up by touching it (as in Terraria),
+  rather than wood going straight into the inventory, or logs as tiles
+  (coarse, and costly in changed tiles). The sprites' machinery will serve
+  later dropped items and creatures.

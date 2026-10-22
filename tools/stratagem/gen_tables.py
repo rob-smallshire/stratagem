@@ -508,6 +508,7 @@ def items_source() -> str:
     lines.append(f"ITEM_FRAME_COUNT = {len(frames)}")
     lines.append("ITEM_SENT_BYTES = 3               \\ In a packet: view column, view line, frame")
     lines.append("ITEMS_SENT_MAX = 1 + ITEM_MAX * ITEM_SENT_BYTES")
+    lines.append("ITEMS_UNTOUCHED = &80             \\ In the count: nothing is redrawn under them")
     lines.append("")
     lines.append("MACRO ITEM_FRAMES")
     for kind, data in enumerate(frames):

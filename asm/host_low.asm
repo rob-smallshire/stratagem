@@ -35,6 +35,8 @@ ENDMACRO
 .call_render_restore    RENDER_CALL render_restore
 .call_render_clear      RENDER_CALL render_clear
 .call_render_light      RENDER_CALL render_light
+.call_render_items      RENDER_CALL render_items
+.call_restore_items     RENDER_CALL restore_items
 
 \ OSWRCH: a command from the parasite and its arguments (COMMAND_FRAME and
 \ its buffer, or COMMAND_FETCH, a slot and an address), or an ordinary
@@ -147,6 +149,19 @@ ENDMACRO
 .host_chunk         EQUW 0      \ A chunk in the store (host_chunk_at)
 .host_fetch_slot    EQUB 0      \ A chunk to copy to the parasite, or 0...
 .host_fetch_to      EQUW 0      \ ... to here
+.host_items         EQUB 0      \ Items to draw (the packet's)...
+.host_item_column   SKIP ITEM_MAX   \ ... at these view columns
+.host_item_line     SKIP ITEM_MAX   \ ... and lines
+.host_item_frame    SKIP ITEM_MAX   \ ... these frames
+.host_items_untouched EQUB 0    \ ITEMS_UNTOUCHED if nothing is redrawn under them
+.host_item_new_low  SKIP ITEM_MAX   \ ... where they go on the screen
+.host_item_new_high SKIP ITEM_MAX
+.host_items_drawn   EQUB 0      \ Items drawn, to restore...
+.host_item_address_low  SKIP ITEM_MAX   \ ... drawn here
+.host_item_address_high SKIP ITEM_MAX
+.host_item_drawn_frame  SKIP ITEM_MAX   \ ... these frames
+.host_items_kept    EQUB 0      \ The first of them left as they are
+.host_item_index    EQUB 0
 
 \ ---------------------------------------------------------------------------
 \ Loader

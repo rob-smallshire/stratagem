@@ -69,7 +69,8 @@ STORE_CHUNK = &FF
 STORE_TILE_BYTES = 4
 STORE_CHUNK_BYTES = 2 + SLOT_BYTES
 FETCH_BYTES = 3                 \ Then a chunk to fetch: its slot, and the
-                                \ parasite address to copy it to; or a 0
+                                \ parasite address to copy it to; or a 0;
+                                \ then the items to draw (items.asm)
 
 \ Host addresses the parasite puts into draw lists (asserted in render.asm)
 HOST_MATERIAL_PAGES = &8100

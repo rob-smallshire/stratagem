@@ -315,7 +315,10 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
 \ Write the items in view to the packet at para_write, past the chunk to
 \ fetch (cache_prefetch): a count, then each item's view column, view line
 \ and frame. Only those wholly in view and clear of the columns the camera
-\ can scroll in are sent (items.shown).
+\ can scroll in are sent (items.shown). The count has ITEMS_UNTOUCHED set
+\ if the host redraws nothing under them this frame (no light's list, no
+\ changed tiles, not the whole view), so that it can leave as they are
+\ those drawn where they were.
 .items_emit
 {
     LDY #0                      \ Past the chunk to fetch: 0, or 3 bytes
@@ -408,7 +411,16 @@ ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
     INX
     BNE loop
 .done
+    LDA zp_redraw               \ Nothing redrawn under them?
+    ORA para_changes
+    ORA sl_list_count
+    BEQ untouched
     LDA item_sent
+    JMP count_set
+.untouched
+    LDA item_sent
+    ORA #ITEMS_UNTOUCHED
+.count_set
     LDY #0
     STA (para_write),Y
     RTS

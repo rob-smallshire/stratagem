@@ -31,29 +31,64 @@ ALIGN &100
 .quarter_offsets                \ Each column's MAX_SHAPES-byte row of a page
     EQUB 0, MAX_SHAPES, 2 * MAX_SHAPES, 3 * MAX_SHAPES
 
-\ Sprite frames: SPRITE_BYTES mask bytes then SPRITE_BYTES data bytes each.
+\ Sprite frames, three bytes wide: the player's (SPRITE_BYTES mask bytes
+\ then SPRITE_BYTES data bytes each), then the items' (ITEM_FRAME_FIRST
+\ on, ITEM_BYTES of each).
 .sprite_frames
     SPRITE_FRAMES
+.item_frames
+    ITEM_FRAMES
+ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
 .sprite_mask_low
     FOR frame, 0, SPRITE_FRAME_COUNT - 1
         EQUB LO(sprite_frames + frame * 2 * SPRITE_BYTES)
+    NEXT
+    FOR frame, 0, ITEM_FRAME_COUNT - 1
+        EQUB LO(item_frames + frame * 2 * ITEM_BYTES)
     NEXT
 .sprite_mask_high
     FOR frame, 0, SPRITE_FRAME_COUNT - 1
         EQUB HI(sprite_frames + frame * 2 * SPRITE_BYTES)
     NEXT
+    FOR frame, 0, ITEM_FRAME_COUNT - 1
+        EQUB HI(item_frames + frame * 2 * ITEM_BYTES)
+    NEXT
 .sprite_data_low
     FOR frame, 0, SPRITE_FRAME_COUNT - 1
         EQUB LO(sprite_frames + frame * 2 * SPRITE_BYTES + SPRITE_BYTES)
+    NEXT
+    FOR frame, 0, ITEM_FRAME_COUNT - 1
+        EQUB LO(item_frames + frame * 2 * ITEM_BYTES + ITEM_BYTES)
     NEXT
 .sprite_data_high
     FOR frame, 0, SPRITE_FRAME_COUNT - 1
         EQUB HI(sprite_frames + frame * 2 * SPRITE_BYTES + SPRITE_BYTES)
     NEXT
+    FOR frame, 0, ITEM_FRAME_COUNT - 1
+        EQUB HI(item_frames + frame * 2 * ITEM_BYTES + ITEM_BYTES)
+    NEXT
+.sprite_lines                   \ Each frame's height
+    FOR frame, 0, SPRITE_FRAME_COUNT - 1
+        EQUB PLAYER_HEIGHT
+    NEXT
+    FOR frame, 0, ITEM_FRAME_COUNT - 1
+        EQUB ITEM_HEIGHT
+    NEXT
 
-\ The screen bytes under the sprite, saved when it is drawn.
+\ The screen bytes under the player's sprite, and under each item's, saved
+\ when they are drawn.
 .sprite_save
     SKIP SPRITE_BYTES
+.item_saves
+    SKIP ITEM_MAX * ITEM_BYTES
+.item_save_low
+    FOR item, 0, ITEM_MAX - 1
+        EQUB LO(item_saves + item * ITEM_BYTES)
+    NEXT
+.item_save_high
+    FOR item, 0, ITEM_MAX - 1
+        EQUB HI(item_saves + item * ITEM_BYTES)
+    NEXT
 
 CLEAR RENDER_CODE, RENDER_END
 ORG RENDER_CODE
@@ -390,10 +425,150 @@ ENDMACRO
     RTS
 }
 
-\ Draw sprite frame zp_sprite_frame with its top line at zp_sprite_address,
-\ saving the screen under it, each byte as (screen AND mask) OR data.
+\ Draw the player's sprite, frame zp_sprite_frame, with its top line at
+\ zp_sprite_address, saving the screen under it.
 .render_sprite
 {
+    LDA #LO(sprite_save)
+    LDX #HI(sprite_save)
+    JMP sprite_draw
+}
+
+\ Remove the player's sprite drawn at zp_sprite_address, restoring the
+\ screen under it.
+.render_restore
+{
+    LDA #LO(sprite_save)
+    LDX #HI(sprite_save)
+    LDY #PLAYER_HEIGHT
+    JMP sprite_undo
+}
+
+\ Remove the items drawn, last first, restoring the screen under them;
+\ but leave as they are those at the start of the list drawn where and as
+\ they are to be drawn again, if nothing is redrawn under them this frame
+\ (host_items_untouched), so that items lying still cost nothing. Work out
+\ where each item the packet carried goes on the screen first.
+.restore_items
+{
+    LDX #0                      \ Where each goes
+.address
+    CPX host_items
+    BEQ addressed
+    LDA #0                      \ Address = screen_start + (line >> 3) *
+    STA zp_ptr + 1              \ ROW_BYTES + column * 8 + (line AND 7)
+    LDA host_item_column,X
+    ASL A
+    ASL A
+    ASL A
+    ROL zp_ptr + 1
+    STA zp_ptr
+    LDA host_item_line,X
+    LSR A
+    LSR A
+    AND #&FE                    \ (line >> 3) * 2 pages
+    CLC
+    ADC zp_ptr + 1
+    STA zp_ptr + 1
+    LDA host_item_line,X
+    AND #7
+    ORA zp_ptr                  \ Column * 8 has its low three bits clear
+    CLC
+    ADC zp_screen_start
+    STA host_item_new_low,X
+    LDA zp_ptr + 1
+    ADC zp_screen_start + 1
+    JSR wrap_screen_high
+    STA host_item_new_high,X
+    INX
+    BNE address
+.addressed
+    LDX #0                      \ Those left as they are
+    LDA host_items_untouched
+    BEQ kept
+.keep
+    CPX host_items
+    BEQ kept
+    CPX host_items_drawn
+    BEQ kept
+    LDA host_item_new_low,X
+    CMP host_item_address_low,X
+    BNE kept
+    LDA host_item_new_high,X
+    CMP host_item_address_high,X
+    BNE kept
+    LDA host_item_frame,X
+    CMP host_item_drawn_frame,X
+    BNE kept
+    INX
+    BNE keep
+.kept
+    STX host_items_kept
+    LDX host_items_drawn        \ The rest, last first
+.loop
+    CPX host_items_kept
+    BEQ done
+    DEX
+    STX host_item_index
+    LDA host_item_address_low,X
+    STA zp_sprite_address
+    LDA host_item_address_high,X
+    STA zp_sprite_address + 1
+    LDY item_save_low,X         \ Its save buffer, in XA
+    LDA item_save_high,X
+    TAX
+    TYA
+    LDY #ITEM_HEIGHT
+    JSR sprite_undo
+    LDX host_item_index
+    JMP loop
+.done
+    STX host_items_drawn
+    RTS
+}
+
+\ Draw the items the packet carried, but those left as they are, saving
+\ the screen under each.
+.render_items
+{
+    LDX host_items_kept
+.loop
+    CPX host_items
+    BEQ done
+    STX host_item_index
+    LDA host_item_new_low,X
+    STA zp_sprite_address
+    STA host_item_address_low,X
+    LDA host_item_new_high,X
+    STA zp_sprite_address + 1
+    STA host_item_address_high,X
+    LDA host_item_frame,X
+    STA zp_sprite_frame
+    STA host_item_drawn_frame,X
+    LDY item_save_low,X         \ Its save buffer, in XA
+    LDA item_save_high,X
+    TAX
+    TYA
+    JSR sprite_draw
+    LDX host_item_index
+    INX
+    BNE loop
+.done
+    STX host_items_drawn
+    RTS
+}
+
+\ Draw sprite frame zp_sprite_frame with its top line at zp_sprite_address,
+\ saving the screen under it at XA, each byte as (screen AND mask) OR
+\ data.
+.sprite_draw
+{
+    STA save0 + 1               \ Point the saves at the buffer
+    STA save1 + 1
+    STA save2 + 1
+    STX save0 + 2
+    STX save1 + 2
+    STX save2 + 2
     LDX zp_sprite_frame         \ Point the AND and ORA operands at the frame
     LDA sprite_mask_low,X
     STA mask0 + 1
@@ -411,13 +586,14 @@ ENDMACRO
     STA data0 + 2
     STA data1 + 2
     STA data2 + 2
-    JSR sprite_pointers
-    LDA #PLAYER_HEIGHT
+    LDA sprite_lines,X
     STA zp_render_count
+    JSR sprite_pointers
     LDX #0
 .line_loop
     LDA (zp_screen),Y
-    STA sprite_save,X
+.save0
+    STA &FFFF,X
 .mask0
     AND &FFFF,X
 .data0
@@ -425,7 +601,8 @@ ENDMACRO
     STA (zp_screen),Y
     INX
     LDA (zp_screen_lower),Y
-    STA sprite_save,X
+.save1
+    STA &FFFF,X
 .mask1
     AND &FFFF,X
 .data1
@@ -433,7 +610,8 @@ ENDMACRO
     STA (zp_screen_lower),Y
     INX
     LDA (zp_tile),Y
-    STA sprite_save,X
+.save2
+    STA &FFFF,X
 .mask2
     AND &FFFF,X
 .data2
@@ -450,22 +628,30 @@ ENDMACRO
     RTS
 }
 
-\ Remove the sprite drawn at zp_sprite_address, restoring the screen under
-\ it.
-.render_restore
+\ Remove the sprite Y lines high drawn at zp_sprite_address, restoring the
+\ screen under it from XA.
+.sprite_undo
 {
+    STA load0 + 1
+    STA load1 + 1
+    STA load2 + 1
+    STX load0 + 2
+    STX load1 + 2
+    STX load2 + 2
+    STY zp_render_count
     JSR sprite_pointers
-    LDA #PLAYER_HEIGHT
-    STA zp_render_count
     LDX #0
 .line_loop
-    LDA sprite_save,X
+.load0
+    LDA &FFFF,X
     STA (zp_screen),Y
     INX
-    LDA sprite_save,X
+.load1
+    LDA &FFFF,X
     STA (zp_screen_lower),Y
     INX
-    LDA sprite_save,X
+.load2
+    LDA &FFFF,X
     STA (zp_tile),Y
     INX
     INY

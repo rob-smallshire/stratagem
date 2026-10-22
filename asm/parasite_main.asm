@@ -227,8 +227,6 @@
     STA (para_write),Y
     JSR store_emit
     JSR cache_prefetch
-    JSR items_emit
-.*para_items_sent
     LDY #PACKET_STRIPS
     LDA para_strips
     STA (para_packet),Y
@@ -269,6 +267,8 @@
     LDY #0
     LDA sl_list_count
     STA (para_list),Y
+    JSR items_emit              \ After the chunk to fetch, knowing the list
+.*para_items_sent
 
     LDA zp_redraw               \ The new columns, drawn after the list as
     BNE header                  \ daylight alone: for the next pass
