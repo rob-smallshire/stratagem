@@ -26,6 +26,7 @@ The keys are those of `implementation-record.md`, and T:
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
 | SPACE | Place a soil block |
 | T | Drop a torch where the miner stands (in air: up to 24) |
+| P | Hold to pick up the items the miner touches (the logs a felled tree drops, which otherwise pile up where they fall) |
 
 Dig down a few tiles to leave the daylight: the miner's light shows below,
 and daylight follows down the shaft.
@@ -160,7 +161,8 @@ are held at the same height, and not both by one item; otherwise it slides
 2 pixels towards the side not held and falls again, unless the slide runs
 into ground or another item. So logs dropped on one spot pile into a cone
 (three, then two on them, then one), and slide down slopes. Only items over
-the tile cache move. The miner picks one up by touching it, into `wood`. At
+the tile cache move. While P is held the miner picks up each one he
+touches, into `wood`; otherwise he passes them by. At
 most 8 lie in the world (more go straight into `wood`). An item whose fall
 left it as it was is marked still (`ITEM_STILL`) and not moved again until
 a tile changes, an item is picked up, or an item it rested on or was
@@ -175,7 +177,9 @@ the sprite is drawn, saving the screen under each, last of all (after the
 sprite and the new columns, so as not to delay the columns past the beam),
 and restores them, last first, before the sprite and the changed tiles. If nothing is redrawn under them (no list, no changed tiles: the
 count's `ITEMS_UNTOUCHED`), the items at the start of the list drawn where
-and as they will be drawn again are left as they are: on the surface,
+and as they will be drawn again are left as they are, unless one meets the
+miner's sprite, this frame or last (`ITEM_BY_MINER` in its frame: the
+sprite is restored and drawn each frame, over it): on the surface,
 where daylight outshines the miner's light, logs lying still cost the host
 almost nothing.
 

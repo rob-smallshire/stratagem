@@ -6,8 +6,8 @@
 \ both corners are held at the same height, and not both by one item;
 \ otherwise it slides SLIDE pixels to the side not held and falls again,
 \ unless the slide is blocked: so items pile up, as sand does. Only items
-\ over the tile cache move (elsewhere they wait). The miner picks up an
-\ item by touching it. At most ITEM_MAX lie in the world: more go straight
+\ over the tile cache move (elsewhere they wait). While P is held
+\ (INPUT_PICK), the miner picks up each item he touches. At most ITEM_MAX lie in the world: more go straight
 \ into the inventory. The packet carries those in view, for the host to
 \ draw as sprites (items_emit).
 \
@@ -88,7 +88,7 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
 }
 
 \ Each item falls, unless it is still, and is picked up if the miner
-\ touches it.
+\ touches it while picking up.
 .items_step
 {
     LDA items_moving            \ A tile changed: none is still
@@ -112,6 +112,9 @@ ITEM_TERRAIN = &80              \ the ground, or an item's index
     JSR item_fall
     LDX item_i
 .fallen
+    LDA zp_input                \ Picking up?
+    AND #INPUT_PICK
+    BEQ next
     JSR item_touches
     BCS next
     JSR item_gained             \ Picked up: the last takes its place, and
@@ -898,6 +901,150 @@ ASSERT SLIDE < 8
     RTS
 }
 
+\ Set the box the miner's sprite covers, this frame or last (as the host
+\ drew it), in world bytes and lines: item_box_left to item_box_right,
+\ item_box_top to item_box_bottom, exclusive at the right and bottom; and
+\ keep this frame's position for the next.
+.item_miner_box
+{
+    LDA zp_player_x + 1         \ The sprite's byte column: x >> 5
+    STA zp_temp + 1
+    LDA zp_player_x
+    JSR lines_of
+    LSR zp_temp + 1
+    ROR A
+    STA item_tmp
+    LDA zp_temp + 1
+    STA item_tmp + 1
+    LDA zp_player_y + 1         \ Its line: y >> 4
+    STA zp_temp + 1
+    LDA zp_player_y
+    JSR lines_of
+    STA zp_temp
+    LDA item_tmp                \ Left: the lesser column
+    CMP item_miner_column
+    LDA item_tmp + 1
+    SBC item_miner_column + 1
+    BCC this_left
+    LDA item_miner_column
+    STA item_box_left
+    LDA item_miner_column + 1
+    STA item_box_left + 1
+    LDA item_tmp
+    CLC
+    ADC #SPRITE_COLUMNS
+    STA item_box_right
+    LDA item_tmp + 1
+    ADC #0
+    STA item_box_right + 1
+    JMP across
+.this_left
+    LDA item_tmp
+    STA item_box_left
+    LDA item_tmp + 1
+    STA item_box_left + 1
+    LDA item_miner_column
+    CLC
+    ADC #SPRITE_COLUMNS
+    STA item_box_right
+    LDA item_miner_column + 1
+    ADC #0
+    STA item_box_right + 1
+.across
+    LDA zp_temp                 \ Top: the lesser line
+    CMP item_miner_line
+    LDA zp_temp + 1
+    SBC item_miner_line + 1
+    BCC this_top
+    LDA item_miner_line
+    STA item_box_top
+    LDA item_miner_line + 1
+    STA item_box_top + 1
+    LDA zp_temp
+    CLC
+    ADC #PLAYER_HEIGHT
+    STA item_box_bottom
+    LDA zp_temp + 1
+    ADC #0
+    STA item_box_bottom + 1
+    JMP kept
+.this_top
+    LDA zp_temp
+    STA item_box_top
+    LDA zp_temp + 1
+    STA item_box_top + 1
+    LDA item_miner_line
+    CLC
+    ADC #PLAYER_HEIGHT
+    STA item_box_bottom
+    LDA item_miner_line + 1
+    ADC #0
+    STA item_box_bottom + 1
+.kept
+    LDA item_tmp                \ For the next frame
+    STA item_miner_column
+    LDA item_tmp + 1
+    STA item_miner_column + 1
+    LDA zp_temp
+    STA item_miner_line
+    LDA zp_temp + 1
+    STA item_miner_line + 1
+    RTS
+}
+
+\ Set item_tmp to ITEM_BY_MINER if item X's sprite meets the miner's box
+\ (item_miner_box), else 0: then the host must draw it again each frame,
+\ as the miner's sprite is. Preserves X and Y; returns with carry clear.
+.item_by_miner
+{
+    LDA #0
+    STA item_tmp
+    LDA item_x_high,X           \ Its byte column: x >> 1
+    LSR A
+    STA zp_temp + 1
+    LDA item_x_low,X
+    ROR A
+    STA zp_temp
+    CMP item_box_right          \ column < right
+    LDA zp_temp + 1
+    SBC item_box_right + 1
+    BCS apart
+    LDA zp_temp                 \ column + SPRITE_COLUMNS > left
+    CLC
+    ADC #SPRITE_COLUMNS
+    STA zp_temp
+    BCC added
+    INC zp_temp + 1
+.added
+    LDA item_box_left
+    CMP zp_temp
+    LDA item_box_left + 1
+    SBC zp_temp + 1
+    BCS apart
+    LDA item_top_low,X          \ top < bottom
+    CMP item_box_bottom
+    LDA item_top_high,X
+    SBC item_box_bottom + 1
+    BCS apart
+    LDA item_top_low,X          \ top + ITEM_HEIGHT > box top
+    CLC
+    ADC #ITEM_HEIGHT
+    STA zp_temp
+    LDA item_top_high,X
+    ADC #0
+    STA zp_temp + 1
+    LDA item_box_top
+    CMP zp_temp
+    LDA item_box_top + 1
+    SBC zp_temp + 1
+    BCS apart
+    LDA #ITEM_BY_MINER
+    STA item_tmp
+.apart
+    CLC
+    RTS
+}
+
 \ Write the items in view to the packet at para_write, past the chunk to
 \ fetch (cache_prefetch): a count, then each item's view column, view line
 \ and frame. Only those wholly in view and clear of the columns the camera
@@ -931,6 +1078,7 @@ ASSERT SLIDE < 8
     ASL item_camera_line
     ROL A
     STA item_camera_line + 1
+    JSR item_miner_box
     LDA #0
     STA item_sent
     LDY #1                      \ Where the next item goes
@@ -977,9 +1125,10 @@ ASSERT SLIDE < 8
     LDA zp_temp2
     STA (para_write),Y
     INY
+    JSR item_by_miner           \ Its frame, marked if by the miner
     LDA item_kind,X
-    CLC
-    ADC #ITEM_FRAME_FIRST
+    ADC #ITEM_FRAME_FIRST       \ (Carry clear)
+    ORA item_tmp
     STA (para_write),Y
     INY
     INC item_sent

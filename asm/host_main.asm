@@ -20,6 +20,7 @@ INKEY_M = &100 - 102
 INKEY_L = &100 - 87
 INKEY_SPACE = &100 - 99
 INKEY_T = &100 - 36
+INKEY_P = &100 - 56
 
 \ The host's start: a clear, narrowed screen.
 .host_init
@@ -552,6 +553,9 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     JSR read_key
     LDX #INKEY_T
     LDA #INPUT_TORCH
+    JSR read_key
+    LDX #INKEY_P
+    LDA #INPUT_PICK
     \ Fall through
 }
 

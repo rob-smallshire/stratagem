@@ -6,8 +6,8 @@ by FakeHost (test_daylight.ParasiteGame)."""
 import pytest
 
 from stratagem import items, sprites
-from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_RIGHT
-from stratagem.player import Player
+from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_PICK, INPUT_RIGHT
+from stratagem.player import PLAYER_HEIGHT, Player
 from stratagem.tiles import PIECES, ROOT
 from stratagem.world import HEIGHTS, TRUNKS, generate_tile
 from test_daylight import ParasiteGame
@@ -15,6 +15,7 @@ from test_daylight import ParasiteGame
 TILE_CACHE_SIZE = 32
 ITEM_STILL = 0x80           # asm/items.asm: in vy, an item that would stay as it is
 ITEMS_UNTOUCHED = 0x80      # in the packet's count of items: nothing redrawn under them
+ITEM_BY_MINER = 0x80        # in an item's frame: it meets the miner's sprite, this frame or last
 
 
 def word(memory, address: int) -> int:
@@ -61,38 +62,58 @@ class ItemWatch:
                                                                  "cached_bottom"))
         self.in_cache = lambda x, y: left <= x <= right and top <= y <= bottom
         self.wood = game.byte("wood")
+        self.picking = bool(game.byte("zp_input") & INPUT_PICK)
 
     def end(self, _mpu):
-        expected, picked = items.step(self.before, self.player, self.tiles, self.in_cache)
+        expected, picked = items.step(self.before, self.player, self.tiles, self.in_cache, self.picking)
         self.after = held_items(self.game)
         assert self.after == expected
         assert self.game.byte("wood") == self.wood + picked
         self.picked += picked
 
 
-def check_packet(game):
-    """The packet's items, after the chunk to fetch: those in view; their
-    count marked if nothing is redrawn under them."""
-    memory = game.memory
-    at = word(memory, game.labels["para_write"])
-    count = memory[at] & ~ITEMS_UNTOUCHED
-    sent = [tuple(memory[at + 1 + 3 * i:at + 4 + 3 * i]) for i in range(count)]
-    redrawn = game.byte("zp_redraw") or game.byte("para_changes") or game.byte("sl_list_count")
-    assert bool(memory[at] & ITEMS_UNTOUCHED) == (not redrawn)
-    camera_x, camera_y = word(memory, game.labels["zp_camera_x"]), word(memory, game.labels["zp_camera_y"])
-    first = len(sprites.sprite_frames())
-    shown = [(column, line, first + kind) for column, line, kind in items.shown(held_items(game), camera_x, camera_y)]
-    assert sent == shown
-    return len(sent)
+class PacketCheck:
+    """The packet's items, after the chunk to fetch: those in view, each
+    marked if it meets the miner's sprite this frame or last; their count
+    marked if nothing is redrawn under them."""
+
+    def __init__(self, game):
+        self.last = (word(game.memory, game.labels["item_miner_column"]),   # the miner's sprite
+                     word(game.memory, game.labels["item_miner_line"]))     # last frame
+
+    def __call__(self, game):
+        memory = game.memory
+        at = word(memory, game.labels["para_write"])
+        count = memory[at] & ~ITEMS_UNTOUCHED
+        sent = [tuple(memory[at + 1 + 3 * i:at + 4 + 3 * i]) for i in range(count)]
+        redrawn = game.byte("zp_redraw") or game.byte("para_changes") or game.byte("sl_list_count")
+        assert bool(memory[at] & ITEMS_UNTOUCHED) == (not redrawn)
+        camera_x, camera_y = word(memory, game.labels["zp_camera_x"]), word(memory, game.labels["zp_camera_y"])
+        miner = word(memory, game.labels["zp_player_x"]) >> 5, word(memory, game.labels["zp_player_y"]) >> 4
+        first = len(sprites.sprite_frames())
+        lying = held_items(game)
+        expected = []
+        for column, line, kind in items.shown(lying, camera_x, camera_y):
+            item = next(i for i in lying if (i.x >> 1) - camera_x == column and i.py - camera_y * 8 == line)
+            left, right = min(miner[0], self.last[0]), max(miner[0], self.last[0]) + sprites.SPRITE_COLUMNS
+            top, bottom = min(miner[1], self.last[1]), max(miner[1], self.last[1]) + PLAYER_HEIGHT
+            by = (left < (item.x >> 1) + sprites.SPRITE_COLUMNS and item.x >> 1 < right
+                  and top < item.py + items.ITEM_HEIGHT and item.py < bottom)
+            expected.append((column, line, first + kind | (ITEM_BY_MINER if by else 0)))
+        self.last = miner
+        assert sent == expected
+        return len(sent)
 
 
-def test_felled_wood_falls_and_is_picked_up():
-    """Dig at the tree beside the start, and step back: its root and each
-    part of its trunk drop a log as they break, which fall and pile up,
-    where the miner, walking left over them, picks them up."""
+def test_felled_wood_piles_up_and_is_picked_up():
+    """Dig at the tree beside the start: its root and each part of its
+    trunk drop a log as they break, which fall and pile up about the miner,
+    who passes them by; then, holding P, he walks over them and picks them
+    up."""
     from stratagem.build import build
     game = ParasiteGame(build())
     watch = ItemWatch(game)
+    check_packet = PacketCheck(game)
     trunk = 127
     assert trunk in TRUNKS
     shown = 0
@@ -109,12 +130,12 @@ def test_felled_wood_falls_and_is_picked_up():
         if watch.dropped:
             break
     assert watch.dropped == 1, "the root"
-    play(20, INPUT_RIGHT)
     play(60, 0)
     ground = HEIGHTS[trunk]
     assert watch.dropped == 1 + TRUNKS[trunk], "the root and each part of the trunk"
+    assert watch.picked == 0, "picked up without P"
     lying = held_items(game)
-    assert len(lying) + watch.picked == watch.dropped
+    assert len(lying) == watch.dropped
     assert all(item.vy == 0 for item in lying), "they lie still"
     assert any(item.py + items.ITEM_HEIGHT == ground * 16 for item in lying), "on the ground"
     assert any(item.py + items.ITEM_HEIGHT < ground * 16 for item in lying), "piled up"
@@ -122,7 +143,8 @@ def test_felled_wood_falls_and_is_picked_up():
                    and a.py < b.py + items.ITEM_HEIGHT and b.py < a.py + items.ITEM_HEIGHT
                    for n, a in enumerate(lying) for b in lying[n + 1:]), "none overlap"
     assert shown == len(lying), "they were in view"
-    play(40, INPUT_LEFT)
+    play(10, INPUT_RIGHT | INPUT_PICK)
+    play(40, INPUT_LEFT | INPUT_PICK)
     assert game.byte("item_count") == 0, "not all picked up"
     assert watch.picked == watch.dropped
     assert game.byte("wood") == watch.dropped

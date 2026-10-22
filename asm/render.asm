@@ -499,7 +499,7 @@ ENDMACRO
     LDA host_item_new_high,X
     CMP host_item_address_high,X
     BNE kept
-    LDA host_item_frame,X
+    LDA host_item_frame,X       \ (Never one by the miner, drawn each frame)
     CMP host_item_drawn_frame,X
     BNE kept
     INX
@@ -546,6 +546,7 @@ ENDMACRO
     STA zp_sprite_address + 1
     STA host_item_address_high,X
     LDA host_item_frame,X
+    AND #&FF - ITEM_BY_MINER
     STA zp_sprite_frame
     STA host_item_drawn_frame,X
     LDY item_save_low,X         \ Its save buffer, in XA

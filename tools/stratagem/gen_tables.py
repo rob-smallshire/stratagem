@@ -131,7 +131,7 @@ def camera_source() -> str:
     for name in ("CAMERA_X_MAX", "CAMERA_Y_MAX", "WINDOW_LEFT", "WINDOW_RIGHT",
                  "WINDOW_TOP", "WINDOW_BOTTOM", "LEAD_MAX", "MAX_STEP_X", "CENTRE_X", "CENTRE_Y",
                  "INPUT_LEFT", "INPUT_RIGHT", "INPUT_UP", "INPUT_DOWN", "INPUT_ACTION", "INPUT_PLACE",
-                 "INPUT_TORCH"):
+                 "INPUT_TORCH", "INPUT_PICK"):
         lines.append(f"{name} = {getattr(camera, name)}")
     return "\n".join(lines) + "\n"
 
@@ -509,6 +509,7 @@ def items_source() -> str:
     lines.append("ITEM_SENT_BYTES = 3               \\ In a packet: view column, view line, frame")
     lines.append("ITEMS_SENT_MAX = 1 + ITEM_MAX * ITEM_SENT_BYTES")
     lines.append("ITEMS_UNTOUCHED = &80             \\ In the count: nothing is redrawn under them")
+    lines.append("ITEM_BY_MINER = &80               \\ In a frame: it meets the miner's sprite")
     lines.append("")
     lines.append("MACRO ITEM_FRAMES")
     for kind, data in enumerate(frames):

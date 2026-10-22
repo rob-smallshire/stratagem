@@ -269,6 +269,12 @@ GUARD &0800
 .item_least_top     SKIP 2
 .item_most_below    SKIP 2
 .item_bounded       SKIP 1      \ Non-zero once they are worked out this frame
+.item_miner_column  SKIP 2      \ The miner's sprite last frame: byte column
+.item_miner_line    SKIP 2      \ ... and line
+.item_box_left      SKIP 2      \ The box it covers, this frame or last
+.item_box_right     SKIP 2
+.item_box_top       SKIP 2
+.item_box_bottom    SKIP 2
 .item_step          SKIP 1      \ A slide: SLIDE or -SLIDE
 .item_tmp           SKIP 2
 .item_bit           SKIP 1

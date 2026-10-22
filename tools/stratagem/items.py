@@ -17,13 +17,14 @@ and falls again: so logs dropped on one spot pile up into a cone, and slide
 down slopes. A slide into solid ground or another item is not made; the
 item lies still.
 Only items over the tile cache move (the 6502 looks at the tile cache);
-others wait. The miner picks up an item by touching it (their boxes
-overlap): it goes into the inventory. At most ITEM_MAX lie in the world:
+others wait. While P is held (INPUT_PICK), the miner picks up each item
+he touches (their boxes overlap): it goes into the inventory; otherwise he
+passes them by, so that they pile up where they fall. At most ITEM_MAX lie in the world:
 more go straight into the inventory.
 
 Each frame, after the miner moves and acts, every item falls, in the
 list's order (each against the others as they are by then), and then is
-picked up if touched; an item picked up is replaced in the list by the
+picked up if touched while picking; an item picked up is replaced in the list by the
 last, which is then dealt with in its turn.
 
 The host draws the items in view as sprites: each at a view column and
@@ -154,15 +155,15 @@ def touches(item: Item, player: Player) -> bool:
 
 
 def step(items: list[Item], player: Player, tile_at: TileAt,
-         in_cache: Callable[[int, int], bool]) -> tuple[list[Item], int]:
+         in_cache: Callable[[int, int], bool], picking: bool) -> tuple[list[Item], int]:
     """One frame: every item falls, and is picked up if the player touches
-    it. Returns the items left and how many were picked up."""
+    it while picking. Returns the items left and how many were picked up."""
     items = list(items)
     picked = 0
     i = 0
     while i < len(items):
         item = fall(items, i, tile_at, in_cache)
-        if touches(item, player):
+        if picking and touches(item, player):
             picked += 1
             items[i] = items[-1]
             items.pop()

@@ -35,6 +35,10 @@
     STA support_wait
     STA item_count
     STA items_moving
+    STA item_miner_column
+    STA item_miner_column + 1
+    STA item_miner_line
+    STA item_miner_line + 1
     STA support_tail
     STA support_lost
     LDA #STARTING_ABILITIES

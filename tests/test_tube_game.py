@@ -24,9 +24,9 @@ SCRIPTS = {
     "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
     "drop-torches": DIG_DEEP + [(60, ["X", "L"]), (3, ["T"]), (20, []), (80, ["X", "L"]), (3, ["T"]), (20, []),
                                 (60, ["Z"]), (30, ["M", "L"]), (20, [])],
-    # The tree beside the start (column 127): its root dug, it falls, and
-    # the miner, having stepped back, walks over the logs it dropped.
-    "fell-a-tree": [(4, ["Z", "L"]), (16, ["X"]), (50, []), (30, ["Z"]), (10, [])],
+    # The tree beside the start (column 127): its root dug, it falls, its
+    # logs pile up about the miner, and he walks over them holding P.
+    "fell-a-tree": [(4, ["Z", "L"]), (60, []), (10, ["X", "P"]), (30, ["Z", "P"]), (10, [])],
 }
 
 
@@ -95,7 +95,7 @@ def expected_screen(bbc, labels):
          (hero.px >> 1) - camera_x, hero.py - camera_y * 8)
     for i in range(peek[labels["host_items"]]):        # drawn after the sprite
         column, line = peek[labels["host_item_column"] + i], peek[labels["host_item_line"] + i]
-        frame = ITEM_FRAMES[peek[labels["host_item_frame"] + i] - len(FRAMES)]
+        frame = ITEM_FRAMES[(peek[labels["host_item_frame"] + i] & 0x7F) - len(FRAMES)]
         draw(frame, sprites.ITEM_BYTES, items.ITEM_HEIGHT, column, line)
     return image
 
