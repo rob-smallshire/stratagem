@@ -29,7 +29,7 @@ def cells_of(tile_at, x0, x1, y0, y1):
     return cells
 
 
-def settle(game, frames: int = 60) -> int:
+def settle(game, frames: int = 200) -> int:
     """Play idle frames until nothing is left to check; returns how many."""
     for n in range(frames):
         game.frame(0)

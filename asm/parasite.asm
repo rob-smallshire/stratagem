@@ -224,6 +224,7 @@ GUARD &0800
 .support_best       SKIP 1      \ ... the most strength it is given
 .support_side       SKIP 1
 .support_checks     SKIP 1
+.support_wait       SKIP 1      \ Frames until the next piece may fall
 .support_tmp        SKIP 1
 
 \ And tables the light sets up afresh each pass, above daylight's window

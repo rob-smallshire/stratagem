@@ -31,6 +31,7 @@
     STA MAILBOX_FRAME
     STA para_sent
     STA support_head
+    STA support_wait
     STA support_tail
     STA support_lost
     LDA #STARTING_ABILITIES

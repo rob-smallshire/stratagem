@@ -23,7 +23,7 @@ SCRIPTS = {
     "drop-torches": DIG_DEEP + [(60, ["X", "L"]), (3, ["T"]), (20, []), (80, ["X", "L"]), (3, ["T"]), (20, []),
                                 (60, ["Z"]), (30, ["M", "L"]), (20, [])],
     # The tree beside the start (column 127): its root dug, it falls.
-    "fell-a-tree": [(12, ["Z", "L"]), (30, [])],
+    "fell-a-tree": [(12, ["Z", "L"]), (60, [])],
 }
 
 

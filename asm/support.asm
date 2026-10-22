@@ -10,13 +10,14 @@
 \ call_set_tile); a check works the tile's strength out again from its
 \ neighbours, and if it has changed, stores it, or at 0 lets the piece fall
 \ (to sky or cave, as its background), which changes it and so queues its
-\ neighbours in turn. A few checks a frame, and no more falls than the
-\ packet has room for as changed tiles. Pieces are clear to light and
+\ neighbours in turn. A few checks a frame, and a piece falls only every
+\ FALL_FRAMES frames, so that a felled tree is seen to come apart. Pieces are clear to light and
 \ passable, so a fall changes neither daylight nor the miner's light: the
 \ tile is only redrawn.
 
 SUPPORT_QUEUE = 64              \ Tiles to check (a power of 2)
 SUPPORT_CHECKS = 6              \ Checks a frame, at most
+FALL_FRAMES = 4                 \ Frames from one fall to the next
 STRENGTH_BITS = 7
 
 SIDE_BELOW = 0                  \ Where a holder is, from the piece held
@@ -70,10 +71,14 @@ SIDE_RIGHT = 3
     RTS
 }
 
-\ Check the queued tiles, at most SUPPORT_CHECKS, and no more falls than
-\ the packet has room for among its changed tiles.
+\ Check the queued tiles, at most SUPPORT_CHECKS, while the packet has room
+\ among its changed tiles.
 .support_step
 {
+    LDA support_wait
+    BEQ ready
+    DEC support_wait
+.ready
     LDA #SUPPORT_CHECKS
     STA support_checks
 .check
@@ -149,6 +154,19 @@ SIDE_RIGHT = 3
     LDA support_material
     JMP change
 .fall
+    LDA support_wait            \ Not yet: checked again first, next frame
+    BEQ falls
+    LDA support_head
+    SEC
+    SBC #1
+    AND #SUPPORT_QUEUE - 1
+    STA support_head
+    LDA #1
+    STA support_checks
+    RTS
+.falls
+    LDA #FALL_FRAMES
+    STA support_wait
     LDA support_shape           \ Sky or cave, as its background
     AND #BACKGROUND_SKY
     STA zp_world_new_shape

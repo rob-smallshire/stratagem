@@ -141,7 +141,9 @@ neighbours; each frame up to 6 are checked (`support_step`), each working
 its strength out again from its neighbours: if it has changed it is
 stored, or at 0 the piece falls, to sky or cave, which queues its
 neighbours in turn, and is sent as a changed tile (no more than the packet
-has room for). Pieces are clear to light and passable, so a fall changes
+has room for). A piece falls only every 4 frames (`FALL_FRAMES`): a piece
+due to fall sooner is checked again next frame. So a felled tree is seen to
+come apart, from the cut upwards, over most of a second. Pieces are clear to light and passable, so a fall changes
 neither daylight nor the miner's light. Torches don't fall yet (one that
 did would have to leave the torches' list).
 
@@ -306,9 +308,10 @@ test_daylight's 490 frames the mean frame is 17,836 (17,455 before the
 store moved), the worst unchanged. PWORLD's tables end at `&A07B`, leaving
 7.1K free below daylight's.
 
-A felled tree (10 pieces) comes down over 9 frames; checking costs the
-parasite about 1,400 cycles a frame while it falls (3,100 at most), and
-the busiest frame of the fall, relighting what fell, about 52,500 (py65).
+A felled tree (10 pieces) came down over 9 frames, before the falls were
+paced (now 35); checking cost the parasite about 1,400 cycles a frame
+while it fell (3,100 at most), and the busiest frame of the fall,
+relighting what fell, about 52,500 (py65).
 
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the
