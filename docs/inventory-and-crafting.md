@@ -222,6 +222,12 @@ most BBC games with at least a card of keys and hints.
 
   At most about 24 kinds, so the inventory is a table of 24 bytes. The cap
   makes chests worth having later, without slots to manage now.
+  The cap also disposes of spoil. Minecraft's dirt and cobblestone, in
+  stacks of 64 across 36 slots, fill the inventory on a long dig, and
+  players dump them in lava (the cobblestone problem); Terraria avoids it
+  with stacks of 9999. With counts and no slots, soil can't crowd out
+  anything, and at 99 the dig still goes through and the extra is lost, so
+  a full count works as a trash slot.
 - **Counts are binary bytes, capped at `COUNT_MAX` (99)** (decided
   2026-10-23, after BCD was tried first). In play a gain is `CMP #99`,
   `BCS`, `INC` and a spend is `DEC`, so counts need no rules of their own.
@@ -463,6 +469,9 @@ the start to the boots (`STARTING_ABILITIES = 0`).
    It's now separate from crafting, which uses the arrows. Try it in the
    emulator.
 9. Do mirrored shapes match?
+10. Which kinds show "full" at the cap? Ore, gems and wood are worth
+    telling; soil and stone reach 99 in any long tunnel, so they should
+    probably stay silent.
 
 ## Steps
 
