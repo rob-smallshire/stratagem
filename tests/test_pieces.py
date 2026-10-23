@@ -12,8 +12,8 @@ from py65.memory import ObservableMemory
 from mos6502 import Machine6502
 from stratagem import gen_tables
 from stratagem.build import read_disc_file
-from stratagem.tiles import (AIR, BACKGROUND_SKY, BACKDROPS, FIRST_PIECE, SHAPE_FULL, SKY, SLOT_COUNT, SLOT_MATERIAL,
-                             TORCH, compose, slot_tile)
+from stratagem.tiles import (AIR, BACKGROUND_SKY, BACKDROPS, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, PIECES,
+                             SHAPE_FULL, SKY, SLOT_COUNT, SLOT_MATERIAL, TORCH, TRUNK, compose, pair_of, slot_tile)
 
 NO_SLOT = 0xFF
 TUBE_R3_STATUS, TUBE_R3 = 0xFEE4, 0xFEE5
@@ -60,6 +60,18 @@ def test_slots_are_given_shown_and_freed(game_build):
             base = labels[name] + slot * 8
             assert list(memory[base:base + 8]) == gen_tables._pair_visibility(parity)[pair * 8:pair * 8 + 8]
 
+    # A trunk in front: its own slot, with the visibility of one behind.
+    front_trunk = (TRUNK, 3 | BACKGROUND_SKY | PIECE_FRONT)
+    put_tile(machine, labels, 9, front_trunk)
+    mpu = machine.call(labels["piece_slot"], a=TRUNK, x=front_trunk[1]).mpu
+    assert mpu.p & 1 and mpu.x not in slots
+    assert memory[labels["pair_slot"] + pair_of(front_trunk)] == mpu.x
+    for name, parity in (("slot_visibility_even", 0), ("slot_visibility_odd", 1)):
+        behind = pair_of(front_trunk) - FRONT_PAIR
+        base = labels[name] + mpu.x * 8
+        assert list(memory[base:base + 8]) == gen_tables._pair_visibility(parity)[behind * 8:behind * 8 + 8]
+    put_tile(machine, labels, 9, (AIR, SHAPE_FULL))
+
     # The sky's torch leaves the tile cache: a sweep frees its slot only.
     put_tile(machine, labels, 700, (AIR, SHAPE_FULL))
     machine.call(labels["slot_sweep"], max_steps=200_000)
@@ -85,6 +97,14 @@ def test_a_full_tile_cache_frees_slots_as_needed(game_build):
     assert memory[labels["pair_slot"]] == mpu.x
 
 
+def test_pairs_are_the_models(game_build):
+    machine, labels = parasite(game_build)
+    for piece in PIECES:
+        for shape in (0, 3, BACKGROUND_SKY | 3, PIECE_FRONT | 2, PIECE_FRONT | BACKGROUND_SKY | 3):
+            mpu = machine.call(labels["piece_pair_of"], a=piece, x=shape).mpu
+            assert mpu.a == pair_of((piece, shape)), (piece, shape)
+
+
 def test_host_composes_slots(game_build):
     machine = Machine6502()
     machine.mpu.memory = ObservableMemory()
@@ -95,15 +115,17 @@ def test_host_composes_slots(game_build):
     memory.subscribe_to_read([TUBE_R3_STATUS], lambda address: 0x80)
     memory.subscribe_to_read([TUBE_R3], lambda address: sent.popleft())
     cycles = []
-    for slot, piece, backdrop in ((0, TORCH, AIR), (5, TORCH, SKY), (SLOT_COUNT - 1, TORCH, SKY)):
-        sent.extend([slot, piece - FIRST_PIECE, BACKDROPS.index(backdrop)])
+    for slot, piece, backdrop, front in ((0, TORCH, AIR, False), (5, TORCH, SKY, False),
+                                         (SLOT_COUNT - 1, TORCH, SKY, False), (7, TRUNK, SKY, True)):
+        pair = pair_of((piece, (BACKGROUND_SKY if backdrop == SKY else 0) | (PIECE_FRONT if front else 0)))
+        sent.extend([slot, pair >> 1, BACKDROPS.index(backdrop)])     # as the parasite sends it
         mpu = machine.mpu
         machine.call(labels["host_compose"])
         assert not sent
         base = SLOT_GRAPHICS + slot * 64
-        assert bytes(memory[base:base + 64]) == compose(piece, backdrop)
-        assert memory[labels["host_slot_pair"] + slot] == (piece - FIRST_PIECE) * 2 + BACKDROPS.index(backdrop)
-        sent.extend([slot, piece - FIRST_PIECE, BACKDROPS.index(backdrop)])
+        assert bytes(memory[base:base + 64]) == compose(piece, backdrop, front)
+        assert memory[labels["host_slot_pair"] + slot] == pair
+        sent.extend([slot, pair >> 1, BACKDROPS.index(backdrop)])
         before = mpu.processorCycles
         machine.call(labels["host_compose"])
         cycles.append(mpu.processorCycles - before)

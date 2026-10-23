@@ -52,7 +52,7 @@ Each frame:
    input it reads into the parasite's mailbox, and draws the new row into
    the hidden row. Then, at vertical sync, it flips, draws the new columns
    ahead of the beam, the changed tile, the light's list (reading it from
-   the Tube as it draws: `render_light.asm`), and the sprite.
+   the Tube as it draws: `render_light.asm`), and the sprite, behind pieces in front.
 
 While the host draws a frame, the parasite works out the next.
 
@@ -118,7 +118,8 @@ the host draws it with.
 The generator grows trees on the surface (`world.tree_part`): a root on
 the grass, a trunk of 1 to 4 tiles and a canopy three wide and two high,
 placed a column at a time with `WORLD_COVER`, a byte a column (the
-covering tree's trunk offset + 1, 0 for none, and its height). So
+covering tree's trunk offset + 1, 0 for none, its height, and
+`COVER_FRONT`). So
 `generate_tile` finds a tile of sky's part with one look-up and a
 subtraction from the trunk's surface height. A tree part's shape byte holds
 its strength (`support.py`: the span on the trunk's column, and beside it
@@ -131,6 +132,28 @@ A straight dig (ahead, up or down) breaks a tree's part whole, at one dig,
 for a piece of wood (`wood`, up to 99): in aiming, a part counts as whole,
 so beside a tree its root, the lowest, goes first, and support brings the
 rest down. Digging diagonally passes through trees, as walking does.
+
+### In front and behind
+
+Each tree stands in front of the miner or behind him, as the hash says for
+its trunk's column (`world.in_front`, about half of them), for a sense of
+depth: its parts' shape bytes have `PIECE_FRONT` (bit 7). Every pixel on the
+screen says whether a sprite may be drawn over it: tiles are drawn in the
+tile colour group (logical colours 8-15) and sprites in the sprite colour
+group (0-7), both mapped to the same colours, and a piece in front is
+composed into its slot with its own pixels in the sprite colour group
+(`tiles.compose`: its data AND `FRONT_COLOURS`). A pair in front is its own
+pair (+ `FRONT_PAIR`), and so its own slot, with the visibility of the pair
+behind; the light's dither keeps colour bit 3, so a dimmed pixel stays in
+its group.
+
+`sprite_draw` leaves a sprite's pixels out over any pixel in the sprite
+colour group (`sprites.drawn_byte`): a byte at or above `&C0` (both pixels
+tiles) is drawn as before; below, the screen's pixels in the sprite group
+are kept, through a 192-byte table of the drawable bits
+(`sprite_drawable`). So the miner passes behind trees in front, and items,
+drawn after him, pass behind him too. It is meant for doors, furniture and
+grass later: any piece can be in front.
 
 ### Support
 
@@ -359,6 +382,11 @@ nothing redrawn under them cost about 580 cycles a frame; when they must
 be redrawn, about 1,800 each (restoring 600, drawing 1,200), so 8 would
 cost about 14,000.
 
+Drawing the miner costs the host 3,036 cycles over tiles, 288 more than
+before sprites could pass behind things (a compare a byte); wholly behind a
+piece in front, 5,680 (py65, `test_sprites.py`). Composing a slot in front
+costs about 2,500 cycles, once, against 1,800 for one behind.
+
 Dropping a torch floods twice (the torch's pool, then the miner's, as the
 tile changed) and relights its surroundings: about 118,000 cycles, so the
 host can miss a frame then.
@@ -369,7 +397,7 @@ host can miss a frame then.
 - Items redrawn are drawn last, so near the top of the view the beam may
   pass one between its restoring and its drawing, and it flickers, in
   frames that redraw under it; they are out for only a second or so. Items
-  are drawn over the miner, and vanish a few columns inside the view's
+  pass behind the miner, and vanish a few columns inside the view's
   sides. Wood isn't shown or spent yet.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.

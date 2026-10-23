@@ -8,10 +8,12 @@
 \ the tile cache is swept, and slots whose pairs are no longer in it are
 \ freed. If there are still none, the piece is sent as its backdrop alone.
 \
-\ A pair is piece index * 2 + backdrop (1 for the sky). The light looks a
-\ piece tile's slot up to find the graphics the host draws it with, and
-\ the slot's visibility (pair_visibility, copied in when the slot is
-\ given), as it would a material's.
+\ A pair is piece index * 2 + backdrop (1 for the sky), + FRONT_PAIR for a
+\ piece in front (PIECE_FRONT), which the host composes in the sprite
+\ colour group. The light looks a piece tile's slot up to find the
+\ graphics the host draws it with, and the slot's visibility
+\ (pair_visibility, copied in when the slot is given, the same in front
+\ as behind), as it would a material's.
 
 PIECE_NO_SLOT = &FF
 
@@ -24,7 +26,7 @@ PIECE_NO_SLOT = &FF
     STA slot_pair,X
     DEX
     BPL slots
-    LDX #PIECE_COUNT * 2 - 1
+    LDX #FRONT_PAIR + PIECE_COUNT * 2 - 1
 .pairs
     STA pair_slot,X
     DEX
@@ -38,11 +40,19 @@ PIECE_NO_SLOT = &FF
     SEC
     SBC #FIRST_PIECE
     ASL A
-    CPX #BACKGROUND_SKY         \ Carry: the sky (the bits above it are clear)
+    CPX #PIECE_FRONT            \ In front?
+    BCC behind
+    ORA #FRONT_PAIR
+.behind
+    PHA
+    TXA
+    AND #BACKGROUND_SKY
+    CMP #BACKGROUND_SKY         \ Carry: the sky
+    PLA
     ADC #0
     RTS
 }
-ASSERT BACKGROUND_SKY = &40 AND SHAPE_BITS < BACKGROUND_SKY
+ASSERT PIECE_FRONT = &80 AND BACKGROUND_SKY = &40 AND SHAPE_BITS < BACKGROUND_SKY
 
 \ The tile the host shows for the piece tile with material A and shape X:
 \ its slot's, in A (material) and X (shape), or its backdrop's if it has no
@@ -141,7 +151,8 @@ ASSERT BACKGROUND_SKY = &40 AND SHAPE_BITS < BACKGROUND_SKY
     LDA piece_ptr + 1
     ADC #HI(slot_visibility_even)
     STA piece_ptr + 1
-    LDA piece_pair
+    LDA piece_pair              \ (The same in front as behind)
+    AND #FRONT_PAIR - 1
     ASL A
     ASL A
     ASL A

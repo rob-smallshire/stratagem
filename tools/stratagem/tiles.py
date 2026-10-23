@@ -17,7 +17,16 @@ was made from, so that digging it can erode further from the same side.
 
 The shape byte holds the shape number (SHAPE_BITS) and BACKGROUND_SKY,
 set if what shows through the tile's empty parts is sky rather than a dark
-cave: tiles at or above the surface line of their column.
+cave: tiles at or above the surface line of their column. A piece's shape
+byte holds its strength (support.py) for a shape, and PIECE_FRONT, set if
+it stands in front of the miner and items.
+
+In front and behind. Every pixel on the screen says whether a sprite may
+be drawn over it: tiles are drawn in the tile colour group, but the pixels
+of pieces in front in the sprite colour group (the same colours), and a
+sprite leaves its pixels out over any pixel in the sprite colour group
+(sprites.drawn_byte): over a piece in front, or over another sprite drawn
+first.
 
 Drawing. A tile is eight character cells, two rows of four; each cell is
 two quarter-cells, one above the other, so in any shape a cell is one of
@@ -68,6 +77,7 @@ FULL_MASK = 0xFFFF
 MAX_SHAPES = 64
 SHAPE_BITS = 0x3F
 BACKGROUND_SKY = 0x40
+PIECE_FRONT = 0x80          # a piece's: in front of sprites
 
 # Depth profiles, each also shifted deeper by 1-3 quarters: flat, 45 degree
 # ramps and half-height (22.5 degree) ramps.
@@ -347,16 +357,27 @@ def backdrop_graphics(backdrop: int) -> bytes:
     return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in MATERIAL_PIXELS[backdrop]])
 
 
-def compose(material: int, backdrop: int) -> bytes:
-    """What the host composes into a slot: (backdrop AND mask) OR data."""
+FRONT_COLOURS = 0x3F        # a screen byte's bits but those of the tile colour group
+
+
+def compose(material: int, backdrop: int, front: bool = False) -> bytes:
+    """What the host composes into a slot: (backdrop AND mask) OR data, the
+    data in the sprite colour group (data AND FRONT_COLOURS) if in front."""
     graphics, back = piece_graphics(material), backdrop_graphics(backdrop)
-    return bytes(back[i] & graphics[64 + i] | graphics[i] for i in range(64))
+    keep = FRONT_COLOURS if front else 0xFF
+    return bytes(back[i] & graphics[64 + i] | graphics[i] & keep for i in range(64))
+
+
+# A pair is the piece index * 2 + 1 for the sky, + FRONT_PAIR in front.
+FRONT_PAIR = 32
+assert PIECE_COUNT * 2 <= FRONT_PAIR
 
 
 def pair_of(tile: tuple[int, int]) -> int:
-    """The pair (piece, backdrop) a piece tile needs: piece index * 2 + sky."""
+    """The pair (piece, backdrop, in front or not) a piece tile needs."""
     material, shape = tile
-    return (material - FIRST_PIECE) * 2 + (1 if shape & BACKGROUND_SKY else 0)
+    return ((material - FIRST_PIECE) * 2 + (1 if shape & BACKGROUND_SKY else 0)
+            + (FRONT_PAIR if shape & PIECE_FRONT else 0))
 
 
 # Slots: SLOT_COUNT composed pairs, 64 bytes each, in SLOT_GROUPS materials
@@ -407,4 +428,6 @@ def tile_pixels(material: int, shape: int) -> list[list[int]]:
 def tile_bytes(tile: tuple[int, int]) -> bytes:
     """A tile's 64 bytes of screen data, its eight cells in order."""
     material, shape = tile
+    if material in PIECES:
+        return compose(material, background(shape), bool(shape & PIECE_FRONT))
     return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in tile_pixels(material, shape)])

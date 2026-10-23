@@ -5,7 +5,10 @@ where colour 0 is transparent.
 Each frame is PLAYER_WIDTH x PLAYER_HEIGHT pixels, three bytes wide. It is
 stored as SPRITE_BYTES mask bytes then SPRITE_BYTES data bytes, byte
 (line * 3 + column); the renderer draws each byte as
-(screen AND mask) OR data.
+(screen AND mask) OR data, but leaves the screen's pixels in the sprite
+colour group as they are (drawn_byte): those of pieces in front
+(tiles.PIECE_FRONT), and of sprites drawn first, which stand in front of
+those drawn after.
 """
 
 from __future__ import annotations
@@ -117,6 +120,19 @@ def encode_frame(pixels: list[list[int]]) -> bytes:
             masks.append((LEFT_PIXEL_BITS if left == 0 else 0) | (RIGHT_PIXEL_BITS if right == 0 else 0))
             data.append(mode2_byte(left, right))
     return bytes(masks + data)
+
+
+def drawable(under: int) -> int:
+    """The bits of a screen byte that a sprite may be drawn over: those of
+    its pixels in the tile colour group (colour bit 3, bits 7 and 6)."""
+    return (LEFT_PIXEL_BITS if under & 0x80 else 0) | (RIGHT_PIXEL_BITS if under & 0x40 else 0)
+
+
+def drawn_byte(under: int, mask: int, data: int) -> int:
+    """A sprite's byte drawn over the screen byte `under`: the renderer's
+    (under AND mask) OR data where under's pixel is drawable, else under's."""
+    keep = drawable(under)
+    return under ^ ((under ^ (under & mask | data)) & keep)
 
 
 def sprite_frames() -> list[bytes]:

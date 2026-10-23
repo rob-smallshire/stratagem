@@ -10,8 +10,8 @@ from conftest import RUN_TIMEOUT_EMULATED_SECONDS
 from stratagem import camera, items, lighting, player, sprites
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
-from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, SHAPE_FULL, SLOT_COUNT, TORCH, slot_of,
-                             tile_bytes)
+from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, SHAPE_FULL, SLOT_COUNT, TORCH,
+                             slot_of, tile_bytes)
 
 TILE_CACHE_SIZE = 32       # asm/layout.asm
 FRAMES = sprites.sprite_frames()
@@ -54,7 +54,8 @@ def host_tiles(bbc, labels):
         slot = slot_of(tile)
         if slot is not None:
             pair = slot_pairs[slot]
-            tile = FIRST_PIECE + (pair >> 1), SHAPE_FULL | (BACKGROUND_SKY if pair & 1 else 0)
+            tile = (FIRST_PIECE + ((pair & FRONT_PAIR - 1) >> 1),
+                    SHAPE_FULL | (BACKGROUND_SKY if pair & 1 else 0) | (PIECE_FRONT if pair & FRONT_PAIR else 0))
         return tile, lights[index] // lighting.LIGHT_SCALE
     return at
 
@@ -89,7 +90,7 @@ def expected_screen(bbc, labels):
             for c in range(sprites.SPRITE_COLUMNS):
                 address = wrap(screen_start + ((line + l) >> 3) * 512 + (column + c) * CELL_BYTES) + ((line + l) & 7)
                 i = l * sprites.SPRITE_COLUMNS + c
-                image[address] = image[address] & frame[i] | frame[frame_bytes + i]
+                image[address] = sprites.drawn_byte(image[address], frame[i], frame[frame_bytes + i])
 
     draw(FRAMES[peek[labels["zp_player_frame"]]], sprites.SPRITE_BYTES, player.PLAYER_HEIGHT,
          (hero.px >> 1) - camera_x, hero.py - camera_y * 8)

@@ -31,10 +31,12 @@ surface, ladders, later torches and furniture.
 - Test: the screen model (`expected_screen` in `tests/test_tube_game.py`)
   applies the same rule; add a scene with the player in front of and behind
   foreground pixels.
-- Trees: each tree in front of the miner or behind, at random (from the
-  generator's hash, by trunk column), for a sense of depth. So for trees the
-  choice is per tree, not per material: a bit in the part's shape byte, or
-  a second set of tree materials.
+- Trees: done (2026-10-23). Each tree is in front of the miner or behind,
+  by the hash of its trunk column: `PIECE_FRONT` in its parts' shape bytes,
+  pieces in front composed in the sprite colour group, and `sprite_draw`
+  leaving sprite pixels out over that group (see `tube-game.md`, In front
+  and behind). Any piece can now be in front: grass blades, doors and
+  furniture need only their own rule for the bit.
 
 ## 2. An on-screen display (HUD)
 

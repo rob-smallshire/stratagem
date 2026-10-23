@@ -144,7 +144,7 @@ ALIGN &100
 ORG slot_visibility_even + &200
 .slot_visibility_odd    SKIP SLOT_COUNT * 8
 .slot_mark              SKIP SLOT_COUNT
-.pair_slot              SKIP PIECE_COUNT * 2    \ Each pair's slot, or PIECE_NO_SLOT
+.pair_slot              SKIP FRONT_PAIR + PIECE_COUNT * 2   \ Each pair's slot, or PIECE_NO_SLOT
 
 SAVE "PGAME", pgame_start, pgame_end, pgame_start
 

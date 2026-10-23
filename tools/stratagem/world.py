@@ -20,7 +20,7 @@ import math
 import random
 
 from stratagem.tiles import (AIR, BACKGROUND_SKY, BEDROCK, CANOPY_LEFT, CANOPY_TOP_LEFT, DIGGABLE, FROM_BOTTOM,
-                             FROM_TOP, GEM, GRASS, ORE, PASSABLE, ROOT, SHAPE_FULL, SKY, SOIL, STONE, TRUNK,
+                             FROM_TOP, GEM, GRASS, ORE, PASSABLE, PIECE_FRONT, ROOT, SHAPE_FULL, SKY, SOIL, STONE, TRUNK,
                              TRUNK_KNOT, WATER, shape_of)
 
 WORLD_SIZE = 256
@@ -102,7 +102,7 @@ def _generate_shaped(x: int, y: int) -> Tile:
     if material == SKY:
         part = tree_part(x, y)
         if part is not None:
-            return part, tree_strength(x)
+            return part, tree_strength(x) | (PIECE_FRONT if in_front(COVER[x][0]) else 0)
     if material not in DIGGABLE:
         return material, SHAPE_FULL
     if y == HEIGHTS[x]:
@@ -132,12 +132,16 @@ def _generate_shaped(x: int, y: int) -> Tile:
 # and the ground beside it is low enough for the canopy to clear it. COVER
 # gives each column its tree, so that a tile's part is one look-up and a
 # subtraction from the surface height (on the 6502, WORLD_COVER: the
-# trunk's offset + 1 in bits 0-1, 0 for none, and its height above).
+# trunk's offset + 1 in bits 0-1, 0 for none, its height in bits 2-4, and
+# COVER_FRONT). Each tree stands in front of the miner or behind him, as
+# the hash says for its trunk's column, for a sense of depth.
 
 TREE_CHANCE = 90            # a trunk where the hash is below this, of 256
 TREE_SALT = 0x5A
 TREE_SPACING = 3            # columns between trunks, at least
 TRUNK_MIN, TRUNK_MAX = 1, 4  # trunk tiles, between the root and the canopy
+TREE_FRONT_SALT = 0xA6
+COVER_FRONT = 0x80
 
 
 def _trunks() -> dict[int, int]:
@@ -175,12 +179,17 @@ def _cover() -> list[tuple[int, int] | None]:
 COVER = _cover()            # each column's tree: (trunk column, trunk height), or None
 
 
+def in_front(trunk: int) -> bool:
+    """Whether the tree with its trunk in column `trunk` stands in front."""
+    return bool(PERM[trunk ^ TREE_FRONT_SALT] & 0x80)
+
+
 def cover_byte(x: int) -> int:
     """COVER[x] as the 6502 holds it."""
     if COVER[x] is None:
         return 0
     trunk, height = COVER[x]
-    return (x - trunk + 2) | height << 2
+    return (x - trunk + 2) | height << 2 | (COVER_FRONT if in_front(trunk) else 0)
 
 
 def tree_part(x: int, y: int) -> int | None:

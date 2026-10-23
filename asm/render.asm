@@ -67,6 +67,10 @@ ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
     FOR frame, 0, ITEM_FRAME_COUNT - 1
         EQUB HI(item_frames + frame * 2 * ITEM_BYTES + ITEM_BYTES)
     NEXT
+\ For each screen byte below &C0, the bits a sprite may be drawn over.
+.sprite_drawable
+    SPRITE_DRAWABLE
+
 .sprite_lines                   \ Each frame's height
     FOR frame, 0, SPRITE_FRAME_COUNT - 1
         EQUB PLAYER_HEIGHT
@@ -580,9 +584,25 @@ ENDMACRO
     RTS
 }
 
+\ A sprite's byte A drawn over a screen byte at (pointer),Y with a pixel in
+\ the sprite colour group: keep the screen's pixels there, those of a piece
+\ in front or of a sprite drawn before (sprites.drawn_byte). Preserves X
+\ and Y.
+MACRO SPRITE_BEHIND pointer, put
+    STA sprite_byte
+    STX sprite_index
+    LDA (pointer),Y
+    TAX
+    EOR sprite_byte
+    AND sprite_drawable,X
+    EOR (pointer),Y
+    LDX sprite_index
+    JMP put
+ENDMACRO
+
 \ Draw sprite frame zp_sprite_frame with its top line at zp_sprite_address,
 \ saving the screen under it at XA, each byte as (screen AND mask) OR
-\ data.
+\ data, but behind pixels in the sprite colour group (SPRITE_BEHIND).
 .sprite_draw
 {
     STA save0 + 1               \ Point the saves at the buffer
@@ -616,28 +636,37 @@ ENDMACRO
     LDA (zp_screen),Y
 .save0
     STA &FFFF,X
+    CMP #&C0                    \ Carry clear: over the sprite colour group
 .mask0
     AND &FFFF,X
 .data0
     ORA &FFFF,X
+    BCC behind0
+.put0
     STA (zp_screen),Y
     INX
     LDA (zp_screen_lower),Y
 .save1
     STA &FFFF,X
+    CMP #&C0
 .mask1
     AND &FFFF,X
 .data1
     ORA &FFFF,X
+    BCC behind1
+.put1
     STA (zp_screen_lower),Y
     INX
     LDA (zp_tile),Y
 .save2
     STA &FFFF,X
+    CMP #&C0
 .mask2
     AND &FFFF,X
 .data2
     ORA &FFFF,X
+    BCC behind2
+.put2
     STA (zp_tile),Y
     INX
     INY
@@ -648,7 +677,16 @@ ENDMACRO
     DEC zp_render_count
     BNE line_loop
     RTS
+.behind0
+    SPRITE_BEHIND zp_screen, put0
+.behind1
+    SPRITE_BEHIND zp_screen_lower, put1
+.behind2
+    SPRITE_BEHIND zp_tile, put2
 }
+
+.sprite_byte        SKIP 1      \ sprite_draw: the byte drawn, before priority
+.sprite_index       SKIP 1      \ ... and X
 
 \ Remove the sprite Y lines high drawn at zp_sprite_address, restoring the
 \ screen under it from XA.

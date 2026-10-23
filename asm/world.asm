@@ -629,8 +629,9 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
 }
 
 \ If a tree has a part at (zp_generate_x, zp_generate_y), in the sky, set
-\ zp_generate_material to it and zp_world_shape to its strength
-\ (world.tree_part, world.tree_strength).
+\ zp_generate_material to it and zp_world_shape to its strength, with
+\ PIECE_FRONT if the tree stands in front (world.tree_part,
+\ world.tree_strength).
 .tree_part
 {
     LDX zp_generate_x
@@ -656,6 +657,7 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
     LDA zp_tree_cover           \ up - height: 2 the canopy, 3 its top
     LSR A
     LSR A
+    AND #7
     STA zp_tree_cover
     LDA zp_tree_up
     SEC
@@ -717,10 +719,16 @@ ASSERT cache_want_r = cache_want_l + 1 AND cache_want_t = cache_want_l + 2 AND c
 .span
     LDA #GAME_SPAN
 .strength
+    LDX zp_generate_x           \ In front, if the tree is
+    LDY world_cover,X
+    BPL behind
+    ORA #PIECE_FRONT
+.behind
     STA zp_world_shape
 .none
     RTS
 }
+ASSERT COVER_FRONT = &80
 
 \ Return carry set if the generated material at (X, zp_generate_y) is open
 \ (passable), clear if not.

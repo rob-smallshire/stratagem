@@ -111,7 +111,9 @@ selects a shadow MODE 2, and loads RENDER, WORLD and MAIN through OSFILE into
   character rows are displayed (248 lines); the 32nd is hidden.
 - Tiles are 8 x 16 pixels: eight cells, four across and two down.
 - Tiles use logical colours 8-15 and sprites 0-7, both mapped to the same
-  eight physical colours, ready for sprite priority and Video NULA.
+  eight physical colours. Pieces in front (trees, by the hash) are drawn
+  in 0-7 too, and sprites leave their pixels out over that group, so the
+  miner passes behind them (`tube-game.md`, In front and behind).
 - Scrolling moves the CRTC start address a cell at a time: 2 pixels
   horizontally, 8 lines vertically, both axes in a frame if need be.
   - A new top or bottom row always lands in the hidden row, so it is drawn

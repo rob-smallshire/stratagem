@@ -454,7 +454,8 @@ INKEY_T = &100 - 36
 
 \ Read a slot, a piece and a backdrop from the parasite, and compose the
 \ piece over the backdrop into the slot's graphics (tiles.compose): the
-\ backdrop where the piece's mask is set, and the piece. The slots are in
+\ backdrop where the piece's mask is set, and the piece, in the sprite
+\ colour group if it is in front (the piece + FRONT_PAIR / 2). The slots are in
 \ the render bank, paged in without the screen, so that the library here in
 \ program RAM can be read. Preserves zp_ptr.
 .host_compose
@@ -474,6 +475,7 @@ INKEY_T = &100 - 36
     STA zp_screen
     READ_BYTE                   \ The piece: piece_library + piece * 128
     STA host_compose_pair
+    AND #FRONT_PAIR / 2 - 1
     LSR A
     TAX
     LDA #0
@@ -506,6 +508,9 @@ INKEY_T = &100 - 36
     STA ROMSEL_COPY
     STA ROMSEL
     LDY #63
+    LDA host_compose_pair
+    AND #FRONT_PAIR
+    BNE front
 .loop
     LDA (zp_screen_lower),Y
     AND (zp_mask),Y
@@ -513,6 +518,18 @@ INKEY_T = &100 - 36
     STA (zp_screen),Y
     DEY
     BPL loop
+    BMI composed
+.front
+    LDA (zp_tile),Y
+    AND #FRONT_COLOURS
+    STA host_compose_front
+    LDA (zp_screen_lower),Y
+    AND (zp_mask),Y
+    ORA host_compose_front
+    STA (zp_screen),Y
+    DEY
+    BPL front
+.composed
     LDA zp_romsel_game
     STA ROMSEL_COPY
     STA ROMSEL
@@ -524,6 +541,7 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
 
 .host_compose_slot  EQUB 0
 .host_compose_pair  EQUB 0
+.host_compose_front EQUB 0
 
 \ ---------------------------------------------------------------------------
 \ Input

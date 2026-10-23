@@ -200,3 +200,16 @@ A running log of design decisions. Add to it whenever one is made.
   that piled up (sand-like) and were picked up with a key looked good, but
   kept many sprites on screen, flickering as the miner walked, and cost
   more to move.
+
+## 2026-10-23
+
+- **Sprite priority by colour group, per piece:** a piece in front has
+  `PIECE_FRONT` in its shape byte and is composed with its pixels in the
+  sprite colour group; sprites leave their pixels out over that group, as
+  Exile does. The choice is per tile, not per material, so each tree can be
+  in front or behind by the hash of its trunk column (about half are in
+  front), and later doors and furniture can use the same bit. A second set
+  of tree materials was the alternative, but material numbers are short
+  (slots start at 24). The cost on the host is a compare per sprite byte
+  (288 cycles for the miner), and about 35 cycles more for each byte over
+  a pixel in front. Items, drawn after the miner, pass behind him too.

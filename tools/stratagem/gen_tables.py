@@ -54,7 +54,7 @@ def tiles_source() -> str:
     lines += [f"TILE_{_symbol(name)} = {number}" for number, name in enumerate(tiles.MATERIAL_NAMES)]
     lines.append(f"MATERIAL_COUNT = {tiles.MATERIAL_COUNT}")
     lines.append(f"DRAWN_COUNT = {tiles.DRAWN_COUNT}")
-    for name in ("SHAPE_FULL", "SHAPE_BITS", "BACKGROUND_SKY", "MAX_SHAPES", "QUARTERS"):
+    for name in ("SHAPE_FULL", "SHAPE_BITS", "BACKGROUND_SKY", "PIECE_FRONT", "MAX_SHAPES", "QUARTERS"):
         lines.append(f"{name} = {getattr(tiles, name)}")
     for name in ("RAMP_TOP_LEFT", "RAMP_TOP_RIGHT", "RAMP_BOTTOM_LEFT", "RAMP_BOTTOM_RIGHT"):
         lines.append(f"SHAPE_{name} = {getattr(world, name)}")
@@ -82,7 +82,8 @@ def tiles_source() -> str:
     lines.append("ENDMACRO")
     lines.append("")
     lines.append("\\ Pieces and the slots they are composed into (tiles.py).")
-    for name in ("FIRST_PIECE", "PIECE_COUNT", "SLOT_MATERIAL", "SLOT_GROUPS", "SLOT_COUNT"):
+    for name in ("FIRST_PIECE", "PIECE_COUNT", "SLOT_MATERIAL", "SLOT_GROUPS", "SLOT_COUNT", "FRONT_PAIR",
+                 "FRONT_COLOURS"):
         lines.append(f"{name} = {getattr(tiles, name)}")
     lines.append("MACRO SLOT_SHAPES")
     lines += _bytes_lines(tiles.SLOT_SHAPES)
@@ -116,10 +117,11 @@ def world_source() -> str:
     lines.append("ENDMACRO")
     lines.append("")
     lines.append("\\ Each column's tree: its trunk's offset + 1 in bits 0-1 (0 for none), and")
-    lines.append("\\ its height above (world.COVER)")
+    lines.append("\\ its height in bits 2-4, and COVER_FRONT if it stands in front (world.COVER)")
     lines.append("MACRO WORLD_COVER")
     lines += _bytes_lines([world.cover_byte(x) for x in range(world.WORLD_SIZE)])
     lines.append("ENDMACRO")
+    lines.append(f"COVER_FRONT = {world.COVER_FRONT}")
     lines.append(f"GAME_SPAN = {support.GAME_SPAN}")
     return "\n".join(lines) + "\n"
 
@@ -157,6 +159,11 @@ def player_source() -> str:
         lines += _bytes_lines(data)
     lines.append("ENDMACRO")
     lines.append("")
+    lines.append("\\ For each screen byte below &C0 (one with a pixel in the sprite colour")
+    lines.append("\\ group), the bits a sprite may be drawn over (sprites.drawable).")
+    lines.append("MACRO SPRITE_DRAWABLE")
+    lines += _bytes_lines([sprites.drawable(under) for under in range(0xC0)])
+    lines.append("ENDMACRO")
     lines.append("")
     for name in ("PLACE_FRAMES", "INVENTORY_MAX", "DIG_FRAMES"):
         lines.append(f"{name} = {getattr(actions, name)}")
