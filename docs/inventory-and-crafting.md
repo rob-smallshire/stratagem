@@ -58,14 +58,21 @@ anything.
 - **Choosing:** 1-9 or the mouse wheel.
 - **Crafting:** shaped recipes on a grid: 2 x 2 in the inventory, 3 x 3 at
   a crafting table. A pickaxe is the shape of a pickaxe. Furnaces smelt
-  with fuel over time while you do other things. Recipes were discovered
-  by experiment or the wiki until the recipe book (2017), which unlocks a
-  recipe when you first pick up one of its ingredients.
-- **For us:** the grid is charming but needs a cursor, item dragging and a
-  wiki. On a keyboard-only BBC it would be slow to use and opaque to
-  learn. Two things are worth taking:
-  - recipes unlocked by picking up an ingredient;
-  - a furnace that works over time, in the world, while you're away.
+  with fuel over time while you do other things.
+- **How the shapes were learnt:** mostly by being told, not by experiment.
+  Crafting arrived in Indev (early 2010), and Notch announced new recipes
+  on his blog and the forums, often with a picture. The shapes look like
+  their items, so the common ones could be guessed. Players shared the
+  rest, and the community wiki grew with the game; later recipes were
+  datamined from each new version. The recipe book (2017), which unlocks
+  a recipe when you first pick up one of its ingredients, admitted that
+  the game relied on outside help. (From memory, not checked.)
+- **For us:** the grid's mouse dragging doesn't suit a BBC keyboard, but
+  the grid itself does, with a key for each cell (see
+  [Making](#making-a-grid-on-the-keys)). It needs a way to learn the shapes
+  without a wiki: a manual, as period games had, and finds in the world.
+  Also worth taking: a furnace that works over time, in the world, while
+  you're away.
 
 ### Zelda: Breath of the Wild (and Tears of the Kingdom)
 
@@ -189,7 +196,7 @@ needs no racing the beam.
 | Model | Who | Fit for us |
 |---|---|---|
 | List of what can be made now | Terraria, Valheim, Don't Starve | high: icons, a cursor down a list, no knowledge needed |
-| Shaped grid | Minecraft | low: a cursor UI, and recipes to be learned elsewhere |
+| Shaped grid | Minecraft | high with a key for each cell: no cursor, and shapes to discover, but they must be taught (a manual, finds) |
 | Experiment with ingredients | BotW cooking | medium: playful, but needs many outcomes to be worth it |
 | Physical, in the world | Exile, TotK, Minecraft's furnace | high for a few stations: matches Exile's physics and our flying items |
 
@@ -197,7 +204,9 @@ needs no racing the beam.
 
 All shown, as in Terraria. Unlocked by holding an ingredient, as in
 Valheim and Minecraft's recipe book. Learnt at a station, as in Don't
-Starve. Found by exploring, as in Subnautica.
+Starve. Found by exploring, as in Subnautica. Printed in the manual, as
+period games did: Elite's came with a novella and a flight manual, and
+most BBC games with at least a card of keys and hints.
 
 ## A proposal
 
@@ -237,8 +246,10 @@ Starve. Found by exploring, as in Subnautica.
   what's held as icons with counts, eight across: each icon is a tile's
   8 x 16 graphics, which exist already for materials and pieces, with
   two digits under it.
-- A cursor moves with the movement keys. L or SPACE puts the item under
-  the cursor in hand. The same key again on RETURN closes the screen.
+- The pack and the crafting grid are one screen (see
+  [Making](#making-a-grid-on-the-keys)). The material chosen there as the
+  brush is also what's in hand when the screen closes. The same key
+  closes it.
 - On closing, the view is redrawn (`draw_view`, as after a jump of the
   camera), which costs a frame or two, once.
 
@@ -246,16 +257,20 @@ Starve. Found by exploring, as in Subnautica.
  +--------------------------------+
  | PACK                           |
  | [soil][stne][wood][ore ][torc] |
- |  42    17    05    03    09    |
+ |  42    14    05    03    09    |
  | [plnk][ladr]                   |
- |  12    04  <                   |
+ | >10<   04          brush: plnk |
  |--------------------------------|
  | MAKE (workbench near)          |
- | [plnk] 4  <- [wood] 1          |
- | [ladr] 2  <- [plnk] 3          |
- | [door] 1  <- [plnk] 6   short 2|
+ |   [stne][stne][stne]           |
+ |   [    ][plnk][    ]  -> [pick]|
+ |   [    ][plnk][    ]           |
  +--------------------------------+
 ```
+
+Here the miner has laid out a stone pickaxe: three stone and two planks
+have left the counts above (17 to 14, 12 to 10), and the shape is
+recognised, so its result shows.
 
 - Icons and digits need no text. A name for the item under the cursor
   could follow later, which would need a small font of about 400 bytes.
@@ -272,24 +287,81 @@ Starve. Found by exploring, as in Subnautica.
 - The torch key stays as a shortcut, and torches become counted and
   craftable (wood and something that burns).
 
-### Making: a list, by station, unlocked by holding
+### Making: a grid on the keys
 
-- The pack screen's second panel lists the recipes known that the
-  stations near the miner allow. Stations count as near within the miner's
-  light window, or a few tiles. Each recipe shows its result, the count
-  made, its ingredients, and what's missing if it can't be made.
-- A recipe becomes known when any of its ingredients has been held, as in
-  Valheim. So the list starts with a handful and grows as you explore.
-  Recipes found by exploring (a gem, a ruin) can come later, as in
-  Subnautica.
-- L makes one. Holding L makes more, a few a second.
+A shaped grid, as in Minecraft, but each cell has its own key, so laying
+out a recipe is drawing it, with no cursor in the grid (chosen
+2026-10-23). One hand chooses the material with the arrow keys, and the
+other places it:
+
+```
+  cells                   brush                   Master keypad
+   T  Y  U                    [up]                   7  8  9
+    G  H  J          [left]  [down]  [right]         4  5  6
+     B  N  M                                         1  2  3
+```
+
+- The **arrow keys** move the brush, a cursor on the pack's icons (eight
+  across). Every Beeb has them, at the right of the keyboard, and play
+  doesn't use them, so they mean the same everywhere. The left hand takes
+  the cells and the right the arrows, which keeps the hands apart.
+- A cell's key puts one of the brush's material in that cell, taking it
+  from the count. The same key with the same brush takes it back out;
+  with another brush it swaps.
+- **DELETE** empties the grid back into the pack. (With the right hand on
+  the arrows, DELETE, COPY and RETURN are all within its reach.)
+- **RETURN** makes the recognised result. Holding it makes more, refilling
+  the same shape from the counts, a few a second, until something runs
+  short.
+- **COPY** steps through the recipe book (below), filling the grid with
+  each known shape from the counts. A cell that can't be filled is left
+  empty, which shows what's missing. The key's name suits it.
+- On the Master 128, the keypad's 7 8 9 / 4 5 6 / 1 2 3 work too, and they
+  make a square grid. On the B+ and Integra-B the rows of letters are
+  staggered, so the grid leans to the right, but it still reads as a grid
+  under the fingers.
+- The crafting screen is a mode of its own, paused, so its keys don't clash
+  with play (T is the torch and M moves down there).
+
+What's recognised:
+
+- **The grid's size follows the station.** In the hand it's 2 x 2 (T Y /
+  G H). Near a workbench it's 3 x 3. A furnace or an anvil near allows
+  the recipes that need them. Stations count as near within the miner's
+  light window, or a few tiles.
+- **Shapes may sit anywhere** in the grid: it's trimmed to the cells used
+  before matching, as in Minecraft. Mirror images could also match; to be
+  decided by playing.
+- **The ingredients are the cells:** one of each per cell, so a recipe's
+  cost is its shape.
 - The thing made pops out of the miner, or the station, as an item, and is
   gathered in, reusing the burst and gather. That's the feedback that
   something happened, with no extra drawing code.
-- Hand crafting needs no station, and covers the first few recipes (planks
-  and torches), like Minecraft's 2 x 2 grid. The workbench is the first
-  thing made, and placed as a piece in the world. It unlocks the rest of
-  the wooden recipes, as in `tile-set.md`.
+- The workbench is among the first things made, and is placed as a piece
+  in the world, as in `tile-set.md`.
+
+### Learning the shapes: a manual, the world, and a book
+
+Minecraft relied on players telling each other (see
+[Minecraft](#minecraft)). We can't count on that, so the game teaches the
+shapes itself, in four ways:
+
+- **A small manual,** as period games had: the keys, the setting, and the
+  first shapes drawn as grids (planks, torches, the workbench, ladders, a
+  door, the stone pickaxe). Enough to start, not everything. It can hint at
+  what isn't shown ("the old miners made boots that let them climb the
+  air") so that finding the rest is a goal. Written as `docs/manual.md`
+  and kept in step with the recipe table, and printable.
+- **Shapes that look like their things,** so many can be guessed from the
+  manual's examples: a pickaxe of any harder material is the same shape.
+- **Finds in the world:** a carved tablet or a page, an item lying in a
+  cave or ruin, that teaches one shape when gathered in. A library in a
+  ruin, a piece with shelves, could teach several when the miner acts on
+  it (L). The rarer things (boots, later the jetpack) are only found this
+  way, which makes exploring pay, as Subnautica's fragments do.
+- **A recipe book,** in the game: every shape made once, or found, is
+  remembered (a bit each), and COPY lays it out again. So nothing has to
+  be remembered twice, and the book shows how much has been learnt.
 
 ### Later: stations that work in the world
 
@@ -304,21 +376,28 @@ the list exists.
 To be tuned by playing. The shape follows `tile-set.md` and
 `game-design.md` (about 20 recipes, three tool tiers).
 
-| Makes | From | Station |
-|---|---|---|
-| 4 planks | 1 wood | hand |
-| 2 torches | 1 wood, 1 ore (or coal later) | hand |
-| workbench | 6 planks | hand |
-| ladder (2) | 3 planks | workbench |
-| platform (4) | 2 planks | workbench |
-| door | 6 planks | workbench |
-| chest | 8 planks | workbench |
-| furnace | 12 stone | workbench |
-| bar | 3 ore | furnace |
-| anvil | 5 bars | furnace |
-| stone pickaxe (tier 2) | 4 stone, 2 planks | workbench |
-| iron pickaxe (tier 3) | 4 bars, 2 planks | anvil |
-| boots (double jump) | 3 bars, 1 gem | anvil |
+Shapes are written row by row, `/` between rows and `.` for an empty
+cell: W wood, P planks, S stone, O ore, B bars, G gem.
+
+| Makes | Shape | Station | Learnt from |
+|---|---|---|---|
+| 4 planks | `W` | hand | manual |
+| 2 torches | `O/W` | hand | manual |
+| workbench | `PP/PP` | hand | manual |
+| 3 ladders | `P.P/PPP/P.P` | workbench | manual |
+| 4 platforms | `PPP` | workbench | made once |
+| door | `PP/PP/PP` | workbench | manual |
+| chest | `PPP/P.P/PPP` | workbench | made once |
+| furnace | `SSS/S.S/SSS` | workbench | a find |
+| bar | `O` | furnace | made once |
+| anvil | `BBB/.B./BBB` | furnace | a find |
+| stone pickaxe (tier 2) | `SSS/.P./.P.` | workbench | manual |
+| iron pickaxe (tier 3) | `BBB/.P./.P.` | anvil | guessed from the stone one |
+| boots (double jump) | `B.B/BGB` | anvil | a find only |
+
+"Made once" means it can be guessed, then stays in the book. Bars might
+come from a physical furnace instead (below), and then `O` at the
+furnace isn't a recipe.
 
 Tier 2 makes stone take two digs rather than four, as already planned in
 `next-steps.md` (`QUARTERS_PER_DIG` per tool). The double jump moves from
@@ -331,14 +410,20 @@ the start to the boots (`STARTING_ABILITIES = 0`).
   with `gen_tables` generating the tables. The 6502 is checked against it
   in py65, as usual.
 - **Parasite:**
-  - It owns the counts (BCD), the known recipes (a bit each: 3 bytes), the hand
-    and the owned tools.
+  - It owns the counts (BCD), the grid (9 bytes of kinds), the recipe
+    book (a bit each: 3 bytes), the brush, which is the hand, and the
+    owned tools.
   - On opening the pack, it scans the tile cache near the miner for
     stations. That's paused, so time doesn't matter.
-  - It answers the host's requests, such as making a recipe, by number.
+  - It answers the host's key presses (brush, cell, make, copy) and sends
+    back the counts, the grid and the result to draw.
+  - Matching trims the grid to its used rows and columns, then compares
+    with each recipe of that size: a few hundred cycles, once per key.
 - **Host:**
   - It draws the panel from what the parasite sends. That's at most
-    24 counts and a list of recipe numbers: well under the packet's room.
+    24 counts, 9 cells and a result: well under the packet's room.
+  - It reads the crafting keys (about 20, with the keypad's) from a
+    table of INKEY numbers, as it reads the game's now.
   - Icons come from the material pages and piece library it already has.
   - Digits, a count's two nibbles, are a small 4 x 7 font, about 70 bytes, generated from Python.
     The panel's code lives in MAIN, which has room.
@@ -350,9 +435,11 @@ the start to the boots (`STARTING_ABILITIES = 0`).
   too and would stay bright, so either accept that, or draw a solid panel
   over a view left as it is.
 - **Memory:**
-  - Parasite: about 24 bytes of counts, 3 of known recipes, and a recipe
-    table of about 20 x 6 bytes.
-  - Host: the font, and the panel's code, about 1K in MAIN.
+  - Parasite: about 24 bytes of counts, 9 of grid, 3 of recipe book, and
+    a recipe table of about 20 x 8 bytes (size, up to 9 cells as
+    nibbles, result and count, station).
+  - Host: the font, the key table, and the panel's code, about 1.5K in
+    MAIN.
   - Neither touches the render region's tight space.
 - **Per-frame cost in play:** none, apart from the hand's icon while it's
   shown.
@@ -366,22 +453,31 @@ the start to the boots (`STARTING_ABILITIES = 0`).
    Minecraft don't pause, and BotW does.
 3. Icons only, or names too? A font costs about 400 bytes and some host
    time.
-4. Should recipes unlock by holding an ingredient, all be shown, or be
-   learnt at stations?
+4. How are shapes learnt? The proposal: the manual, guessing, finds in
+   the world, and a book of what's been made or found. Should holding an
+   ingredient also reveal shapes, as in Valheim? That would make the
+   manual and finds matter less.
 5. Is the furnace a menu station or a physical one? Prototype both.
 6. Does dug material keep its kind? The proposal says yes. Then is there
    one cap per kind, or a total that makes the miner choose what to keep?
-7. Keys: RETURN for the pack, TAB to cycle the hand?
+7. Keys: which key opens the pack (P is free; RETURN now makes)? TAB to
+   cycle the hand in play?
+8. Should movement in play be WASD, with dig and place on K and L? It
+   breaks with BBC custom (Z X and * ?) but is what players now expect.
+   It's now separate from crafting, which uses the arrows. Try it in the
+   emulator.
+9. Do mirrored shapes match?
 
 ## Steps
 
 1. Inventory by kind (model, then the 6502): dug material keeps its kind.
    Placing puts back the kind in hand. Wood joins the table.
-2. The pack screen: paused, icons and counts, with a cursor to put things
-   in hand. Plus the cycle key and the hand's icon above the miner.
-3. Recipes: hand crafting (planks, torches, workbench) in the pack
-   screen's second panel, with discovery by holding.
-4. The workbench as a piece, and the recipes it allows: ladders,
+2. The pack screen: paused, icons and counts, with the brush chosen by
+   the arrow keys as the hand. Plus the cycle key and the hand's icon
+   above the miner.
+3. The 2 x 2 hand grid on T Y / G H: planks, torches, the workbench.
+   The recipe book and COPY. The manual's first pages.
+4. The workbench as a piece, and the 3 x 3 grid near it: ladders,
    platforms, doors, the stone pickaxe and its faster digging.
-5. The furnace and anvil, bars, the iron pickaxe and the boots, with the
-   double jump earned.
+5. The furnace and anvil, bars, the iron pickaxe, finds in the world, and
+   the boots, with the double jump earned.

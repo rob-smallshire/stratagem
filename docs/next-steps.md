@@ -60,8 +60,8 @@ count; leave room for health and the item in hand.
 ## 3. Crafting and the first progression loop
 
 Now designed in `inventory-and-crafting.md` (inventory by kind, a paused
-pack screen, a recipe list by station unlocked by holding an ingredient,
-and its steps). The first notes:
+pack screen, a shaped grid with a key for each cell, shapes taught by a
+manual, finds and a recipe book, and its steps). The first notes:
 
 The Terraria loop: dig, collect, craft, dig better. A first slice:
 

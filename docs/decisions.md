@@ -218,3 +218,11 @@ A running log of design decisions. Add to it whenever one is made.
   the byte's own, the clamp is the carry, and drawing a count needs no
   conversion, only its nibbles. The arithmetic is on the 65C02 parasite,
   which clears decimal mode on interrupts (`inventory-and-crafting.md`).
+- **Crafting is a shaped grid with a key for each cell:** T Y U / G H J /
+  B N M (and the Master's keypad) are the cells, and the arrow keys move
+  the material chosen, so a recipe is drawn, not dragged with a cursor. A list of makeable recipes, as in Terraria, was the
+  alternative: easier, but with nothing to discover. Minecraft's players
+  learnt its shapes from each other and a wiki; ours learn them from a
+  small manual, as period games had, from shapes that look like their
+  things, and from finds in the world, and a recipe book keeps what's
+  been made or found (`inventory-and-crafting.md`).
