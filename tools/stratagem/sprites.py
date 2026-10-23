@@ -13,6 +13,7 @@ those drawn after.
 
 from __future__ import annotations
 
+from stratagem.inventory import KIND_COUNT, KIND_GEM, KIND_ORE, KIND_SOIL, KIND_STONE
 from stratagem.items import ITEM_HEIGHT, ITEM_WIDTH, WOOD
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, Player
 from stratagem.screen import mode2_byte
@@ -79,8 +80,10 @@ RR..RR
 """,
 }
 
-# Each kind of item (items.py), lying on the ground: a log, its cut end
-# showing its rings.
+# Each kind of item (items.py, the inventory's kinds), lying on the ground
+# or shown above the miner as the hand: a log, its cut end showing its
+# rings; a clod of soil; a chunk of stone (white, black being clear); one
+# of ore; a gem.
 _ITEMS = {
     WOOD: """
 RRRRY.
@@ -89,7 +92,36 @@ RRRYRY
 RRRYYY
 RRRRY.
 """,
+    KIND_SOIL: """
+.RRYR.
+RRRRRY
+RYRRRR
+RRRRYR
+.RRRR.
+""",
+    KIND_STONE: """
+.WWWW.
+WWBWWW
+WWWWBW
+WBWWWW
+.WWWW.
+""",
+    KIND_ORE: """
+.WWWW.
+WYYWWW
+WWYYBW
+WBWYYW
+.WWWW.
+""",
+    KIND_GEM: """
+..CC..
+.CMMC.
+CMMMMC
+.CMMC.
+..CC..
+""",
 }
+assert sorted(_ITEMS) == list(range(KIND_COUNT))
 
 POSES = ["stand", "walk1", "walk2", "jump"]
 STAND, WALK1, WALK2, JUMP = range(len(POSES))

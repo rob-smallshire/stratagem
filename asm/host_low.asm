@@ -153,16 +153,16 @@ ENDMACRO
 .host_fetch_slot    EQUB 0      \ A chunk to copy to the parasite, or 0...
 .host_fetch_to      EQUW 0      \ ... to here
 .host_items         EQUB 0      \ Items to draw (the packet's)...
-.host_item_column   SKIP ITEM_MAX   \ ... at these view columns
-.host_item_line     SKIP ITEM_MAX   \ ... and lines
-.host_item_frame    SKIP ITEM_MAX   \ ... these frames
+.host_item_column   SKIP ITEMS_DRAWN   \ ... at these view columns
+.host_item_line     SKIP ITEMS_DRAWN   \ ... and lines
+.host_item_frame    SKIP ITEMS_DRAWN   \ ... these frames
 .host_items_untouched EQUB 0    \ ITEMS_UNTOUCHED if nothing is redrawn under them
-.host_item_new_low  SKIP ITEM_MAX   \ ... where they go on the screen
-.host_item_new_high SKIP ITEM_MAX
+.host_item_new_low  SKIP ITEMS_DRAWN   \ ... where they go on the screen
+.host_item_new_high SKIP ITEMS_DRAWN
 .host_items_drawn   EQUB 0      \ Items drawn, to restore...
-.host_item_address_low  SKIP ITEM_MAX   \ ... drawn here
-.host_item_address_high SKIP ITEM_MAX
-.host_item_drawn_frame  SKIP ITEM_MAX   \ ... these frames
+.host_item_address_low  SKIP ITEMS_DRAWN   \ ... drawn here
+.host_item_address_high SKIP ITEMS_DRAWN
+.host_item_drawn_frame  SKIP ITEMS_DRAWN   \ ... these frames
 .host_items_kept    EQUB 0      \ The first of them left as they are
 .host_item_index    EQUB 0
 .host_sprite_address EQUW 0     \ The player's sprite's, kept while items are drawn

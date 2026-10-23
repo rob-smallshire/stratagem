@@ -483,9 +483,9 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 
 1. Done: inventory by kind (model, then the 6502): dug material keeps its
    kind. Placing puts back the kind in hand. Wood joins the table.
-2. The pack screen: paused, icons and counts, with the brush chosen by
-   the arrow keys as the hand (done). Plus the cycle key (TAB, done) and
-   the hand's icon above the miner (to do).
+2. Done: the pack screen: paused, icons and counts, with the brush chosen
+   by the arrow keys as the hand. Plus the cycle key (TAB) and the hand's
+   icon above the miner (an item's picture, for a second, when it changes).
 3. The 2 x 2 hand grid on T Y / G H: planks, torches, the workbench.
    The recipe book and COPY. The manual's first pages.
 4. The workbench as a piece, and the 3 x 3 grid near it: ladders,

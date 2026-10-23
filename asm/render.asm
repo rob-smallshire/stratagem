@@ -84,13 +84,13 @@ ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
 .sprite_save
     SKIP SPRITE_BYTES
 .item_saves
-    SKIP ITEM_MAX * ITEM_BYTES
+    SKIP ITEMS_DRAWN * ITEM_BYTES
 .item_save_low
-    FOR item, 0, ITEM_MAX - 1
+    FOR item, 0, ITEMS_DRAWN - 1
         EQUB LO(item_saves + item * ITEM_BYTES)
     NEXT
 .item_save_high
-    FOR item, 0, ITEM_MAX - 1
+    FOR item, 0, ITEMS_DRAWN - 1
         EQUB HI(item_saves + item * ITEM_BYTES)
     NEXT
 

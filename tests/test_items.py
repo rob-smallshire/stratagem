@@ -9,11 +9,12 @@ import pytest
 
 from stratagem import items, sprites
 from stratagem.camera import INPUT_ACTION, INPUT_LEFT
-from stratagem.inventory import KIND_WOOD
+from stratagem.inventory import KIND_SOIL, KIND_STONE, KIND_WOOD
+from stratagem.pack import KEY_CYCLE
 from stratagem.player import PLAYER_HEIGHT, Player
 from stratagem.tiles import PIECES, ROOT
 from stratagem.world import HEIGHTS, TRUNKS, generate_tile
-from test_daylight import ParasiteGame
+from test_daylight import MAILBOX_KEYS, ParasiteGame
 
 TILE_CACHE_SIZE = 32
 ITEMS_UNTOUCHED = 0x80      # in the packet's count of items: nothing redrawn under them
@@ -94,10 +95,13 @@ class ItemWatch:
 
 class PacketCheck:
     """The packet's items, after the chunk to fetch: those in view, each
-    marked if it meets the miner's sprite this frame or last; their count
-    marked if nothing is redrawn under them."""
+    marked if it meets the miner's sprite this frame or last, then the hand
+    if shown (items.hand_shown), marked so; their count marked if nothing
+    is redrawn under them."""
 
     def __init__(self, game):
+        self.hand = items.HandShown(game.byte("hand_last"), game.byte("hand_timer"))
+        self.hand_frames = 0
         self.last = (word(game.memory, game.labels["item_miner_x"]) >> 5,   # the miner's sprite
                      word(game.memory, game.labels["item_miner_y"]) >> 4)   # last frame
 
@@ -120,6 +124,12 @@ class PacketCheck:
             by = (left < (item.px >> 1) + sprites.SPRITE_COLUMNS and item.px >> 1 < right
                   and top < item.py + items.ITEM_HEIGHT and item.py < bottom)
             expected.append((column, line, first + kind | (ITEM_BY_MINER if by else 0)))
+        self.hand = items.show_hand(self.hand, game.byte("hand"))
+        assert game.byte("hand_timer") == self.hand.timer
+        hero = Player(x=word(memory, game.labels["zp_player_x"]), y=word(memory, game.labels["zp_player_y"]))
+        for column, line, kind in items.hand_shown(self.hand, hero, camera_x, camera_y):
+            expected.append((column, line, first + kind | ITEM_BY_MINER))
+            self.hand_frames += 1
         self.last = miner
         assert sent == expected
         return len(sent)
@@ -157,6 +167,23 @@ def test_felled_wood_is_thrown_out_and_gathered_in():
     assert watch.bounced, "none bounced"
     assert items.GATHERING in watch.states
     assert shown >= 3, "too few were in view at once"
+
+
+def test_the_hand_is_shown_above_the_miner_when_it_changes():
+    """TAB cycles the hand from the soil to the stone: it is shown above the
+    miner for HAND_FRAMES frames, as items.py says, and then not."""
+    from stratagem.build import build
+    game = ParasiteGame(build())
+    labels = game.labels
+    game.memory[labels["inventory"] + KIND_SOIL] = 5
+    game.memory[labels["inventory"] + KIND_STONE] = 3
+    check_packet = PacketCheck(game)
+    for frame in range(items.HAND_FRAMES + 20):
+        game.memory[MAILBOX_KEYS] = KEY_CYCLE if frame == 5 else 0
+        game.frame(0)
+        check_packet(game)
+    assert game.byte("hand") == KIND_STONE
+    assert check_packet.hand_frames == items.HAND_FRAMES
 
 
 @pytest.mark.parametrize("seed", [1988, 1, 2, 3])

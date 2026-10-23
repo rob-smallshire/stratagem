@@ -260,3 +260,9 @@ A running log of design decisions. Add to it whenever one is made.
   can hold, so the crafting screen will send keys its own way; this byte is
   for play. TAB cycles only through kinds held that place something, as
   it is for placing; the pack chooses any.
+- **The hand is shown as one more item:** the parasite appends it to the
+  packet's items for a second after any change of hand, marked as by the
+  miner, so the host draws it with the items' code, each frame, last. A
+  host-side icon of its own would have needed new drawing code and a
+  timer on the host. Each kind gets a 6 x 5 item picture rather than its
+  8 x 16 tile icon, which the sprite code (three bytes wide) can't draw.

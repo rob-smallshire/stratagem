@@ -42,7 +42,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from stratagem.camera import MAX_STEP_X
-from stratagem.inventory import KIND_WOOD
+from stratagem.inventory import KIND_SOIL, KIND_WOOD
 from stratagem.player import GRAVITY, PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.screen import VIEW_COLUMNS, VIEW_ROWS
 from stratagem.tiles import CANOPY_LEFT, QUARTER_LINES, QUARTER_PIXELS, QUARTERS, ROOT, TRUNK, TRUNK_KNOT, solid_quarter_cells
@@ -191,12 +191,45 @@ def step(items: list[Item], player: Player, tile_at: TileAt, in_cache: InCache) 
     return items, gathered
 
 
+HAND_FRAMES = 50            # a second: how long the hand is shown above the miner
+HAND_GAP = 2                # lines between it and the miner's head
+
+
+@dataclass(frozen=True)
+class HandShown:
+    """The hand shown above the miner, as an item's picture (sprites.py),
+    after the items, for HAND_FRAMES frames once it changes: by TAB, a dig
+    of another kind, placing with none left, or the pack."""
+    last: int = KIND_SOIL       # the hand as last seen
+    timer: int = 0              # frames left to show it
+
+
+def show_hand(state: HandShown, hand: int) -> HandShown:
+    """A game frame's change to what is shown, given the hand."""
+    if hand != state.last:
+        return HandShown(hand, HAND_FRAMES)
+    return replace(state, timer=max(state.timer - 1, 0))
+
+
+def hand_shown(state: HandShown, player: Player, camera_x: int, camera_y: int) -> list[tuple[int, int, int]]:
+    """The hand, if shown and in view, as `shown` gives items."""
+    column = (player.px >> 1) - camera_x
+    line = player.py - ITEM_HEIGHT - HAND_GAP - camera_y * 8
+    if state.timer and _in_view(column, line):
+        return [(column, line, state.last)]
+    return []
+
+
+def _in_view(column: int, line: int) -> bool:
+    return MAX_STEP_X <= column <= VIEW_COLUMNS - MAX_STEP_X - ITEM_WIDTH // 2 and 0 <= line <= VIEW_LINES - ITEM_HEIGHT
+
+
 def shown(items: list[Item], camera_x: int, camera_y: int) -> list[tuple[int, int, int]]:
     """The items the host draws, in order: (view column, view line, kind)."""
     result = []
     for item in items:
         column = (item.px >> 1) - camera_x
         line = item.py - camera_y * 8
-        if MAX_STEP_X <= column <= VIEW_COLUMNS - MAX_STEP_X - ITEM_WIDTH // 2 and 0 <= line <= VIEW_LINES - ITEM_HEIGHT:
+        if _in_view(column, line):
             result.append((column, line, item.kind))
     return result

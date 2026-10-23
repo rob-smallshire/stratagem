@@ -24,6 +24,8 @@ GUARD &0800
 .pack_i          SKIP 1
 .pack_keys_held  SKIP 1      \ The second byte of input last frame...
 .pack_keys_pressed SKIP 1    \ ... and its keys pressed this frame
+.hand_last       SKIP 1      \ The hand as last shown (items.asm)...
+.hand_timer      SKIP 1      \ ... and frames left to show it
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
 .target_x        SKIP 1      \ The tile aimed at

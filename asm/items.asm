@@ -11,7 +11,7 @@
 \ (items_emit).
 
 ASSERT ITEM_MAX_FALL <= 4 * 16  \ A quarter-cell a frame, at most
-ASSERT WOOD = 0 AND ITEM_FRAME_COUNT = 1   \ Wood, for now, is all there is
+ASSERT WOOD = KIND_WOOD AND ITEM_FRAME_COUNT = KIND_COUNT  \ Item kinds are the inventory's
 ASSERT ITEM_OFFSET_X * 16 < 128
 
 \ Material A broke at tile (X, Y): throw out what it drops, if anything.
@@ -932,11 +932,6 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 .counted
     LDA #0
     STA item_sent
-    LDA item_count              \ None: only the miner's position, kept
-    BNE any
-    JSR item_miner_keep
-    JMP done
-.any
     LDA zp_camera_y             \ The camera's top line: camera_y * 8
     STA item_camera_line
     LDA zp_camera_y + 1
@@ -947,6 +942,12 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
     ASL item_camera_line
     ROL A
     STA item_camera_line + 1
+    LDA item_count              \ None: only the miner's position, kept
+    BNE any
+    JSR item_miner_keep
+    LDY #1
+    JMP done
+.any
     JSR item_miner_box
     LDY #1                      \ Where the next item goes
     LDX #0
@@ -1003,6 +1004,7 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
     INX
     BNE loop
 .done
+    JSR hand_emit               \ And the hand, if shown
     LDA zp_redraw               \ Nothing redrawn under them?
     ORA para_changes
     ORA sl_list_count
@@ -1015,6 +1017,87 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 .count_set
     LDY #0
     STA (para_write),Y
+    RTS
+}
+
+\ After the items, the hand, shown above the miner as its kind's item for
+\ HAND_FRAMES frames once it changes (items.hand_shown), marked as by the
+\ miner, so that it is drawn each frame as he moves. Y is where it goes in
+\ the packet, and is moved on past it.
+.hand_emit
+{
+    LDA hand
+    CMP hand_last
+    BEQ same
+    STA hand_last
+    LDA #HAND_FRAMES
+    STA hand_timer
+    BNE show                    \ Always branches
+.same
+    LDA hand_timer
+    BEQ done
+    DEC hand_timer
+    BEQ done
+.show
+    LDA zp_player_x + 1         \ Column: (x >> 5) - camera_x
+    STA zp_temp + 1
+    LDA zp_player_x
+    LDX #5
+.shift_x
+    LSR zp_temp + 1
+    ROR A
+    DEX
+    BNE shift_x
+    SEC
+    SBC zp_camera_x
+    STA zp_temp
+    LDA zp_temp + 1
+    SBC zp_camera_x + 1
+    BNE done
+    LDA zp_temp
+    SEC
+    SBC #MAX_STEP_X
+    CMP #VIEW_COLUMNS - 2 * MAX_STEP_X - ITEM_WIDTH DIV 2 + 1
+    BCS done
+    LDA zp_player_y + 1         \ Line: (y >> 4) - ITEM_HEIGHT - HAND_GAP
+    STA zp_temp2 + 1            \ - camera_y * 8
+    LDA zp_player_y
+    LDX #4
+.shift_y
+    LSR zp_temp2 + 1
+    ROR A
+    DEX
+    BNE shift_y
+    SEC
+    SBC #ITEM_HEIGHT + HAND_GAP
+    STA zp_temp2
+    LDA zp_temp2 + 1
+    SBC #0
+    STA zp_temp2 + 1
+    LDA zp_temp2
+    SEC
+    SBC item_camera_line
+    STA zp_temp2
+    LDA zp_temp2 + 1
+    SBC item_camera_line + 1
+    BNE done
+    LDA zp_temp2
+    CMP #VIEW_LINES - ITEM_HEIGHT + 1
+    BCS done
+    LDA zp_temp                 \ Sent
+    STA (para_write),Y
+    INY
+    LDA zp_temp2
+    STA (para_write),Y
+    INY
+    LDA hand
+    CLC
+    ADC #ITEM_FRAME_FIRST
+    ORA #ITEM_BY_MINER
+    STA (para_write),Y
+    INY
+    INC item_sent
+.done
     RTS
 }
 

@@ -31,6 +31,7 @@
     STA pack_open
     STA pack_held
     STA pack_keys_held
+    STA hand_timer
     STA zp_player_jump_held
     STA zp_player_air_jumps
     STA redraw_tile
@@ -51,6 +52,7 @@
     STA zp_abilities
     LDA #KIND_SOIL
     STA hand
+    STA hand_last
     LDA #1
     STA zp_player_facing
     LDA #LO(PLAYER_START_X)

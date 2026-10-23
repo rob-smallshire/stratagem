@@ -11,7 +11,7 @@ import pytest
 
 from conftest import RUN_TIMEOUT_EMULATED_SECONDS
 from mos6502 import Machine6502
-from stratagem import inventory, pack
+from stratagem import inventory, pack, sprites
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.inventory import KIND_COUNT
@@ -148,6 +148,7 @@ def test_panel_matches_model(game_build):
             assert memory[address] == want, f"trial {trial}, moved: &{address:04X}"
 
 
+ITEM_FRAME_FIRST = len(sprites.sprite_frames())
 PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (1, 9), (6, 0)     # Beebium's keyboard matrix: P, cursor left, TAB
 
 
@@ -223,3 +224,11 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
         bbc.keyboard.matrix_up(*TAB_KEY)
         frames(bbc, labels, 1)
         assert parasite[plabels["hand"]] == kind, "TAB didn't cycle the hand"
+        frames(bbc, labels, 1)
+        count = peek[labels["host_items"]]
+        assert count and peek[labels["host_item_frame"] + count - 1] & 0x7F == ITEM_FRAME_FIRST + kind, \
+            "the hand isn't shown"
+        expected = expected_screen(bbc, labels)
+        actual = screen[SCREEN_START:SCREEN_END]
+        differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
+        assert differences[:8] == [], f"{len(differences)} screen bytes differ with the hand shown"

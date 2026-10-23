@@ -146,9 +146,24 @@ wood. SPACE places the kind in hand, as its material; with none of it
 left, the hand moves first to the first kind carried that places
 something; a hand that places nothing (wood, chosen in the pack) places
 nothing. TAB moves the hand to the next kind after it, in kind order and
-round again, that is held and places something (`hand_cycle`); nothing
-shows it yet but what SPACE then places. The pack (below) shows the counts
-and chooses any kind held.
+round again, that is held and places something (`hand_cycle`). The pack
+(below) shows the counts and chooses any kind held.
+
+Whenever the hand changes (TAB, a dig of another kind, placing with none
+left, the pack), it is shown above the miner for a second
+(`HAND_FRAMES`, 50), as its kind's item picture, `HAND_GAP` (2) lines over
+his head (`items.hand_shown`, `hand_emit`): the parasite sends it after
+the items, as one more, marked as by the miner so that the host draws it
+each frame as he moves, last. So the host needed no new code, only room
+for one more item (`ITEMS_DRAWN`). Each kind has an item picture now
+(`sprites.py`): a log, a clod of soil, a chunk of stone (white: black is
+clear in a sprite), ore, a gem; they'll do for dropped blocks too. While
+shown it costs the host about 1,300 cycles a frame (831 to draw it, 486
+to restore under it) and the parasite about 270; otherwise the parasite
+24. Memory: 144 bytes of pictures and 20 of save buffer in the render
+region's graphics (252 bytes left there), 8 in low RAM; 133 bytes in
+PLIGHT, 2 of variables and 6 in PGAME, which has 19 left before its next
+page.
 
 TAB came after the input byte was full (P took bit 7), so the host writes
 a second byte of input, `MAILBOX_KEYS` (TAB is `KEY_CYCLE`), before the
@@ -467,8 +482,7 @@ host can miss a frame then.
   frames that redraw under it; they are out for only a second or so. Items
   pass behind the miner, and vanish a few columns inside the view's
   sides. Wood isn't spent yet.
-- The pack: no icon of the hand above the miner yet, so TAB's choice
-  can't be seen. Five kinds only (icons are 64 bytes each, so 24
+- The pack: five kinds only (icons are 64 bytes each, so 24
   would need room beyond the render region's graphics). Keys read by
   OSBYTE `&81`, about 270 host cycles each a frame: scanning the keyboard
   directly would be cheaper, and matters more as keys are added.
