@@ -179,6 +179,20 @@ happens only on the frame of a dig, a place or a gathered log. Memory: 6
 bytes of variables (5 counts and the hand), 36 bytes of code and tables
 in PLIGHT, and 38 more in PGAME's digging and placing.
 
+### Keys
+
+The host reads the keys itself each frame (`read_input`, `scan_keys`), as
+OS 1.20's `interrogateKeyboard` does, but for all of them at once, with
+interrupts held off: it stops the keyboard's own scanning (System VIA
+latch bit 3, `3` to port B), sets port A's direction to `&7F`, and for
+each key in a table writes its internal key number (an INKEY number's
+`-n - 1`) to port A and reads its state in bit 7; then lets the scanning
+start again (`&0B`). A key costs about 31 cycles, against about 270 by
+OSBYTE `&81`: the nine keys of play take 370 cycles a frame (2,429
+before), the pack's five 233 (1,368), with interrupts held off for as
+long. Which keys are read, and the bits they set, is a table
+(`key_table`): play's, and the pack's.
+
 ### The pack
 
 P opens the pack (`pack.py`, `asm/pack.asm`; `render_pack` in
@@ -202,9 +216,8 @@ a jump of the camera (`pack_plan_camera`).
 Costs, measured:
 
 - In play, on the parasite, 84 cycles a frame to see whether P or TAB
-  was pressed; on the host, each of P and TAB is one more OSBYTE `&81`,
-  about 280 cycles (the nine keys of play now take 2,429, about 6% of the
-  host's frame; the pack's five, 1,368).
+  was pressed; on the host, each of P and TAB is one more key in the scan
+  (see Keys), about 31 cycles.
 - Opening, on the host: 31,551 cycles with one kind shown, 47,550 with
   five, most of it clearing the panel's five rows. So the panel may take
   two frames to appear, the beam overtaking it; once per opening.
@@ -483,9 +496,7 @@ host can miss a frame then.
   pass behind the miner, and vanish a few columns inside the view's
   sides. Wood isn't spent yet.
 - The pack: five kinds only (icons are 64 bytes each, so 24
-  would need room beyond the render region's graphics). Keys read by
-  OSBYTE `&81`, about 270 host cycles each a frame: scanning the keyboard
-  directly would be cheaper, and matters more as keys are added.
+  would need room beyond the render region's graphics).
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.

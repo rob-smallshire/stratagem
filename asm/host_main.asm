@@ -12,21 +12,6 @@ GUARD USER_END
 
 .host_main_start
 
-\ Negative INKEY numbers, as OSBYTE &81 takes them in X
-INKEY_Z = &100 - 98
-INKEY_X = &100 - 67
-INKEY_K = &100 - 71
-INKEY_M = &100 - 102
-INKEY_L = &100 - 87
-INKEY_SPACE = &100 - 99
-INKEY_T = &100 - 36
-INKEY_P = &100 - 56
-INKEY_LEFT = &100 - 26
-INKEY_RIGHT = &100 - 122
-INKEY_UP = &100 - 58
-INKEY_DOWN = &100 - 42
-INKEY_TAB = &100 - 97
-
 \ The host's start: a clear, narrowed screen.
 .host_init
 {
@@ -608,74 +593,82 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
 
 .read_input
 {
-    LDA #0                      \ The second byte: TAB, in play
-    STA zp_input
+    PHP                         \ The keyboard's own, without interrupts
+    SEI
+    LDA #3                      \ Stop its scanning
+    STA SYSTEM_VIA_B
+    LDA #&7F                    \ Port A: a key number out, its state in
+    STA SYSTEM_VIA_DDRA         \ (bit 7)
     BIT host_flags
-    BVS keys_read
-    LDX #INKEY_TAB
-    LDA #KEY_CYCLE
-    JSR read_key
-.keys_read
-    LDA zp_input
+    BVS pack
+    LDY #play_keys_second - key_table  \ In play: TAB in the second byte
+    JSR scan_keys
     STA zp_keys
-    LDA #0
+    JSR scan_keys               \ (play_keys follows)
+    JMP read
+.pack
+    LDA #0                      \ In the pack: P and the cursor keys
+    STA zp_keys
+    LDY #pack_keys - key_table
+    JSR scan_keys
+.read
     STA zp_input
-    LDX #INKEY_P
-    LDA #INPUT_PACK
-    JSR read_key
-    BIT host_flags              \ In the pack, the arrow keys
-    BVC play
-    LDX #INKEY_LEFT
-    LDA #INPUT_LEFT
-    JSR read_key
-    LDX #INKEY_RIGHT
-    LDA #INPUT_RIGHT
-    JSR read_key
-    LDX #INKEY_UP
-    LDA #INPUT_UP
-    JSR read_key
-    LDX #INKEY_DOWN
-    LDA #INPUT_DOWN
-    JMP read_key
-.play
-    LDX #INKEY_Z
-    LDA #INPUT_LEFT
-    JSR read_key
-    LDX #INKEY_X
-    LDA #INPUT_RIGHT
-    JSR read_key
-    LDX #INKEY_K
-    LDA #INPUT_UP
-    JSR read_key
-    LDX #INKEY_M
-    LDA #INPUT_DOWN
-    JSR read_key
-    LDX #INKEY_L
-    LDA #INPUT_ACTION
-    JSR read_key
-    LDX #INKEY_SPACE
-    LDA #INPUT_PLACE
-    JSR read_key
-    LDX #INKEY_T
-    LDA #INPUT_TORCH
-    \ Fall through
-}
-
-\ If the key with negative INKEY number X is pressed, set bits A in zp_input.
-.read_key
-{
-    PHA
-    LDA #&81
-    LDY #&FF
-    JSR OSBYTE
-    PLA
-    CPX #&FF
-    BNE done
-    ORA zp_input
-    STA zp_input
-.done
+    LDA #&0B                    \ Let it scan again
+    STA SYSTEM_VIA_B
+    PLP
     RTS
 }
+
+\ Return in A the bits of the keys pressed of those in key_table from Y up
+\ to an &FF, and Y past it.
+.scan_keys
+{
+    LDA #0
+    STA zp_temp
+.loop
+    LDA key_table,Y
+    BMI done
+    STA SYSTEM_VIA_A_NO_HANDSHAKE
+    INY
+    BIT SYSTEM_VIA_A_NO_HANDSHAKE
+    BPL next
+    LDA key_table,Y
+    ORA zp_temp
+    STA zp_temp
+.next
+    INY
+    BNE loop                    \ Always branches
+.done
+    INY
+    LDA zp_temp
+    RTS
+}
+
+\ Keys, as internal key numbers (an INKEY number's -n - 1), and the bits
+\ they set.
+KEY_TAB = 96
+KEY_P = 55
+KEY_Z = 97
+KEY_X = 66
+KEY_K = 70
+KEY_M = 101
+KEY_L = 86
+KEY_SPACE = 98
+KEY_T = 35
+KEY_LEFT = 25
+KEY_RIGHT = 121
+KEY_UP = 57
+KEY_DOWN = 41
+.key_table
+.play_keys_second
+    EQUB KEY_TAB, KEY_CYCLE, &FF
+.play_keys
+    EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, KEY_K, INPUT_UP
+    EQUB KEY_M, INPUT_DOWN, KEY_L, INPUT_ACTION, KEY_SPACE, INPUT_PLACE, KEY_T, INPUT_TORCH, &FF
+.pack_keys
+    EQUB KEY_P, INPUT_PACK, KEY_LEFT, INPUT_LEFT, KEY_RIGHT, INPUT_RIGHT, KEY_UP, INPUT_UP
+    EQUB KEY_DOWN, INPUT_DOWN, &FF
+ASSERT play_keys = play_keys_second + 3
 
 INCLUDE "asm/pixels.asm"
 INCLUDE "asm/scroll.asm"

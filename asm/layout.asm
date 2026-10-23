@@ -26,3 +26,5 @@ TILE_CACHE_SIZE  = 32           \ The tile cache is TILE_CACHE_SIZE square
 CRTC_ADDRESS = &FE00
 CRTC_DATA    = &FE01
 SYSTEM_VIA_B = &FE40            \ Addressable latch (hardware scroll wrap size)
+SYSTEM_VIA_DDRA = &FE43         \ Port A's direction: the keyboard, the sound chip
+SYSTEM_VIA_A_NO_HANDSHAKE = &FE4F

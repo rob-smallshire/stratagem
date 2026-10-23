@@ -266,3 +266,12 @@ A running log of design decisions. Add to it whenever one is made.
   host-side icon of its own would have needed new drawing code and a
   timer on the host. Each kind gets a 6 x 5 item picture rather than its
   8 x 16 tile icon, which the sprite code (three bytes wide) can't draw.
+
+## 2026-10-24
+
+- **The host scans the keyboard itself:** OSBYTE `&81` cost about 270
+  cycles a key, 2,429 a frame for play's nine, and crafting will add a
+  dozen more. Writing each key's number to the System VIA's port A and
+  reading bit 7, as the MOS does inside, costs about 31; the keys are a
+  table, read with interrupts held off and the MOS's scanning stopped,
+  then restarted. The MOS still sees the keyboard between frames.
