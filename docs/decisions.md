@@ -213,3 +213,8 @@ A running log of design decisions. Add to it whenever one is made.
   (slots start at 24). The cost on the host is a compare per sprite byte
   (288 cycles for the miner), and about 35 cycles more for each byte over
   a pixel in front. Items, drawn after the miner, pass behind him too.
+- **Inventory counts are BCD bytes, capped at 99:** a count takes a byte
+  whatever its cap, and 99 is the most two digits show. As BCD the cap is
+  the byte's own, the clamp is the carry, and drawing a count needs no
+  conversion, only its nibbles. The arithmetic is on the 65C02 parasite,
+  which clears decimal mode on interrupts (`inventory-and-crafting.md`).

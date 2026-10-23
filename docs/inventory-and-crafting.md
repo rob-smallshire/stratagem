@@ -210,6 +210,19 @@ Starve. Found by exploring, as in Subnautica.
 
   At most about 24 kinds, so the inventory is a table of 24 bytes. The cap
   makes chests worth having later, without slots to manage now.
+- **Counts are BCD bytes** (decided 2026-10-23). A BCD byte holds 00-99
+  exactly, so the cap is the byte's own limit, and its two nibbles are the
+  two digits drawn, with no binary-to-decimal conversion.
+  - Counting is `SED`, `CLC`/`SEC`, `ADC`/`SBC`, then `CLD`. `INC` and
+    `DEC` don't work in decimal, so they must not be used on counts.
+  - Full is a carry out of `ADC` (or `CMP #&99`), and empty a borrow, so
+    the clamp is free. `CMP` orders BCD counts correctly, so a recipe's
+    "enough?" test is a plain compare against BCD amounts in its table.
+  - Only the parasite (a 65C02) does the arithmetic. It clears the decimal
+    flag on an interrupt, so the Tube's handlers are safe. The host only
+    reads nibbles to draw them.
+  - The Python model keeps counts as integers, and the tests compare
+    through a BCD conversion. `gen_tables` writes recipe amounts as BCD.
 - **Tools and upgrades** are owned, not counted: a pickaxe tier, boots,
   the jetpack. They're bits, like `zp_abilities` already. Nothing to
   choose between: the best pickaxe owned is used.
@@ -318,7 +331,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
   with `gen_tables` generating the tables. The 6502 is checked against it
   in py65, as usual.
 - **Parasite:**
-  - It owns the counts, the known recipes (a bit each: 3 bytes), the hand
+  - It owns the counts (BCD), the known recipes (a bit each: 3 bytes), the hand
     and the owned tools.
   - On opening the pack, it scans the tile cache near the miner for
     stations. That's paused, so time doesn't matter.
@@ -327,7 +340,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
   - It draws the panel from what the parasite sends. That's at most
     24 counts and a list of recipe numbers: well under the packet's room.
   - Icons come from the material pages and piece library it already has.
-  - Digits are a small 4 x 7 font, about 70 bytes, generated from Python.
+  - Digits, a count's two nibbles, are a small 4 x 7 font, about 70 bytes, generated from Python.
     The panel's code lives in MAIN, which has room.
   - Drawn while paused, so no beam racing. Its cost is once, on opening,
     and then per cursor move.
@@ -346,8 +359,9 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 
 ## Open questions
 
-1. Counts by kind with a cap of 99, or slots and stacks? The proposal
-   says counts. Slots matter only if capacity is meant to be a pressure.
+1. Counts by kind, or slots and stacks? The proposal says counts (BCD,
+   capped at 99: decided). Slots matter only if capacity is meant to be a
+   pressure.
 2. Should the pack pause the world? The proposal says yes. Terraria and
    Minecraft don't pause, and BotW does.
 3. Icons only, or names too? A font costs about 400 bytes and some host
