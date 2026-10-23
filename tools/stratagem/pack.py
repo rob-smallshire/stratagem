@@ -95,8 +95,8 @@ def icon(kind: int) -> bytes:
 
 
 # Digits, three pixels wide and seven lines high, in a cell pair (two
-# bytes, four pixels, across) of eight lines: the left cell's eight bytes,
-# then the right's.
+# bytes, four pixels, across) of eight lines, the first blank, to part them
+# from the icon above: the left cell's eight bytes, then the right's.
 _DIGITS = """
 ###  #  ### ### # # ### ### ### ### ###
 # # ##    #   # # # #   #     # # # # #
@@ -111,10 +111,12 @@ _MARKS = {
 #.
 ##
 ##
+##
 #.
 """,
     "left": """
 .#
+##
 ##
 ##
 .#
@@ -124,8 +126,8 @@ _MARKS = {
 
 def _digit_pixels(digit: int) -> list[list[int]]:
     lines = [line.ljust(39) for line in _DIGITS.strip("\n").split("\n")]
-    return [[DIGIT_COLOUR if c == "#" else PANEL_COLOUR for c in line[digit * 4:digit * 4 + 3]] + [PANEL_COLOUR]
-            for line in lines] + [[PANEL_COLOUR] * 4]
+    return [[PANEL_COLOUR] * 4] + [[DIGIT_COLOUR if c == "#" else PANEL_COLOUR for c in line[digit * 4:digit * 4 + 3]]
+                                   + [PANEL_COLOUR] for line in lines]
 
 
 def digit(digit: int) -> bytes:
@@ -136,14 +138,15 @@ def digit(digit: int) -> bytes:
 
 
 def mark(side: str) -> bytes:
-    """An arrowhead's cell, centred on the count's line: "right" points
+    """An arrowhead's cell, centred on the count's digits: "right" points
     right, before the slot; "left" points left, after it; "blank" is
     neither."""
     if side == "blank":
         return bytes(CELL_BYTES)
     rows = [line for line in _MARKS[side].split()]
     pixels = [[PANEL_COLOUR] * 2] * 2 + [[MARK_COLOUR if c == "#" else PANEL_COLOUR for c in row] for row in rows] \
-        + [[PANEL_COLOUR] * 2] * 2
+        + [[PANEL_COLOUR] * 2]
+    assert len(pixels) == CELL_BYTES
     return bytes(mode2_byte(*row) for row in pixels)
 
 
