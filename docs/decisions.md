@@ -226,3 +226,15 @@ A running log of design decisions. Add to it whenever one is made.
   small manual, as period games had, from shapes that look like their
   things, and from finds in the world, and a recipe book keeps what's
   been made or found (`inventory-and-crafting.md`).
+- **Kinds carried, and the hand until it can be chosen:** wood, soil,
+  stone, ore and gems are counted apart; dug grass is soil, and ore and
+  gems can be placed back as blocks, as in Terraria. Until the pack screen
+  lets the hand be chosen, it follows the kind last dug, and placing with
+  none of it left moves it to the first kind carried, so the miner can
+  always put back what he has. Item kinds are inventory kinds, so a
+  gathered item adds to its own count.
+- **Inventory counts are binary after all, not BCD:** BCD saved only the
+  conversion to digits, which the paused pack screen can afford, and it
+  forbade `INC` and `DEC` on counts, a rule easy to break later. In play a
+  gain is a compare and an `INC` (15 cycles; BCD's was 19) and a spend a
+  `DEC`. The cap stays at 99, the most two digits show.

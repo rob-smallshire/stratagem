@@ -9,6 +9,7 @@ from stratagem.piece_lab import Cell
 from stratagem.tiles import BACKGROUND_SKY, MATERIAL_NAMES, PASSABLE, PIECES, SKY
 from stratagem.world import HEIGHTS, TRUNKS, generate_tile
 from test_daylight import ParasiteGame
+from test_items import wood
 
 TILE_CACHE_SIZE = 32
 STRENGTH_BITS = 7
@@ -108,7 +109,7 @@ def test_digging_at_a_tree_fells_it():
     for _ in range(12):
         game.frame(INPUT_LEFT | INPUT_ACTION)
         game.host.check_cache()
-    assert game.byte("wood") + game.byte("item_count") >= 1, "no wood"
+    assert wood(game) + game.byte("item_count") >= 1, "no wood"
     settle(game)
     ground = HEIGHTS[trunk]
     left = [(x, y) for x in range(trunk - 1, trunk + 2) for y in range(ground - 10, ground)

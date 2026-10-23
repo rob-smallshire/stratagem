@@ -48,6 +48,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     \ Cut the step back to the ramp.
     JSR target_tile
     STA action_tile
+    STA dug_material
     LDA target_shape
     AND #SHAPE_BITS
     TAX
@@ -74,7 +75,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     JSR target_tile
     STA action_tile             \ The material, unless nothing is left
     TAX
-    STX chopped_material
+    STX dug_material
     LDA material_chops,X
     STA chopped
     BNE nothing_left
@@ -129,7 +130,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     BEQ not_chopped
     LDX target_x
     LDY target_y
-    LDA chopped_material
+    LDA dug_material
     JMP item_drop
 .not_chopped
     LDA zp_world_new_shape      \ Only a tile dug away entirely goes into the
@@ -138,10 +139,11 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LDX action_tile
     LDA material_passable,X
     BEQ done
-    LDA inventory
-    CMP #INVENTORY_MAX
-    BCS done
-    INC inventory
+    LDX dug_material            \ Its kind is carried, and in hand
+    LDA material_yields,X
+    BMI done
+    STA hand
+    JMP inventory_gain
 .done
     RTS
 }
@@ -190,21 +192,40 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     RTS
 }
 
-\ Place a block in the empty tile aimed at, if any and if one is carried.
+\ Place the kind in hand in the empty tile aimed at, if any. If none of
+\ that kind is left, the hand moves first to the first kind held that
+\ places something; if there is none, nothing is placed.
 .place
 {
-    LDA inventory
-    BEQ done
+    LDX hand
+    LDA inventory,X
+    BNE in_hand
+    LDX #0
+.find
+    LDA kind_places,X
+    BMI next
+    LDA inventory,X
+    BNE found
+.next
+    INX
+    CPX #KIND_COUNT
+    BNE find
+    RTS
+.found
+    STX hand
+.in_hand
     LDA #&FF                    \ Aim for an empty tile
     STA want
     JSR aim
     BCS done
     JSR target_background
     STA zp_world_new_shape      \ SHAPE_FULL with the background
-    LDA #PLACED_TILE
+    LDX hand
+    LDA kind_places,X
     JSR change_target
     BCS done
-    DEC inventory
+    LDX hand
+    DEC inventory,X
     LDA #PLACE_FRAMES
     STA cooldown
     LDA #ACTION_PLACE

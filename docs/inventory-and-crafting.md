@@ -10,10 +10,13 @@ frame, and the games below show it isn't needed (see
 
 ## Where we are
 
-- `inventory`: one count (up to 99) of dug blocks of any material. The place
-  key (SPACE) puts back `PLACED_TILE`, whatever was dug.
-- `wood`: logs gathered in from felled trees (`items.py`). Nothing spends
-  it, and nothing shows it.
+- `inventory`: a count (up to 99) of each kind: wood, soil, stone, ore
+  and gems (`inventory.py`, step 1, done). Dug material keeps its kind (dug
+  grass is soil), and logs gathered in from felled trees are wood. Nothing
+  spends wood yet, and nothing shows the counts.
+- `hand`: the kind SPACE places: the kind last dug, or, when none of it is
+  left, the first kind carried that places something. Choosing it comes
+  with the pack screen.
 - Torches: dropped with T, at most 24 in the world, never picked up; not
   counted as held.
 - Dropped items exist as sprites that burst out and are gathered in. The
@@ -219,19 +222,12 @@ most BBC games with at least a card of keys and hints.
 
   At most about 24 kinds, so the inventory is a table of 24 bytes. The cap
   makes chests worth having later, without slots to manage now.
-- **Counts are BCD bytes** (decided 2026-10-23). A BCD byte holds 00-99
-  exactly, so the cap is the byte's own limit, and its two nibbles are the
-  two digits drawn, with no binary-to-decimal conversion.
-  - Counting is `SED`, `CLC`/`SEC`, `ADC`/`SBC`, then `CLD`. `INC` and
-    `DEC` don't work in decimal, so they must not be used on counts.
-  - Full is a carry out of `ADC` (or `CMP #&99`), and empty a borrow, so
-    the clamp is free. `CMP` orders BCD counts correctly, so a recipe's
-    "enough?" test is a plain compare against BCD amounts in its table.
-  - Only the parasite (a 65C02) does the arithmetic. It clears the decimal
-    flag on an interrupt, so the Tube's handlers are safe. The host only
-    reads nibbles to draw them.
-  - The Python model keeps counts as integers, and the tests compare
-    through a BCD conversion. `gen_tables` writes recipe amounts as BCD.
+- **Counts are binary bytes, capped at `COUNT_MAX` (99)** (decided
+  2026-10-23, after BCD was tried first). In play a gain is `CMP #99`,
+  `BCS`, `INC` and a spend is `DEC`, so counts need no rules of their own.
+  BCD would have saved the conversion to digits, but that's only needed
+  while the pack screen is open and paused: dividing a count by ten, by
+  subtraction, is at most about 100 cycles, 24 times on opening.
 - **Tools and upgrades** are owned, not counted: a pickaxe tier, boots,
   the jetpack. They're bits, like `zp_abilities` already. Nothing to
   choose between: the best pickaxe owned is used.
@@ -410,7 +406,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
   with `gen_tables` generating the tables. The 6502 is checked against it
   in py65, as usual.
 - **Parasite:**
-  - It owns the counts (BCD), the grid (9 bytes of kinds), the recipe
+  - It owns the counts, the grid (9 bytes of kinds), the recipe
     book (a bit each: 3 bytes), the brush, which is the hand, and the
     owned tools.
   - On opening the pack, it scans the tile cache near the miner for
@@ -425,7 +421,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
   - It reads the crafting keys (about 20, with the keypad's) from a
     table of INKEY numbers, as it reads the game's now.
   - Icons come from the material pages and piece library it already has.
-  - Digits, a count's two nibbles, are a small 4 x 7 font, about 70 bytes, generated from Python.
+  - Digits are a small 4 x 7 font, about 70 bytes, generated from Python.
     The panel's code lives in MAIN, which has room.
   - Drawn while paused, so no beam racing. Its cost is once, on opening,
     and then per cursor move.
@@ -446,7 +442,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 
 ## Open questions
 
-1. Counts by kind, or slots and stacks? The proposal says counts (BCD,
+1. Counts by kind, or slots and stacks? The proposal says counts (binary,
    capped at 99: decided). Slots matter only if capacity is meant to be a
    pressure.
 2. Should the pack pause the world? The proposal says yes. Terraria and
@@ -470,8 +466,8 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 
 ## Steps
 
-1. Inventory by kind (model, then the 6502): dug material keeps its kind.
-   Placing puts back the kind in hand. Wood joins the table.
+1. Done: inventory by kind (model, then the 6502): dug material keeps its
+   kind. Placing puts back the kind in hand. Wood joins the table.
 2. The pack screen: paused, icons and counts, with the brush chosen by
    the arrow keys as the hand. Plus the cycle key and the hand's icon
    above the miner.

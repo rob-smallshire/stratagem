@@ -24,7 +24,7 @@ The keys are those of `implementation-record.md`, and T:
 | Z, X | Walk left, right |
 | K | Jump; in the air, a fresh press jumps again |
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
-| SPACE | Place a soil block |
+| SPACE | Place a block of the kind in hand: the kind last dug, or, with none of it left, the first kind carried (soil, stone, ore, gems) |
 | T | Drop a torch where the miner stands (in air: up to 24) |
 
 Dig down a few tiles to leave the daylight: the miner's light shows below,
@@ -129,9 +129,29 @@ a tree on a hillside stands on a terrace a tile wide, rooted, not floating
 over the slope.
 
 A straight dig (ahead, up or down) breaks a tree's part whole, at one dig,
-for a piece of wood (`wood`, up to 99): in aiming, a part counts as whole,
+for a piece of wood: in aiming, a part counts as whole,
 so beside a tree its root, the lowest, goes first, and support brings the
 rest down. Digging diagonally passes through trees, as walking does.
+
+### The inventory
+
+The miner carries a count of each kind (`inventory.py`, `asm/inventory.asm`):
+wood, soil, stone, ore and gems, up to 99 of each. A tile dug away
+entirely gives one of the kind its material yields (dug grass is soil),
+and that kind goes into the hand; a felled tree's logs, gathered in, are
+wood. SPACE places the kind in hand, as its material; with none of it
+left, the hand moves first to the first kind carried that places
+something (wood places nothing yet). Choosing the hand, and seeing the
+counts, come next (`inventory-and-crafting.md`).
+
+Each count is a byte, `inventory` + kind, up to `COUNT_MAX` (99). A gain
+(`inventory_gain`) is the compare with the cap and an `INC`, 15 cycles, or
+29 with its call; finding the kind a dig yields and setting the hand adds
+14. A place's spend is a `DEC`, 11 cycles with loading the hand. Either
+happens only on the frame of a dig, a place or a gathered log. Memory: 6
+bytes of variables (5 counts and the hand), 36 bytes of code and tables
+in PLIGHT, and 38 more in PGAME's digging and placing, which leaves 44
+bytes before PGAME's next page.
 
 ### In front and behind
 
@@ -183,10 +203,10 @@ and off one under it at half speed (losing half its speed across), or
 comes to rest if landing slower than `BOUNCE_MIN`; one still flying after
 `FLY_FRAMES` (40) is gathered. It rests for `REST_FRAMES` (25), then is
 gathered: it flies to the miner through anything, faster each frame (to
-`GATHER_MAX`, 4 pixels and lines), and is his, into `wood`, when it touches
+`GATHER_MAX`, 4 pixels and lines), and is his, into the inventory, when it touches
 him. Items pass through each other. So a felled tree's logs burst out, show
 how many there are, and are gone in about a second; at most 8 are out at
-once (more go straight into `wood`). One flying where the tile it would
+once (more go straight into the inventory). One flying where the tile it would
 look at isn't in the tile cache is gathered at once. This is the loot
 burst and magnet of many games (Exile's objects have velocities and
 bounce too, but by angle and magnitude: `apply_tile_collision_to_position_and_velocity`).
@@ -398,7 +418,7 @@ host can miss a frame then.
   pass one between its restoring and its drawing, and it flickers, in
   frames that redraw under it; they are out for only a second or so. Items
   pass behind the miner, and vanish a few columns inside the view's
-  sides. Wood isn't shown or spent yet.
+  sides. The counts aren't shown, and wood isn't spent yet.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.

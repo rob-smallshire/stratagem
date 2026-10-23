@@ -7,7 +7,7 @@ import random
 import pytest
 
 from conftest import FakeHost, parasite_machine
-from stratagem import actions, player
+from stratagem import actions, inventory, player
 from stratagem.actions import Hands
 from stratagem.camera import INPUT_ACTION, INPUT_PLACE
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
@@ -23,6 +23,29 @@ def machine(game_build):
     machine.host = FakeHost(machine, labels)
     machine.call(labels["world_reset"])
     return machine
+
+
+def write_hands(memory, labels, hands: Hands) -> None:
+    """The model's hands into the 6502's."""
+    for kind, count in enumerate(hands.counts):
+        memory[labels["inventory"] + kind] = count
+    memory[labels["hand"]] = hands.hand
+    memory[labels["cooldown"]] = hands.cooldown
+
+
+def read_hands(memory, labels) -> Hands:
+    counts = tuple(memory[labels["inventory"] + kind] for kind in range(inventory.KIND_COUNT))
+    return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]])
+
+
+def random_hands(rng: random.Random) -> Hands:
+    """Hands with counts often empty or full, the hand on a kind placed, and
+    often empty, so that placing moves it."""
+    counts = [rng.choice([0, 0, 1, 2, rng.randrange(100), 98, 99]) for _ in range(inventory.KIND_COUNT)]
+    hand = rng.choice(sorted(inventory.PLACES))
+    if rng.random() < 0.5:
+        counts[hand] = 0
+    return Hands(tuple(counts), 0, hand)
 
 
 def assert_tile_matches(machine, labels, world, target) -> None:
@@ -59,6 +82,7 @@ def test_actions_match_model(machine, game_build):
     ramps = 0
     for episode in range(60):
         state = _random_start(rng, world)
+        hands = random_hands(rng)
         inputs = 0
         cached_at = None
         for _ in range(150):
@@ -69,9 +93,7 @@ def test_actions_match_model(machine, game_build):
                 harness.fill_cache(world, *here)
                 cached_at = here
             harness.write(state, inputs)
-            memory[labels["inventory"]] = hands.inventory
-            memory[labels["cooldown"]] = hands.cooldown
-            memory[labels["wood"]] = hands.wood
+            write_hands(memory, labels, hands)
             memory[labels["item_count"]] = 0        # wood dropped is items.py's business
             machine.call(labels["update_player"])
             machine.call(labels["player_action"])
@@ -80,8 +102,7 @@ def test_actions_match_model(machine, game_build):
             expected = player.step(state, inputs, world.tile_at)
             assert actual == expected, f"from {state} with inputs {inputs}"
             hands, action, target = actions.act(hands, expected, inputs, world)
-            assert (memory[labels["inventory"]], memory[labels["cooldown"]], memory[labels["wood"]]) == \
-                (hands.inventory, hands.cooldown, hands.wood)
+            assert read_hands(memory, labels) == hands
             assert memory[labels["action"]] == action, f"at {expected} with inputs {inputs}"
             if target is not None:
                 assert (memory[labels["target_x"]], memory[labels["target_y"]]) == target
@@ -101,6 +122,37 @@ def test_actions_match_model(machine, game_build):
             for x in range(x0, x0 + CHUNK_SIZE):
                 mpu = machine.call(labels["tile_at"], x=x, y=y).mpu
                 assert (mpu.a, memory[labels["zp_world_shape"]]) == world.tile_at(x, y), (x, y)
+
+
+def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
+    """Placing puts down the kind in hand; with none of it left, the first
+    kind held that places something, which the hand moves to; with nothing
+    to place, nothing. The 6502 does as the model, from random places and
+    hands."""
+    labels = game_build.labels["PARASITE"]
+    harness = PlayerHarness(machine, labels)
+    memory = machine.mpu.memory
+    rng = random.Random(1066)
+    world = World()
+    seen = collections.Counter()
+    for trial in range(300):
+        state = _random_start(rng, world)
+        inputs = INPUT_PLACE | rng.choice([0, INPUT_UP, INPUT_DOWN])
+        hands = random_hands(rng)
+        harness.fill_cache(world, state.px // 8, state.py // 16)
+        harness.write(state, inputs)
+        write_hands(memory, labels, hands)
+        machine.call(labels["player_action"])
+        machine.host.take_queue()
+        before = hands
+        hands, action, target = actions.act(hands, state, inputs, world)
+        assert memory[labels["action"]] == action, f"trial {trial}: {state}"
+        assert read_hands(memory, labels) == hands, f"trial {trial}: {state}"
+        if target is not None:
+            assert_tile_matches(machine, labels, world, target)
+        seen["moved" if hands.hand != before.hand else "nothing held" if not any(
+            before.counts[k] for k in inventory.PLACES) else "kept"] += 1
+    assert min(seen.values()) >= 5 and len(seen) == 3, seen
 
 
 @pytest.mark.parametrize("keys", [pytest.param(INPUT_LEFT | INPUT_DOWN, marks=pytest.mark.slow),
@@ -134,9 +186,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
                     harness.fill_cache(world, *here)
                     cached_at = here
                 harness.write(state, keys)
-                memory[labels["inventory"]] = hands.inventory
-                memory[labels["cooldown"]] = hands.cooldown
-                memory[labels["wood"]] = hands.wood
+                write_hands(memory, labels, hands)
                 memory[labels["item_count"]] = 0
                 machine.call(labels["update_player"])
                 machine.call(labels["player_action"])
@@ -146,6 +196,7 @@ def test_long_diagonal_tunnels_match_model(machine, game_build, keys):
                 assert actual == expected, f"from {state}"
                 hands, action, target = actions.act(hands, expected, keys, world)
                 assert memory[labels["action"]] == action
+                assert read_hands(memory, labels) == hands
                 if target is not None:
                     assert (memory[labels["target_x"]], memory[labels["target_y"]]) == target
                     assert_tile_matches(machine, labels, world, target)
@@ -198,9 +249,8 @@ def test_diagonal_digs_in_random_ground_match_model(machine, game_build, keys):
                               facing=1 if keys & INPUT_RIGHT else -1)
         harness.fill_cache(world, tx0, ty0)
         harness.write(state, keys)
-        hands = Hands(inventory=rng.randrange(5))
-        memory[labels["inventory"]] = hands.inventory
-        memory[labels["cooldown"]] = 0
+        hands = random_hands(random.Random(trial))     # leaving rng's trials as they were
+        write_hands(memory, labels, hands)
         machine.call(labels["player_action"])
         machine.host.take_queue()
         dx = 1 if keys & INPUT_RIGHT else -1
@@ -209,7 +259,7 @@ def test_diagonal_digs_in_random_ground_match_model(machine, game_build, keys):
             sides[actions.near_side(state, target, dx)] += 1
         hands, action, target = actions.act(hands, state, keys, world)
         assert memory[labels["action"]] == action, f"trial {trial}: {state}"
-        assert memory[labels["inventory"]] == hands.inventory
+        assert read_hands(memory, labels) == hands
         if target is not None:
             assert (memory[labels["target_x"]], memory[labels["target_y"]]) == target, f"trial {trial}: {state}"
             assert_tile_matches(machine, labels, world, target)

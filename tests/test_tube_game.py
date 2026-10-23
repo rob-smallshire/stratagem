@@ -7,7 +7,7 @@ the brighter of its tile's daylight and the parasite's smooth miner's light
 import pytest
 
 from conftest import RUN_TIMEOUT_EMULATED_SECONDS
-from stratagem import camera, items, lighting, player, sprites
+from stratagem import camera, inventory, items, lighting, player, sprites
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
 from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, SHAPE_FULL, SLOT_COUNT, TORCH,
@@ -130,7 +130,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
         assert items_shown >= 2, "the felled tree's logs weren't drawn"
         parasite = bbc.connect_coprocessor().memory.address
         plabels = game_build.labels["PARASITE"]
-        assert parasite.peek[plabels["wood"]] >= 2, "the logs weren't gathered in"
+        assert parasite.peek[plabels["inventory"] + inventory.KIND_WOOD] >= 2, "the logs weren't gathered in"
     if any("T" in keys for _, keys in script):
         # Torches were dropped, and they light the tiles around them.
         camera_x, camera_y = word(peek, labels["zp_camera_x"]), word(peek, labels["zp_camera_y"])

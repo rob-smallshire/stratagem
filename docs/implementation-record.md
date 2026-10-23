@@ -237,7 +237,8 @@ A 6 x 24 pixel box. Positions are in sixteenths of a pixel and line, 16-bit.
     shape, the tile becomes the largest shape within what is left, so the
     near side always goes first.
   - When nothing is left, the tile becomes air or sky (by its background)
-    and a block goes into the inventory (up to 99).
+    and one of its kind (dug grass is soil) goes into the inventory
+    (up to 99 of each) and the hand (see `tube-game.md`, The inventory).
 - **Aiming:**
   - **Down:** the tile holding the line just below the feet.
   - **Up:** the tile holding the line just above the head.
@@ -324,8 +325,8 @@ Working with Beebium (see `CLAUDE.md` and `platform-notes.md`):
 
 - Placeholder art drawn by code; grass on slopes loses its green top; no HUD,
   so the inventory can't be seen.
-- One inventory count, one placeable material, no crafting; the double jump
-  is free.
+- No way to choose the hand but digging, no crafting; the double jump is
+  free.
 - 104 changed chunks, then digging is refused; nothing is saved.
 - No enemies, objects, water physics, light or sound.
 - Caves come from a coarse hash and are blocky, though their corners are

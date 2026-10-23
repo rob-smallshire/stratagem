@@ -58,18 +58,7 @@ ASSERT ITEM_OFFSET_X * 16 < 128
 .done
     RTS
 .full
-    JMP item_gained
-}
-
-\ An item went into the inventory.
-.item_gained
-{
-    LDA wood
-    CMP #INVENTORY_MAX
-    BCS done
-    INC wood
-.done
-    RTS
+    JMP inventory_gain          \ A is its kind
 }
 
 \ Set item X's pixel and top line from its position: px = x >> 4, top =
@@ -131,7 +120,8 @@ ASSERT ITEM_OFFSET_X * 16 < 128
     BNE next
     JSR item_touches
     BCS next
-    JSR item_gained             \ His: the last takes its place
+    LDA item_kind,X             \ His: the last takes its place
+    JSR inventory_gain
     DEC item_count
     LDY item_count
     LDX item_i

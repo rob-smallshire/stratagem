@@ -22,8 +22,11 @@
     STA zp_player_vx
     STA zp_player_vy
     STA zp_player_on_ground
-    STA inventory
-    STA wood
+    LDX #KIND_COUNT - 1
+.clear_inventory
+    STA inventory,X
+    DEX
+    BPL clear_inventory
     STA cooldown
     STA zp_player_jump_held
     STA zp_player_air_jumps
@@ -43,6 +46,8 @@
     STA support_lost
     LDA #STARTING_ABILITIES
     STA zp_abilities
+    LDA #KIND_SOIL
+    STA hand
     LDA #1
     STA zp_player_facing
     LDA #LO(PLAYER_START_X)

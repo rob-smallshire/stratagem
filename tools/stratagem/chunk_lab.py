@@ -37,6 +37,7 @@ import numpy as np
 
 from stratagem import actions, player, world
 from stratagem.actions import Hands
+from stratagem.inventory import KIND_COUNT, KIND_SOIL
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, INPUT_RIGHT, INPUT_UP
 from stratagem.tiles import AIR, SHAPE_BITS, SHAPE_FULL, SKY
 from stratagem.world import CHUNK_SIZE, CHUNKS_ACROSS, HEIGHTS, World, background_bits, generate_tile
@@ -86,7 +87,7 @@ def play(seed: int, frames: int) -> UnlimitedWorld:
     start_px = 128 * player.TILE_WIDTH + 1
     start_py = HEIGHTS[128] * player.TILE_HEIGHT - player.PLAYER_HEIGHT
     hero = player.Player(x=start_px * player.SUBPIXELS, y=start_py * player.SUBPIXELS)
-    hands = Hands(inventory=20)
+    hands = Hands(counts=tuple(20 if kind == KIND_SOIL else 0 for kind in range(KIND_COUNT)))
     weights = [m[0] for m in MOVES]
     left = 0
     for _ in range(frames):

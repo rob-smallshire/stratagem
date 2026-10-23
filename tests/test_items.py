@@ -9,6 +9,7 @@ import pytest
 
 from stratagem import items, sprites
 from stratagem.camera import INPUT_ACTION, INPUT_LEFT
+from stratagem.inventory import KIND_WOOD
 from stratagem.player import PLAYER_HEIGHT, Player
 from stratagem.tiles import PIECES, ROOT
 from stratagem.world import HEIGHTS, TRUNKS, generate_tile
@@ -25,6 +26,11 @@ def word(memory, address: int) -> int:
 
 def signed(byte: int) -> int:
     return byte - 256 if byte & 0x80 else byte
+
+
+def wood(game) -> int:
+    """The wood the miner carries."""
+    return game.memory[game.labels["inventory"] + KIND_WOOD]
 
 
 def held_items(game) -> list[items.Item]:
@@ -74,13 +80,13 @@ class ItemWatch:
         left, right, top, bottom = (game.byte(name) for name in ("cached_left", "cached_right", "cached_top",
                                                                  "cached_bottom"))
         self.in_cache = lambda x, y: left <= x <= right and top <= y <= bottom
-        self.wood = game.byte("wood")
+        self.wood = wood(game)
 
     def end(self, _mpu):
         expected, gathered = items.step(self.before, self.player, self.tiles, self.in_cache)
         self.after = held_items(self.game)
         assert self.after == expected
-        assert self.game.byte("wood") == self.wood + gathered
+        assert wood(self.game) == self.wood + gathered
         self.gathered += gathered
         self.states |= {item.state for item in self.after}
         self.bounced |= any(b.state == items.FLYING and a.vy > 0 > b.vy for a, b in zip(self.before, self.after))
@@ -147,7 +153,7 @@ def test_felled_wood_is_thrown_out_and_gathered_in():
     assert watch.thrown == 1 + TRUNKS[trunk], "the root and each part of the trunk"
     assert game.byte("item_count") == 0, "not all gathered in"
     assert watch.gathered == watch.thrown
-    assert game.byte("wood") == watch.thrown
+    assert wood(game) == watch.thrown
     assert watch.bounced, "none bounced"
     assert items.GATHERING in watch.states
     assert shown >= 3, "too few were in view at once"

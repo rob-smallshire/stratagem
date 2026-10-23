@@ -24,21 +24,23 @@ Digging erodes the tile by quarters from the side nearest the player
 QUARTERS_PER_DIG of them, by how hard the material is (see
 tiles.dig_shape). So soft ground goes
 in one dig and stone in four, and you see it go. When nothing is left the
-tile is empty (sky or cave, by its background), and a block goes into the
-inventory (up to INVENTORY_MAX). A tree's part breaks whole, at one dig,
+tile is empty (sky or cave, by its background), and one of the kind its
+material yields goes into the inventory (inventory.py), and into the hand.
+A tree's part breaks whole, at one dig,
 leaving it empty, and a trunk's part drops a piece of wood (items.py) for
 the miner to gather in; what it held falls (support.py). Only straight digs break parts: digging diagonally
 passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
-falls. Each dig starts a cooldown. Placing puts
-whole SOIL in an empty tile (AIR or SKY), using a block. If the world has
-no room for a change, nothing happens.
+falls. Each dig starts a cooldown. Placing puts a whole block of the kind
+in hand (inventory.py) in an empty tile (AIR or SKY). If the world has no
+room for a change, nothing happens.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+from stratagem import inventory
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, INPUT_RIGHT, INPUT_UP
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
@@ -47,22 +49,20 @@ from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, 
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
 QUARTERS_PER_DIG = {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1}
-assert set(QUARTERS_PER_DIG) == set(DIGGABLE)
+assert set(QUARTERS_PER_DIG) == set(DIGGABLE) == set(inventory.YIELDS)
 DIG_FRAMES = 8
 PLACE_FRAMES = 6
 EMPTY = frozenset({AIR, SKY})
 CHOPPABLE = frozenset(TREE_PARTS)       # broken whole by a dig, for wood
-PLACED_TILE = SOIL
-INVENTORY_MAX = 99
 
 NONE, DIG, PLACE = 0, 1, 2
 
 
 @dataclass(frozen=True)
 class Hands:
-    inventory: int = 0
+    counts: tuple[int, ...] = inventory.EMPTY   # of each kind (inventory.py)
     cooldown: int = 0
-    wood: int = 0           # gathered in (items.py)
+    hand: int = inventory.KIND_SOIL             # the kind placing puts down
 
 
 def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
@@ -226,7 +226,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
     """One frame's digging or placing. Returns the new hands, what was done
     and where, changing the world."""
     if hands.cooldown:
-        return Hands(hands.inventory, hands.cooldown - 1, hands.wood), NONE, None
+        return replace(hands, cooldown=hands.cooldown - 1), NONE, None
 
     in_world = _in_world
     if inputs & INPUT_ACTION:
@@ -246,21 +246,33 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
                 left = cut_to(shape & SHAPE_BITS, ramp)
                 tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
                 if world.set_tile(*target, tile):
-                    inventory = min(hands.inventory + 1, INVENTORY_MAX) if left is None else hands.inventory
-                    return Hands(inventory, DIG_FRAMES, hands.wood), DIG, target
+                    return _dug(hands, material, left), DIG, target
                 return hands, NONE, None
             if material in CHOPPABLE:
                 if world.set_tile(*target, (background(behind), SHAPE_FULL | behind)):
-                    return Hands(hands.inventory, DIG_FRAMES, hands.wood), DIG, target
+                    return replace(hands, cooldown=DIG_FRAMES), DIG, target
                 return hands, NONE, None
             left = dig_shape(shape & SHAPE_BITS, QUARTERS_PER_DIG[material], side)
             tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
             if world.set_tile(*target, tile):
-                inventory = min(hands.inventory + 1, INVENTORY_MAX) if left is None else hands.inventory
-                return Hands(inventory, DIG_FRAMES, hands.wood), DIG, target
-    elif inputs & INPUT_PLACE and hands.inventory:
+                return _dug(hands, material, left), DIG, target
+    elif inputs & INPUT_PLACE:
+        hand = inventory.in_hand(hands.counts, hands.hand)
+        if hand is None:
+            return hands, NONE, None
+        hands = replace(hands, hand=hand)
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
                      and not overlaps_player(player, x, y))
-        if target is not None and world.set_tile(*target, (PLACED_TILE, SHAPE_FULL | background_bits(*target))):
-            return Hands(hands.inventory - 1, PLACE_FRAMES, hands.wood), PLACE, target
+        if target is not None and world.set_tile(*target, (inventory.PLACES[hand],
+                                                           SHAPE_FULL | background_bits(*target))):
+            return Hands(inventory.spend(hands.counts, hand), PLACE_FRAMES, hand), PLACE, target
     return hands, NONE, None
+
+
+def _dug(hands: Hands, material: int, left: int | None) -> Hands:
+    """The hands after a dig of `material` that left `left` of it (None if
+    nothing): a tile dug away entirely is carried, and is in hand."""
+    if left is not None:
+        return replace(hands, cooldown=DIG_FRAMES)
+    kind = inventory.YIELDS[material]
+    return Hands(inventory.gain(hands.counts, kind), DIG_FRAMES, kind)
