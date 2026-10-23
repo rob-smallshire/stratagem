@@ -238,3 +238,8 @@ A running log of design decisions. Add to it whenever one is made.
   forbade `INC` and `DEC` on counts, a rule easy to break later. In play a
   gain is a compare and an `INC` (15 cycles; BCD's was 19) and a spend a
   `DEC`. The cap stays at 99, the most two digits show.
+- **No signal when a count is full:** at 99 the extra is lost silently,
+  which is spoil disposal for bulk materials; rare kinds seldom reach the
+  cap, the pack screen shows the counts, and finds that matter are owned
+  bits, which can't overflow. Left to the player's diligence until playing
+  shows otherwise.

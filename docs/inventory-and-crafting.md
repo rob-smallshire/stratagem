@@ -169,7 +169,11 @@ the player three things at the moment they matter:
 1. **Something was gained.** We have this already: the logs fly into the
    miner. A brief label or icon above him would add how many.
 2. **What's in hand,** when it changes, and when it's used up.
-3. **That the pack is full,** when something can't be taken.
+3. **That the pack is full,** when something can't be taken. We leave
+   this out (decided 2026-10-23): at the cap the extra is simply lost,
+   which matters only for bulk materials, and the pack screen shows a 99
+   to anyone who looks, as Elite's cargo screen did. Finds that matter are
+   owned, not counted, so they can't overflow. Playing may yet show a need.
 
 Everything else waits for the player to ask, in a paused screen. That
 fits the BBC: a paused screen costs drawing time once, not every frame, and
@@ -227,7 +231,8 @@ most BBC games with at least a card of keys and hints.
   players dump them in lava (the cobblestone problem); Terraria avoids it
   with stacks of 9999. With counts and no slots, soil can't crowd out
   anything, and at 99 the dig still goes through and the extra is lost, so
-  a full count works as a trash slot.
+  a full count works as a trash slot. Nothing signals it: the player's
+  diligence, and the pack screen's counts, are enough.
 - **Counts are binary bytes, capped at `COUNT_MAX` (99)** (decided
   2026-10-23, after BCD was tried first). In play a gain is `CMP #99`,
   `BCS`, `INC` and a spend is `DEC`, so counts need no rules of their own.
@@ -469,9 +474,6 @@ the start to the boots (`STARTING_ABILITIES = 0`).
    It's now separate from crafting, which uses the arrows. Try it in the
    emulator.
 9. Do mirrored shapes match?
-10. Which kinds show "full" at the cap? Ore, gems and wood are worth
-    telling; soil and stone reach 99 in any long tunnel, so they should
-    probably stay silent.
 
 ## Steps
 
