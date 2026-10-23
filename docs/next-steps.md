@@ -40,6 +40,11 @@ surface, ladders, later torches and furniture.
 
 ## 2. An on-screen display (HUD)
 
+Set aside (2026-10-23): a HUD costs drawing every frame, and games that
+show least do without one. What's carried is shown in a paused pack
+screen instead, with brief signs near the miner when it changes (see
+`inventory-and-crafting.md`). Kept here in case it comes back.
+
 The player can't see how many blocks they carry. Start with the inventory
 count; leave room for health and the item in hand.
 
@@ -53,6 +58,10 @@ count; leave room for health and the item in hand.
 - Mind the beam: draw it where and when the beam isn't.
 
 ## 3. Crafting and the first progression loop
+
+Now designed in `inventory-and-crafting.md` (inventory by kind, a paused
+pack screen, a recipe list by station unlocked by holding an ingredient,
+and its steps). The first notes:
 
 The Terraria loop: dig, collect, craft, dig better. A first slice:
 

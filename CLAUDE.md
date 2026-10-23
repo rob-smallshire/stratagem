@@ -11,6 +11,8 @@ filing system resident, and is tested in the Beebium emulator.
   `docs/tube-prototypes.md`, how we got there.
 - `docs/tile-set.md`: the planned tile set (pieces, objects, back walls) and
   how the format and renderer could carry it.
+- `docs/inventory-and-crafting.md`: how other games hold, show and craft
+  things, and the proposed design for Stratagem.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).
 - `docs/architecture.md`: memory model, memory map, screen, world, frame.
