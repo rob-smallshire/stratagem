@@ -28,6 +28,8 @@
     DEX
     BPL clear_inventory
     STA cooldown
+    STA pack_open
+    STA pack_held
     STA zp_player_jump_held
     STA zp_player_air_jumps
     STA redraw_tile
@@ -79,6 +81,8 @@
     BNE wait
     LDA MAILBOX_INPUT
     STA zp_input
+    JSR pack_input              \ The pack's frame, if it is open
+    BCS para_loop
 .*para_input                    \ (Labels like this are for timing)
     INC zp_frame
     JSR update_player
@@ -89,7 +93,7 @@
 .no_torch
     JSR items_step
 .*para_items_moved
-    JSR plan_camera
+    JSR pack_plan_camera
 }
 .first_frame
     JSR para_frame

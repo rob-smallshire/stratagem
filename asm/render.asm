@@ -94,6 +94,16 @@ ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
         EQUB HI(item_saves + item * ITEM_BYTES)
     NEXT
 
+\ The pack's panel (render_pack): each kind's icon (a tile's 64 bytes), the
+\ digits (two cells each) and the arrowheads (pointing right, then left,
+\ then two blank cells).
+.pack_icons
+    PACK_ICONS
+.pack_digits
+    PACK_DIGITS
+.pack_marks
+    PACK_MARKS
+
 CLEAR RENDER_CODE, RENDER_END
 ORG RENDER_CODE
 GUARD RENDER_END
@@ -734,6 +744,285 @@ ENDMACRO
 .done
     RTS
 }
+
+\ Draw the pack's panel (tools/stratagem/pack.py) from host_pack_count,
+\ host_pack_kinds, host_pack_counts and host_pack_index: across the top of
+\ the view, a blank row, then for each row of kinds their icons, two rows,
+\ and their counts below, with arrowheads either side of the hand's count,
+\ and a blank row.
+ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
+.render_pack
+{
+    LDA host_pack_count         \ The panel's rows, cleared
+    CLC
+    ADC #PACK_COLUMNS - 1
+    LSR A
+    LSR A
+    LSR A
+    ASL A
+    ASL A
+    SEC
+    ADC #PANEL_TOP
+    STA pack_row_end
+    LDA #PANEL_TOP
+    STA pack_row
+.clear_row
+    LDA #PANEL_LEFT             \ Along the row, cell by cell
+    LDY pack_row
+    JSR pack_cell_address
+    LDX #PANEL_COLUMNS
+.clear_cell
+    LDA #0
+    FOR line, 0, 7
+        LDY #line
+        STA (zp_screen),Y
+    NEXT
+    CLC
+    LDA zp_screen
+    ADC #CELL_BYTES
+    STA zp_screen
+    BCC same_page
+    INC zp_screen + 1
+    LDA zp_screen + 1
+    CMP #HI(SCREEN_END)
+    BCC same_page
+    LDA #HI(SCREEN_START)
+    STA zp_screen + 1
+.same_page
+    DEX
+    BNE clear_cell
+    INC pack_row
+    LDA pack_row
+    CMP pack_row_end
+    BNE clear_row
+    LDA #0
+    STA pack_slot
+.slot
+    LDA pack_slot
+    CMP host_pack_count
+    BNE draw_slot
+    RTS
+.draw_slot
+    JSR pack_place
+    LDX pack_slot               \ The icon: pack_icons + kind * 64, its
+    LDA host_pack_kinds,X       \ cells four across, two down
+    LDY #0
+    STY zp_tile + 1
+    LDY #6
+.times_64
+    ASL A
+    ROL zp_tile + 1
+    DEY
+    BNE times_64
+    CLC
+    ADC #LO(pack_icons)
+    STA zp_tile
+    LDA zp_tile + 1
+    ADC #HI(pack_icons)
+    STA zp_tile + 1
+    LDA #0
+    STA pack_cell
+.icon_cell
+    LDA pack_cell
+    LSR A
+    LSR A
+    CLC
+    ADC pack_top
+    TAY
+    LDA pack_cell
+    AND #3
+    SEC
+    ADC pack_left
+    JSR pack_put
+    INC pack_cell
+    LDA pack_cell
+    CMP #8
+    BNE icon_cell
+    LDX pack_slot               \ The count: tens, unless none, and units
+    LDA host_pack_counts,X
+    LDX #0
+.tens
+    CMP #10
+    BCC units
+    SBC #10
+    INX
+    BNE tens                    \ Always branches
+.units
+    STA pack_units
+    TXA
+    BEQ no_tens
+    JSR pack_digit
+    LDA pack_left
+    CLC
+    ADC #1
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #2
+    JSR pack_put_count
+.no_tens
+    LDA pack_units
+    JSR pack_digit
+    LDA pack_left
+    CLC
+    ADC #3
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #4
+    JSR pack_put_count
+    JSR pack_slot_marks
+    INC pack_slot
+    JMP slot
+}
+
+\ Redraw the arrowheads of the pack's panel, the hand having moved.
+.render_pack_marks
+{
+    LDA #0
+    STA pack_slot
+.loop
+    LDA pack_slot
+    CMP host_pack_count
+    BEQ done
+    JSR pack_place
+    JSR pack_slot_marks
+    INC pack_slot
+    BNE loop                    \ Always branches
+.done
+    RTS
+}
+
+\ Set pack_left, pack_top and pack_count_row for slot pack_slot: its
+\ arrowhead's column, its icon's top row and its count's row.
+.pack_place
+{
+    LDA pack_slot
+    AND #PACK_COLUMNS - 1
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC #PANEL_LEFT + 1
+    STA pack_left
+    LDA pack_slot
+    LSR A
+    LSR A
+    LSR A
+    ASL A
+    ASL A
+    SEC
+    ADC #PANEL_TOP
+    STA pack_top
+    CLC
+    ADC #2
+    STA pack_count_row
+    RTS
+}
+
+\ Draw slot pack_slot's arrowheads, if it is the hand's, or blank cells.
+.pack_slot_marks
+{
+    LDX #LO(pack_marks)
+    LDY #HI(pack_marks)
+    LDA pack_slot
+    CMP host_pack_index
+    BEQ hand
+    LDX #LO(pack_marks + 2 * CELL_BYTES)
+    LDY #HI(pack_marks + 2 * CELL_BYTES)
+.hand
+    STX zp_tile
+    STY zp_tile + 1
+    LDA pack_left
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #5
+    JMP pack_put_count
+}
+
+\ Point zp_tile at digit A's graphics.
+.pack_digit
+{
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC #LO(pack_digits)
+    STA zp_tile
+    LDA #HI(pack_digits)
+    ADC #0
+    STA zp_tile + 1
+    RTS
+}
+
+\ Copy the cell at zp_tile to view cell A in the count's row, and move
+\ zp_tile on to the next cell.
+.pack_put_count
+    LDY pack_count_row
+    \ Fall through
+
+\ Copy the cell at zp_tile to view cell (A, Y), and move zp_tile on to the
+\ next cell.
+.pack_put
+{
+    JSR pack_cell_address
+    LDY #7
+.loop
+    LDA (zp_tile),Y
+    STA (zp_screen),Y
+    DEY
+    BPL loop
+    LDA zp_tile
+    CLC
+    ADC #8
+    STA zp_tile
+    BCC done
+    INC zp_tile + 1
+.done
+    RTS
+}
+
+\ Point zp_screen at view cell (A, Y): zp_screen_start + Y * ROW_BYTES + A *
+\ CELL_BYTES, wrapped.
+.pack_cell_address
+{
+    STA zp_screen
+    LDA #0
+    ASL zp_screen
+    ROL A
+    ASL zp_screen
+    ROL A
+    ASL zp_screen
+    ROL A
+    STA zp_screen + 1
+    TYA
+    ASL A                       \ ROW_BYTES = 2 pages
+    ADC zp_screen + 1           \ (Carry clear: Y < 128)
+    STA zp_screen + 1
+    CLC
+    LDA zp_screen
+    ADC zp_screen_start
+    STA zp_screen
+    LDA zp_screen + 1
+    ADC zp_screen_start + 1
+    CMP #HI(SCREEN_END)
+    BCC wrapped
+    SBC #HI(SCREEN_END - SCREEN_START)
+.wrapped
+    STA zp_screen + 1
+    RTS
+}
+
+.pack_row           SKIP 1      \ render_pack's workspace
+.pack_row_end       SKIP 1
+.pack_slot          SKIP 1
+.pack_left          SKIP 1
+.pack_top           SKIP 1
+.pack_count_row     SKIP 1
+.pack_cell          SKIP 1
+.pack_units         SKIP 1
 
 \ Clear the whole screen to colour 0.
 .render_clear

@@ -20,6 +20,11 @@ INKEY_M = &100 - 102
 INKEY_L = &100 - 87
 INKEY_SPACE = &100 - 99
 INKEY_T = &100 - 36
+INKEY_P = &100 - 56
+INKEY_LEFT = &100 - 26
+INKEY_RIGHT = &100 - 122
+INKEY_UP = &100 - 58
+INKEY_DOWN = &100 - 42
 
 \ The host's start: a clear, narrowed screen.
 .host_init
@@ -55,6 +60,10 @@ INKEY_T = &100 - 36
     JSR host_read_from
     READ_BYTE
     STA host_flags
+    BIT host_flags
+    BVC game
+    JMP host_pack_frame
+.game
     READ_BYTE
     STA zp_plan_dx
     READ_BYTE
@@ -158,22 +167,7 @@ INKEY_T = &100 - 36
 .fetched
 .*host_fetch_done               \ (For timing)
 
-    JSR read_input              \ The input, to the parasite's mailbox
-    INC host_frames
-    JSR host_claim
-    LDA #LO(MAILBOX_INPUT)
-    STA host_transfer
-    LDA #0
-    STA host_transfer + 1
-    LDA #TUBE_BYTES_TO_PARASITE
-    LDX #LO(host_transfer)
-    LDY #HI(host_transfer)
-    JSR TUBE_ENTRY
-    LDA zp_input
-    JSR host_write_byte
-    LDA host_frames
-    JSR host_write_byte
-    JSR host_release
+    JSR host_send_input
 
     LDA host_flags              \ The plan: the whole view, or the new row
     BEQ move                    \ (into the hidden row) and new columns
@@ -221,6 +215,69 @@ INKEY_T = &100 - 36
     STA zp_columns_width
     INC host_frame_count
 .*host_frame_shown              \ Tests stop here
+    RTS
+}
+
+\ Read the input and write it to the parasite's mailbox, with the count of
+\ packets read.
+.host_send_input
+{
+    JSR read_input
+    INC host_frames
+    JSR host_claim
+    LDA #LO(MAILBOX_INPUT)
+    STA host_transfer
+    LDA #0
+    STA host_transfer + 1
+    LDA #TUBE_BYTES_TO_PARASITE
+    LDX #LO(host_transfer)
+    LDY #HI(host_transfer)
+    JSR TUBE_ENTRY
+    LDA zp_input
+    JSR host_write_byte
+    LDA host_frames
+    JSR host_write_byte
+    JMP host_release
+}
+
+\ The pack's packet (pack.asm), after its flags: the kinds shown, their
+\ counts and the hand's place. At vertical sync draw the panel, or the
+\ hand's arrowheads, if the packet says so; the view is left as it is
+\ around it, and nothing moves.
+.host_pack_frame
+{
+    READ_BYTE
+    STA host_pack_count
+    READ_BYTE
+    STA host_pack_index
+    LDX #0
+.loop
+    CPX host_pack_count
+    BEQ read
+    READ_BYTE
+    STA host_pack_kinds,X
+    READ_BYTE
+    STA host_pack_counts,X
+    INX
+    BNE loop                    \ Always branches
+.read
+    JSR host_release
+    JSR host_send_input
+    LDA #19                     \ Wait for vertical sync
+    JSR OSBYTE
+    LDA host_flags
+    AND #PACKET_PACK_DRAW
+    BEQ not_drawn
+    JSR call_render_pack
+    JMP done
+.not_drawn
+    LDA host_flags
+    AND #PACKET_PACK_MOVED
+    BEQ done
+    JSR call_render_pack_marks
+.done
+    INC host_frame_count
+.*host_pack_shown               \ Tests stop here
     RTS
 }
 
@@ -550,6 +607,24 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
 {
     LDA #0
     STA zp_input
+    LDX #INKEY_P
+    LDA #INPUT_PACK
+    JSR read_key
+    BIT host_flags              \ In the pack, the arrow keys
+    BVC play
+    LDX #INKEY_LEFT
+    LDA #INPUT_LEFT
+    JSR read_key
+    LDX #INKEY_RIGHT
+    LDA #INPUT_RIGHT
+    JSR read_key
+    LDX #INKEY_UP
+    LDA #INPUT_UP
+    JSR read_key
+    LDX #INKEY_DOWN
+    LDA #INPUT_DOWN
+    JMP read_key
+.play
     LDX #INKEY_Z
     LDA #INPUT_LEFT
     JSR read_key

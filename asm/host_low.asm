@@ -37,6 +37,8 @@ ENDMACRO
 .call_render_light      RENDER_CALL render_light
 .call_render_items      RENDER_CALL render_items
 .call_restore_items     RENDER_CALL restore_items
+.call_render_pack       RENDER_CALL render_pack
+.call_render_pack_marks RENDER_CALL render_pack_marks
 
 \ OSWRCH: a command from the parasite and its arguments (COMMAND_FRAME and
 \ its buffer, or COMMAND_FETCH, a slot and an address), or an ordinary
@@ -163,6 +165,10 @@ ENDMACRO
 .host_items_kept    EQUB 0      \ The first of them left as they are
 .host_item_index    EQUB 0
 .host_sprite_address EQUW 0     \ The player's sprite's, kept while items are drawn
+.host_pack_count    EQUB 0      \ The pack's kinds shown (its packet's)...
+.host_pack_index    EQUB 0      \ ... the hand's place among them...
+.host_pack_kinds    SKIP KIND_COUNT \ ... them...
+.host_pack_counts   SKIP KIND_COUNT \ ... and their counts
 
 \ ---------------------------------------------------------------------------
 \ Loader

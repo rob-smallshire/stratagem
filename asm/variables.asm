@@ -10,6 +10,18 @@ GUARD &0800
 .hand            SKIP 1      \ The kind placing puts down
 .chopped         SKIP 1      \ Non-zero if this dig broke a tree's part
 .dug_material    SKIP 1      \ The material this dig took from
+
+\ The pack (pack.asm)
+.pack_open       SKIP 1      \ Non-zero while the pack is open
+.pack_held       SKIP 1      \ The input last frame
+.pack_pressed    SKIP 1      \ Keys pressed this frame
+.pack_draw       SKIP 1      \ Non-zero if the host must draw the panel...
+.pack_moved      SKIP 1      \ ... or the arrowheads, the hand having moved
+.pack_closed     SKIP 1      \ Non-zero on the frame it closed
+.pack_count      SKIP 1      \ The kinds shown...
+.pack_index      SKIP 1      \ ... the hand's place among them...
+.pack_kinds      SKIP KIND_COUNT \ ... and them
+.pack_i          SKIP 1
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
 .target_x        SKIP 1      \ The tile aimed at

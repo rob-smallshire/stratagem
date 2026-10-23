@@ -323,10 +323,9 @@ Working with Beebium (see `CLAUDE.md` and `platform-notes.md`):
 
 ## Known limitations
 
-- Placeholder art drawn by code; grass on slopes loses its green top; no HUD,
-  so the inventory can't be seen.
-- No way to choose the hand but digging, no crafting; the double jump is
-  free.
+- Placeholder art drawn by code; grass on slopes loses its green top; no HUD:
+  the pack (P, `tube-game.md`) shows the inventory, paused.
+- No crafting; the double jump is free.
 - 104 changed chunks, then digging is refused; nothing is saved.
 - No enemies, objects, water physics, light or sound.
 - Caves come from a coarse hash and are blocky, though their corners are

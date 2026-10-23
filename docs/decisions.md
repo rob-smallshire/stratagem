@@ -243,3 +243,14 @@ A running log of design decisions. Add to it whenever one is made.
   cap, the pack screen shows the counts, and finds that matter are owned
   bits, which can't overflow. Left to the player's diligence until playing
   shows otherwise.
+- **The pack pauses by the parasite sending the pack's packet instead of
+  the game's:** P is read like any key, the parasite runs no game frame
+  while the pack is open and sends a short packet (the kinds shown, their
+  counts, the hand), and the host draws the panel from it; closing is a
+  game frame with no input that redraws the view, as a camera jump does.
+  The host stays a drawer of packets, and nothing new is needed to resume.
+  The panel spans the top of the view, black, over the view left as it
+  is; dimming the rest by palette is for later. The kinds shown are fixed
+  on opening, so the hand moving off a kind with none left doesn't shift
+  the others; and a move redraws only the arrowheads, as redrawing the
+  panel showed it half drawn for a frame. P opens it for now.

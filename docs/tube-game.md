@@ -26,6 +26,8 @@ The keys are those of `implementation-record.md`, and T:
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
 | SPACE | Place a block of the kind in hand: the kind last dug, or, with none of it left, the first kind carried (soil, stone, ore, gems) |
 | T | Drop a torch where the miner stands (in air: up to 24) |
+| P | Open the pack, pausing the game; P again closes it |
+| Cursor keys | In the pack: move the hand across the kinds shown |
 
 Dig down a few tiles to leave the daylight: the miner's light shows below,
 and daylight follows down the shaft.
@@ -141,8 +143,8 @@ entirely gives one of the kind its material yields (dug grass is soil),
 and that kind goes into the hand; a felled tree's logs, gathered in, are
 wood. SPACE places the kind in hand, as its material; with none of it
 left, the hand moves first to the first kind carried that places
-something (wood places nothing yet). Choosing the hand, and seeing the
-counts, come next (`inventory-and-crafting.md`).
+something; a hand that places nothing (wood, chosen in the pack) places
+nothing. The pack (below) shows the counts and chooses the hand.
 
 Each count is a byte, `inventory` + kind, up to `COUNT_MAX` (99). A gain
 (`inventory_gain`) is the compare with the cap and an `INC`, 15 cycles, or
@@ -150,8 +152,43 @@ Each count is a byte, `inventory` + kind, up to `COUNT_MAX` (99). A gain
 14. A place's spend is a `DEC`, 11 cycles with loading the hand. Either
 happens only on the frame of a dig, a place or a gathered log. Memory: 6
 bytes of variables (5 counts and the hand), 36 bytes of code and tables
-in PLIGHT, and 38 more in PGAME's digging and placing, which leaves 44
-bytes before PGAME's next page.
+in PLIGHT, and 38 more in PGAME's digging and placing.
+
+### The pack
+
+P opens the pack (`pack.py`, `asm/pack.asm`; `render_pack` in
+`render.asm`), and the game pauses. The parasite runs no game frame while
+it is open: each frame it takes the input and sends the pack's packet
+instead (`PACKET_PACK`): the kinds shown, their counts and the hand's
+place among them. The kinds shown are those held, and the hand whatever
+its count, in kind order, fixed on opening (nothing can change them while
+paused). The host draws the panel across the top of the view: a blank
+row, then, for each row of eight kinds, their icons (a tile's 8 x 16
+pixels), their counts below in a 3 x 7 font, right-aligned, and
+arrowheads either side of the hand's count. The rest of the view is left
+as it is, sprite and items included. While the pack is open the host
+reads P and the cursor keys instead of the game's keys, and a press of a
+cursor key moves the hand a kind (left, right) or a row (up, down); only
+the arrowheads are redrawn (`PACKET_PACK_MOVED`), since redrawing the
+panel showed it half drawn for a frame. P again closes the pack: that
+frame is the game's, with no input, and redraws the view whole, as after
+a jump of the camera (`pack_plan_camera`).
+
+Costs, measured:
+
+- In play, on the parasite, 55 cycles a frame to see whether P was
+  pressed; on the host, reading P is one more OSBYTE `&81`, 268 cycles
+  (the eight keys now take 2,142).
+- Opening, on the host: 31,551 cycles with one kind shown, 47,550 with
+  five, most of it clearing the panel's five rows. So the panel may take
+  two frames to appear, the beam overtaking it; once per opening.
+- Moving the hand: 608 to 2,960 cycles on the host, about 490 on the
+  parasite.
+- Memory: on the host, 528 bytes of icons, digits and arrowheads in the
+  render region's graphics (425 bytes left there), 448 bytes of code in its
+  code (2,032 left), about 130 in MAIN and 48 in low RAM; on the parasite,
+  299 bytes in PLIGHT, 14 bytes of variables and 5 in PGAME, which now has
+  28 bytes before its next page.
 
 ### In front and behind
 
@@ -418,7 +455,12 @@ host can miss a frame then.
   pass one between its restoring and its drawing, and it flickers, in
   frames that redraw under it; they are out for only a second or so. Items
   pass behind the miner, and vanish a few columns inside the view's
-  sides. The counts aren't shown, and wood isn't spent yet.
+  sides. Wood isn't spent yet.
+- The pack: no TAB to cycle the hand in play, and no icon of the hand
+  above the miner, yet. Five kinds only (icons are 64 bytes each, so 24
+  would need room beyond the render region's graphics). Keys read by
+  OSBYTE `&81`, 268 host cycles each a frame: scanning the keyboard
+  directly would be cheaper.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.

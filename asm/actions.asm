@@ -194,10 +194,13 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 
 \ Place the kind in hand in the empty tile aimed at, if any. If none of
 \ that kind is left, the hand moves first to the first kind held that
-\ places something; if there is none, nothing is placed.
+\ places something; if there is none, or the hand places nothing, nothing
+\ is placed.
 .place
 {
     LDX hand
+    LDA kind_places,X
+    BMI none
     LDA inventory,X
     BNE in_hand
     LDX #0
@@ -210,6 +213,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     INX
     CPX #KIND_COUNT
     BNE find
+.none
     RTS
 .found
     STX hand

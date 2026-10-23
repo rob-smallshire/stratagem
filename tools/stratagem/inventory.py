@@ -7,7 +7,8 @@ grass is soil), and puts that kind in hand. A tree's part gives nothing
 directly: its wood is thrown out as items (items.py), each gathered in
 adding one WOOD. Placing puts down the material the kind in hand PLACES;
 if none of that kind is left, the hand moves first to the first kind held
-that places something, in kind order. (Choosing the hand comes later.)
+that places something, in kind order. A kind in hand that places nothing
+(wood, chosen in the pack: pack.py) places nothing.
 """
 
 from stratagem.tiles import GEM, GRASS, ORE, SOIL, STONE
@@ -39,7 +40,10 @@ def spend(counts: tuple[int, ...], kind: int) -> tuple[int, ...]:
 
 def in_hand(counts: tuple[int, ...], hand: int) -> int | None:
     """The kind placing puts down: the hand, if any of it is left, otherwise
-    the first kind held that places something; None if there is none."""
+    the first kind held that places something; None if there is none, or
+    if the hand places nothing."""
+    if hand not in PLACES:
+        return None
     if counts[hand]:
         return hand
     for kind in range(KIND_COUNT):

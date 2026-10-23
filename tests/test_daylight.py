@@ -17,6 +17,7 @@ from stratagem.world import HEIGHTS
 TILE_CACHE_SIZE = 32
 SUN_DEPTH = 0xBD00              # asm/parasite.asm
 MAILBOX_INPUT, MAILBOX_FRAME = 0x8E, 0x8F
+PACKET_REDRAW, PACKET_PACK, PACKET_PACK_DRAW, PACKET_PACK_MOVED = 0x80, 0x40, 0x20, 0x10    # tube_layout.asm
 
 KEYS = {"Z": INPUT_LEFT, "X": INPUT_RIGHT, "K": INPUT_UP, "M": INPUT_DOWN, "L": INPUT_ACTION}
 # Down a shaft from the surface, along a tunnel, and back up the shaft.
@@ -35,9 +36,20 @@ class ParasiteGame:
         self.mpu = self.machine.mpu
         self.memory = self.mpu.memory
         self.host = FakeHost(self.machine, self.labels)
-        self.machine.hooks[self.labels["para_send"]] = self.host.take_packet
+        self.machine.hooks[self.labels["para_send"]] = self.take_packet
         self.mpu.pc = self.labels["pgame_start"]
         self.run_to(self.labels["para_loop"])
+
+    def take_packet(self, mpu=None) -> None:
+        """The host's part in the store, from a game's packet (not the
+        pack's, which carries none)."""
+        if not self.packet()[0] & PACKET_PACK:
+            self.host.take_packet(mpu)
+
+    def packet(self) -> list[int]:
+        """The packet being sent (at para_send), from its start."""
+        at = self.memory[self.labels["para_packet"]] | self.memory[self.labels["para_packet"] + 1] << 8
+        return list(self.memory[at:at + 64])
 
     def run_to(self, address: int, max_steps: int = 5_000_000) -> None:
         for _ in range(max_steps):

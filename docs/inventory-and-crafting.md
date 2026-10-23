@@ -13,10 +13,13 @@ frame, and the games below show it isn't needed (see
 - `inventory`: a count (up to 99) of each kind: wood, soil, stone, ore
   and gems (`inventory.py`, step 1, done). Dug material keeps its kind (dug
   grass is soil), and logs gathered in from felled trees are wood. Nothing
-  spends wood yet, and nothing shows the counts.
-- `hand`: the kind SPACE places: the kind last dug, or, when none of it is
-  left, the first kind carried that places something. Choosing it comes
-  with the pack screen.
+  spends wood yet.
+- `hand`: the kind SPACE places: the kind last dug, or chosen in the pack,
+  or, when none of it is left, the first kind carried that places
+  something.
+- The pack (step 2, in part): P pauses the game and shows the kinds held
+  with their counts across the top of the view; the cursor keys move the
+  hand (`tube-game.md`, The pack).
 - Torches: dropped with T, at most 24 in the world, never picked up; not
   counted as held.
 - Dropped items exist as sprites that burst out and are gathered in. The
@@ -467,8 +470,9 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 5. Is the furnace a menu station or a physical one? Prototype both.
 6. Does dug material keep its kind? The proposal says yes. Then is there
    one cap per kind, or a total that makes the miner choose what to keep?
-7. Keys: which key opens the pack (P is free; RETURN now makes)? TAB to
-   cycle the hand in play?
+7. Keys: P opens the pack, for now (decided 2026-10-23: free, and easy to
+   find; it sits near L, but opening the pack by mistake costs nothing).
+   TAB to cycle the hand in play?
 8. Should movement in play be WASD, with dig and place on K and L? It
    breaks with BBC custom (Z X and * ?) but is what players now expect.
    It's now separate from crafting, which uses the arrows. Try it in the
@@ -480,8 +484,8 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 1. Done: inventory by kind (model, then the 6502): dug material keeps its
    kind. Placing puts back the kind in hand. Wood joins the table.
 2. The pack screen: paused, icons and counts, with the brush chosen by
-   the arrow keys as the hand. Plus the cycle key and the hand's icon
-   above the miner.
+   the arrow keys as the hand (done). Plus the cycle key and the hand's
+   icon above the miner (to do).
 3. The 2 x 2 hand grid on T Y / G H: planks, torches, the workbench.
    The recipe book and COPY. The manual's first pages.
 4. The workbench as a piece, and the 3 x 3 grid near it: ladders,

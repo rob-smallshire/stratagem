@@ -38,11 +38,11 @@ def read_hands(memory, labels) -> Hands:
     return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]])
 
 
-def random_hands(rng: random.Random) -> Hands:
-    """Hands with counts often empty or full, the hand on a kind placed, and
-    often empty, so that placing moves it."""
+def random_hands(rng: random.Random, kinds=sorted(inventory.PLACES)) -> Hands:
+    """Hands with counts often empty or full, the hand on one of `kinds`
+    (those placed, by default), and often empty, so that placing moves it."""
     counts = [rng.choice([0, 0, 1, 2, rng.randrange(100), 98, 99]) for _ in range(inventory.KIND_COUNT)]
-    hand = rng.choice(sorted(inventory.PLACES))
+    hand = rng.choice(kinds)
     if rng.random() < 0.5:
         counts[hand] = 0
     return Hands(tuple(counts), 0, hand)
@@ -127,18 +127,18 @@ def test_actions_match_model(machine, game_build):
 def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
     """Placing puts down the kind in hand; with none of it left, the first
     kind held that places something, which the hand moves to; with nothing
-    to place, nothing. The 6502 does as the model, from random places and
-    hands."""
+    to place, or a hand that places nothing (wood), nothing. The 6502 does
+    as the model, from random places and hands."""
     labels = game_build.labels["PARASITE"]
     harness = PlayerHarness(machine, labels)
     memory = machine.mpu.memory
     rng = random.Random(1066)
     world = World()
     seen = collections.Counter()
-    for trial in range(300):
+    for trial in range(800):
         state = _random_start(rng, world)
         inputs = INPUT_PLACE | rng.choice([0, INPUT_UP, INPUT_DOWN])
-        hands = random_hands(rng)
+        hands = random_hands(rng, range(inventory.KIND_COUNT))
         harness.fill_cache(world, state.px // 8, state.py // 16)
         harness.write(state, inputs)
         write_hands(memory, labels, hands)
@@ -150,9 +150,9 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
         assert read_hands(memory, labels) == hands, f"trial {trial}: {state}"
         if target is not None:
             assert_tile_matches(machine, labels, world, target)
-        seen["moved" if hands.hand != before.hand else "nothing held" if not any(
-            before.counts[k] for k in inventory.PLACES) else "kept"] += 1
-    assert min(seen.values()) >= 5 and len(seen) == 3, seen
+        seen["moved" if hands.hand != before.hand else "places nothing" if before.hand not in inventory.PLACES
+             else "nothing held" if not any(before.counts[k] for k in inventory.PLACES) else "kept"] += 1
+    assert min(seen.values()) >= 5 and len(seen) == 4, seen
 
 
 @pytest.mark.parametrize("keys", [pytest.param(INPUT_LEFT | INPUT_DOWN, marks=pytest.mark.slow),
