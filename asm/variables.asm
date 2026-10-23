@@ -22,6 +22,8 @@ GUARD &0800
 .pack_index      SKIP 1      \ ... the hand's place among them...
 .pack_kinds      SKIP KIND_COUNT \ ... and them
 .pack_i          SKIP 1
+.pack_keys_held  SKIP 1      \ The second byte of input last frame...
+.pack_keys_pressed SKIP 1    \ ... and its keys pressed this frame
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
 .target_x        SKIP 1      \ The tile aimed at

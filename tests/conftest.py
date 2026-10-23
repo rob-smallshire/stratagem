@@ -82,7 +82,7 @@ def parasite_machine(game_build: BuildResult):
 # The store of changed chunks (asm/tube_layout.asm, asm/world.asm)
 OSWRCH = 0xFFEE
 COMMAND_FRAME, COMMAND_FETCH = 128, 129
-MAILBOX_FETCHED = 0x8D
+MAILBOX_FETCHED = 0x8C
 STORE_QUEUE, STORE_CHUNK = 32, 0xFF
 SLOT_BYTES, CHUNK_TILES = 128, 64
 

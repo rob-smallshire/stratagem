@@ -30,6 +30,7 @@
     STA cooldown
     STA pack_open
     STA pack_held
+    STA pack_keys_held
     STA zp_player_jump_held
     STA zp_player_air_jumps
     STA redraw_tile

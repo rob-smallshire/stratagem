@@ -18,10 +18,11 @@ LIST_BYTES = &500
 
 \ The parasite's mailbox, written by the host: the input, then a count of
 \ frames read (so the parasite knows the input has come)
+MAILBOX_KEYS = &8D              \ The second byte of input (KEY_CYCLE)
 MAILBOX_INPUT = &8E
 MAILBOX_FRAME = &8F
-MAILBOX_BYTES = 2
-MAILBOX_FETCHED = &8D           \ Set by the host when it has copied a chunk
+MAILBOX_BYTES = 3               \ From MAILBOX_KEYS
+MAILBOX_FETCHED = &8C           \ Set by the host when it has copied a chunk
                                 \ asked for at once (COMMAND_FETCH)
 
 \ Commands, by OSWRCH from the parasite to the host

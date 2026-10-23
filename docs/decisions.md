@@ -254,3 +254,9 @@ A running log of design decisions. Add to it whenever one is made.
   on opening, so the hand moving off a kind with none left doesn't shift
   the others; and a move redraws only the arrowheads, as redrawing the
   panel showed it half drawn for a frame. P opens it for now.
+- **A second byte of input, for TAB:** P filled the input byte, so the host
+  writes `MAILBOX_KEYS` too, in the same transfer, with `MAILBOX_FETCHED`
+  moved down to `&8C`. Crafting's keys will need more than another byte
+  can hold, so the crafting screen will send keys its own way; this byte is
+  for play. TAB cycles only through kinds held that place something, as
+  it is for placing; the pack chooses any.

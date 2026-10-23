@@ -26,6 +26,7 @@ The keys are those of `implementation-record.md`, and T:
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
 | SPACE | Place a block of the kind in hand: the kind last dug, or, with none of it left, the first kind carried (soil, stone, ore, gems) |
 | T | Drop a torch where the miner stands (in air: up to 24) |
+| TAB | Cycle the hand to the next kind held that places something |
 | P | Open the pack, pausing the game; P again closes it |
 | Cursor keys | In the pack: move the hand across the kinds shown |
 
@@ -144,7 +145,16 @@ and that kind goes into the hand; a felled tree's logs, gathered in, are
 wood. SPACE places the kind in hand, as its material; with none of it
 left, the hand moves first to the first kind carried that places
 something; a hand that places nothing (wood, chosen in the pack) places
-nothing. The pack (below) shows the counts and chooses the hand.
+nothing. TAB moves the hand to the next kind after it, in kind order and
+round again, that is held and places something (`hand_cycle`); nothing
+shows it yet but what SPACE then places. The pack (below) shows the counts
+and chooses any kind held.
+
+TAB came after the input byte was full (P took bit 7), so the host writes
+a second byte of input, `MAILBOX_KEYS` (TAB is `KEY_CYCLE`), before the
+input and the count of packets read; `MAILBOX_FETCHED` moved down to `&8C`
+to make room, and the mailbox is `&8C`-`&8F`. The pack's keys are pressed
+when they go down (`pack_keys_held`), as P is.
 
 Each count is a byte, `inventory` + kind, up to `COUNT_MAX` (99). A gain
 (`inventory_gain`) is the compare with the cap and an `INC`, 15 cycles, or
@@ -176,9 +186,10 @@ a jump of the camera (`pack_plan_camera`).
 
 Costs, measured:
 
-- In play, on the parasite, 55 cycles a frame to see whether P was
-  pressed; on the host, reading P is one more OSBYTE `&81`, 268 cycles
-  (the eight keys now take 2,142).
+- In play, on the parasite, 84 cycles a frame to see whether P or TAB
+  was pressed; on the host, each of P and TAB is one more OSBYTE `&81`,
+  about 280 cycles (the nine keys of play now take 2,429, about 6% of the
+  host's frame; the pack's five, 1,368).
 - Opening, on the host: 31,551 cycles with one kind shown, 47,550 with
   five, most of it clearing the panel's five rows. So the panel may take
   two frames to appear, the beam overtaking it; once per opening.
@@ -456,11 +467,11 @@ host can miss a frame then.
   frames that redraw under it; they are out for only a second or so. Items
   pass behind the miner, and vanish a few columns inside the view's
   sides. Wood isn't spent yet.
-- The pack: no TAB to cycle the hand in play, and no icon of the hand
-  above the miner, yet. Five kinds only (icons are 64 bytes each, so 24
+- The pack: no icon of the hand above the miner yet, so TAB's choice
+  can't be seen. Five kinds only (icons are 64 bytes each, so 24
   would need room beyond the render region's graphics). Keys read by
-  OSBYTE `&81`, 268 host cycles each a frame: scanning the keyboard
-  directly would be cheaper.
+  OSBYTE `&81`, about 270 host cycles each a frame: scanning the keyboard
+  directly would be cheaper, and matters more as keys are added.
 - The flood's spike: spreading it over two frames, or making it cheaper.
 - The list can hold 255 cells; beyond that, cells could be left unlit.
 - Untested beyond Beebium; the Master 128 not yet.

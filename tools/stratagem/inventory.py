@@ -8,7 +8,8 @@ directly: its wood is thrown out as items (items.py), each gathered in
 adding one WOOD. Placing puts down the material the kind in hand PLACES;
 if none of that kind is left, the hand moves first to the first kind held
 that places something, in kind order. A kind in hand that places nothing
-(wood, chosen in the pack: pack.py) places nothing.
+(wood, chosen in the pack: pack.py) places nothing. In play, TAB cycles
+the hand to the next kind held that places something (cycle).
 """
 
 from stratagem.tiles import GEM, GRASS, ORE, SOIL, STONE
@@ -36,6 +37,16 @@ def spend(counts: tuple[int, ...], kind: int) -> tuple[int, ...]:
     """One fewer of `kind`, of which there is at least one."""
     assert counts[kind]
     return counts[:kind] + (counts[kind] - 1,) + counts[kind + 1:]
+
+
+def cycle(counts: tuple[int, ...], hand: int) -> int:
+    """The next kind after the hand, in kind order and round again, that is
+    held and places something; the hand if there is none."""
+    for step in range(1, KIND_COUNT + 1):
+        kind = (hand + step) % KIND_COUNT
+        if kind in PLACES and counts[kind]:
+            return kind
+    return hand
 
 
 def in_hand(counts: tuple[int, ...], hand: int) -> int | None:

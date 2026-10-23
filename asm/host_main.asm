@@ -25,6 +25,7 @@ INKEY_LEFT = &100 - 26
 INKEY_RIGHT = &100 - 122
 INKEY_UP = &100 - 58
 INKEY_DOWN = &100 - 42
+INKEY_TAB = &100 - 97
 
 \ The host's start: a clear, narrowed screen.
 .host_init
@@ -218,14 +219,14 @@ INKEY_DOWN = &100 - 42
     RTS
 }
 
-\ Read the input and write it to the parasite's mailbox, with the count of
-\ packets read.
+\ Read the input and write it to the parasite's mailbox, after the second
+\ byte of input and before the count of packets read.
 .host_send_input
 {
     JSR read_input
     INC host_frames
     JSR host_claim
-    LDA #LO(MAILBOX_INPUT)
+    LDA #LO(MAILBOX_KEYS)
     STA host_transfer
     LDA #0
     STA host_transfer + 1
@@ -233,6 +234,8 @@ INKEY_DOWN = &100 - 42
     LDX #LO(host_transfer)
     LDY #HI(host_transfer)
     JSR TUBE_ENTRY
+    LDA zp_keys
+    JSR host_write_byte
     LDA zp_input
     JSR host_write_byte
     LDA host_frames
@@ -605,6 +608,16 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
 
 .read_input
 {
+    LDA #0                      \ The second byte: TAB, in play
+    STA zp_input
+    BIT host_flags
+    BVS keys_read
+    LDX #INKEY_TAB
+    LDA #KEY_CYCLE
+    JSR read_key
+.keys_read
+    LDA zp_input
+    STA zp_keys
     LDA #0
     STA zp_input
     LDX #INKEY_P

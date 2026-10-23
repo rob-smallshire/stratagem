@@ -118,6 +118,7 @@ ENDMACRO
 .zp_machine         EQUB 0
 .zp_redraw          EQUB 0
 .zp_input           EQUB 0
+.zp_keys            EQUB 0      \ The second byte of input (KEY_CYCLE)
 .redraw_tile        EQUB 0      \ A changed tile to redraw at the flip...
 .redraw_tile_x      EQUB 0
 .redraw_tile_y      EQUB 0

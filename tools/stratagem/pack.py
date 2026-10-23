@@ -25,11 +25,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.inventory import KIND_COUNT, KIND_GEM, KIND_ORE, KIND_SOIL, KIND_STONE, KIND_WOOD
+from stratagem.inventory import KIND_COUNT, KIND_GEM, KIND_ORE, KIND_SOIL, KIND_STONE, KIND_WOOD, cycle
 from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, mode2_byte
 from stratagem.tiles import AIR, GEM, ORE, SHAPE_FULL, SOIL, STONE, TRUNK, tile_bytes
 
 INPUT_PACK = 128                    # P: open or close the pack
+KEY_CYCLE = 1                       # TAB, in the second byte of input: cycle the hand
 
 PACK_COLUMNS = 8                    # kinds across
 SLOT_CELLS = 8
@@ -52,6 +53,7 @@ class Pack:
     moved: bool = False             # the hand moved: redraw the arrowheads
     closed: bool = False            # it closed this frame: redraw the view
     kinds: tuple[int, ...] = ()     # the kinds shown, since it opened
+    held_keys: int = 0              # the second byte of input last frame
 
 
 def shown(counts: tuple[int, ...], hand: int) -> list[int]:
@@ -59,14 +61,19 @@ def shown(counts: tuple[int, ...], hand: int) -> list[int]:
     return [kind for kind in range(KIND_COUNT) if counts[kind] or kind == hand]
 
 
-def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int) -> tuple[Pack, int]:
-    """One frame's input to the pack, before the game's. Returns the pack and
-    the hand; the game runs this frame only if the pack isn't open."""
+def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0) -> tuple[Pack, int]:
+    """One frame's input to the pack, before the game's: `inputs` and the
+    second byte, `keys`. Returns the pack and the hand; the game runs this
+    frame only if the pack isn't open. In play, TAB (KEY_CYCLE) cycles the
+    hand (inventory.cycle)."""
     pressed = inputs & ~pack.held
-    pack = replace(pack, held=inputs, draw=False, moved=False, closed=False)
+    pressed_keys = keys & ~pack.held_keys
+    pack = replace(pack, held=inputs, held_keys=keys, draw=False, moved=False, closed=False)
     if not pack.open:
         if pressed & INPUT_PACK:
             return replace(pack, open=True, draw=True, kinds=tuple(shown(counts, hand))), hand
+        if pressed_keys & KEY_CYCLE:
+            return pack, cycle(counts, hand)
         return pack, hand
     if pressed & INPUT_PACK:
         return replace(pack, open=False, closed=True), hand

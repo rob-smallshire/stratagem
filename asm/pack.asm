@@ -5,7 +5,8 @@
 \ game's, has no input and redraws the view whole.
 
 \ Before the game's frame: return with carry set if the frame was the pack's
-\ (its packet sent), carry clear for the game's.
+\ (its packet sent), carry clear for the game's, TAB having cycled the hand
+\ if pressed.
 .pack_input
 {
     LDA #0
@@ -18,6 +19,12 @@
     STA pack_pressed
     LDA zp_input
     STA pack_held
+    LDA pack_keys_held          \ And of the second byte
+    EOR #&FF
+    AND MAILBOX_KEYS
+    STA pack_keys_pressed
+    LDA MAILBOX_KEYS
+    STA pack_keys_held
     LDA pack_open
     BNE open
     BIT pack_pressed            \ INPUT_PACK is bit 7
@@ -28,6 +35,11 @@
     JSR pack_shown              \ The kinds shown, while it is open
     JMP sent
 .game
+    LDA pack_keys_pressed       \ TAB: the hand to the next kind
+    AND #KEY_CYCLE
+    BEQ play
+    JSR hand_cycle
+.play
     CLC
     RTS
 .open

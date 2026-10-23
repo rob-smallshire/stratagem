@@ -15,9 +15,9 @@ from stratagem import inventory, pack
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.inventory import KIND_COUNT
-from stratagem.pack import INPUT_PACK, Pack
+from stratagem.pack import INPUT_PACK, KEY_CYCLE, Pack
 from stratagem.screen import SCREEN_END, SCREEN_START
-from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, PACKET_PACK, PACKET_PACK_DRAW, PACKET_PACK_MOVED,
+from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, MAILBOX_KEYS, PACKET_PACK, PACKET_PACK_DRAW, PACKET_PACK_MOVED,
                            PACKET_REDRAW, ParasiteGame)
 
 INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT_LEFT | INPUT_RIGHT,
@@ -37,9 +37,22 @@ def test_the_hand_moves_across_the_kinds_shown():
     assert not closed.open and closed.closed and hand == 2
 
 
-def send(game, inputs: int) -> list[int]:
+def test_tab_cycles_the_hand_through_kinds_placed():
+    counts = (7, 3, 0, 2, 0)        # wood, soil, no stone, ore, no gems
+    assert inventory.cycle(counts, inventory.KIND_SOIL) == inventory.KIND_ORE
+    assert inventory.cycle(counts, inventory.KIND_ORE) == inventory.KIND_SOIL      # round again, past the wood
+    assert inventory.cycle(counts, inventory.KIND_WOOD) == inventory.KIND_SOIL
+    assert inventory.cycle((7, 0, 0, 0, 0), inventory.KIND_SOIL) == inventory.KIND_SOIL    # nothing to place
+    state, hand = pack.step(Pack(), counts, inventory.KIND_SOIL, 0, KEY_CYCLE)
+    assert hand == inventory.KIND_ORE
+    state, hand = pack.step(state, counts, hand, 0, KEY_CYCLE)      # held, not pressed again
+    assert hand == inventory.KIND_ORE
+
+
+def send(game, inputs: int, keys: int = 0) -> list[int]:
     """One frame, the game's or the pack's: returns its packet."""
     memory, labels = game.memory, game.labels
+    memory[MAILBOX_KEYS] = keys
     memory[MAILBOX_INPUT] = inputs
     memory[MAILBOX_FRAME] = memory[labels["para_sent"]]
     game.machine.step()
@@ -55,7 +68,8 @@ def test_parasite_pack_matches_model(game_build):
     rng = random.Random(1984)
     state = Pack()
     inputs = 0
-    seen = {"opened": 0, "moved": 0, "closed": 0, "paused": 0}
+    seen = {"opened": 0, "moved": 0, "closed": 0, "paused": 0, "cycled": 0}
+    keys = 0
     for frame in range(600):
         if not state.open and rng.random() < 0.1:
             for kind in range(KIND_COUNT):
@@ -63,12 +77,15 @@ def test_parasite_pack_matches_model(game_build):
             memory[labels["hand"]] = rng.randrange(KIND_COUNT)
         if rng.random() < 0.3:
             inputs = rng.choice(INPUTS)
+        if rng.random() < 0.3:
+            keys = rng.choice([0, KEY_CYCLE])
         counts = tuple(memory[labels["inventory"] + kind] for kind in range(KIND_COUNT))
         hand = memory[labels["hand"]]
         player = memory[labels["zp_player_x"]:labels["zp_player_x"] + 4]
         game_frame = memory[labels["zp_frame"]]
-        state, hand_after = pack.step(state, counts, hand, inputs)
-        packet = send(game, inputs)
+        was_open = state.open
+        state, hand_after = pack.step(state, counts, hand, inputs, keys)
+        packet = send(game, inputs, keys)
         assert bool(memory[labels["pack_open"]]) == state.open, f"frame {frame}"
         if state.open:
             assert memory[labels["hand"]] == hand_after, f"frame {frame}"
@@ -84,6 +101,9 @@ def test_parasite_pack_matches_model(game_build):
             seen["paused"] += 1
         else:
             assert not packet[0] & PACKET_PACK, f"frame {frame}"
+            if not was_open:
+                assert memory[labels["hand"]] == hand_after, f"frame {frame}"
+                seen["cycled"] += hand_after != hand
             if state.closed:
                 assert packet[0] & PACKET_REDRAW, "the view wasn't redrawn on closing"
                 assert memory[labels["zp_input"]] == 0, "the closing frame had input"
@@ -128,7 +148,7 @@ def test_panel_matches_model(game_build):
             assert memory[address] == want, f"trial {trial}, moved: &{address:04X}"
 
 
-PACK_KEY, LEFT_KEY = (3, 7), (1, 9)     # Beebium's keyboard matrix: P, cursor left
+PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (1, 9), (6, 0)     # Beebium's keyboard matrix: P, cursor left, TAB
 
 
 def frames(bbc, labels, count: int, keys=(), label: str = "host_frame_shown") -> None:
@@ -151,7 +171,9 @@ def tap(bbc, labels, key) -> None:
 def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     """Fell the tree beside the start and dig down, open the pack: the panel
     is drawn over the view, which is otherwise left as it was; choose the
-    wood; close it: the view is redrawn whole, as the models say."""
+    wood; close it: the view is redrawn whole, as the models say. Then,
+    given some stone, TAB cycles the hand from the wood to the soil and the
+    stone."""
     from test_tube_game import expected_screen
     bbc = tube_bbc
     labels, plabels = game_build.labels["HOST"], game_build.labels["PARASITE"]
@@ -193,3 +215,11 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     actual = screen[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
     assert differences[:8] == [], f"{len(differences)} screen bytes differ after closing"
+
+    bbc.connect_coprocessor().memory.address.bus[plabels["inventory"] + inventory.KIND_STONE] = 4
+    for kind in (inventory.KIND_SOIL, inventory.KIND_STONE):
+        bbc.keyboard.matrix_down(*TAB_KEY)
+        frames(bbc, labels, 2)
+        bbc.keyboard.matrix_up(*TAB_KEY)
+        frames(bbc, labels, 1)
+        assert parasite[plabels["hand"]] == kind, "TAB didn't cycle the hand"
