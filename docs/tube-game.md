@@ -329,7 +329,9 @@ with its belt slot's number beside it, one more item picture (the numbers
 1 to 9 are item frames, `items.NUMBER_FIRST`); 0 shows the tool in use
 again, choosing nothing. Drawing the number costs what an item costs, only
 while the tool is shown; its frames take 270 bytes of the render region's
-graphics area, which has 237 left. The pack shows the belt below the grid: each slot's icon or a
+graphics area, which has 237 left.
+
+The pack shows the belt below the grid: each slot's icon or a
 socket, its key's number below it, and arrowheads either side of the tool
 hand's, redrawn when it moves.
 
