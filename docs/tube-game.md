@@ -24,7 +24,7 @@ The keys are those of `implementation-record.md`, and T:
 | Z, X | Walk left, right |
 | K | Jump; in the air, a fresh press jumps again |
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
-| SPACE | Place the kind in hand: the kind last dug, or chosen, or, with none of it left, the first kind carried that places something (soil, stone, ore, gems, torches: up to 24 in the world) |
+| SPACE | Place the kind in hand: the kind chosen (TAB, the pack), or, with none of it left, the first kind carried that places something (soil, stone, ore, gems, torches: up to 24 in the world) |
 | TAB | Cycle the hand to the next kind held that places something |
 | P | Open the pack, pausing the game; P again closes it |
 | Z X K M | In the pack: move the hand across the kinds shown |
@@ -144,8 +144,8 @@ rest down. Digging diagonally passes through trees, as walking does.
 
 The miner carries a count of each kind (`inventory.py`, `asm/inventory.asm`):
 wood, soil, stone, ore and gems, up to 99 of each. A tile dug away
-entirely gives one of the kind its material yields (dug grass is soil),
-and that kind goes into the hand; a felled tree's logs, gathered in, are
+entirely gives one of the kind its material yields (dug grass is soil);
+the hand stays as it was; a felled tree's logs, gathered in, are
 wood. SPACE places the kind in hand, as its material; with none of it
 left, the hand moves first to the first kind carried that places
 something; a hand that places nothing (wood, chosen in the pack) places

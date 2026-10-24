@@ -139,10 +139,9 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LDX action_tile
     LDA material_passable,X
     BEQ done
-    LDX dug_material            \ Its kind is carried, and in hand
+    LDX dug_material            \ Its kind is carried
     LDA material_yields,X
     BMI done
-    STA hand
     JMP inventory_gain
 .done
     RTS

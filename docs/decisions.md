@@ -325,3 +325,13 @@ A running log of design decisions. Add to it whenever one is made.
   the next kind shown, round again, as it cycles the hand in play, but to
   any kind, wood and planks included, since those are what's crafted
   with. More of the pack's keys are now play's.
+- **Digging no longer puts what's dug in hand:** mining, the hand was
+  nearly always the thing just dug, which is rarely what you want to
+  place. The hand now changes only by choice (TAB, the pack), or when it
+  runs out.
+- **Tools, planned:** by hand, soil and grass take 4 digs and stone, ore
+  and gems can't be dug; trees still break whole, so wood, planks, the
+  workbench and a wooden pickaxe (a T of planks, at the bench) are the way
+  out. Pickaxes are kinds in the pack, the best held used, and wear out
+  after a number of digs (about 60 for wood, 130 for stone, as in
+  Minecraft), breaking with no warning shown, a count spent.

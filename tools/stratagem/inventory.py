@@ -3,7 +3,7 @@ items.asm keep it: a count of each kind of thing carried, a binary byte up
 to COUNT_MAX, and the kind in hand, which placing puts down.
 
 A tile dug away entirely gives one of the kind its material YIELDS (dug
-grass is soil), and puts that kind in hand. A tree's part gives nothing
+grass is soil); the hand stays as it was. A tree's part gives nothing
 directly: its wood is thrown out as items (items.py), each gathered in
 adding one WOOD. Placing puts down the material the kind in hand PLACES;
 if none of that kind is left, the hand moves first to the first kind held

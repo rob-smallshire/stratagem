@@ -25,7 +25,8 @@ QUARTERS_PER_DIG of them, by how hard the material is (see
 tiles.dig_shape). So soft ground goes
 in one dig and stone in four, and you see it go. When nothing is left the
 tile is empty (sky or cave, by its background), and one of the kind its
-material yields goes into the inventory (inventory.py), and into the hand.
+material yields goes into the inventory (inventory.py); the hand stays as
+it was.
 A tree's part breaks whole, at one dig,
 leaving it empty, and a trunk's part drops a piece of wood (items.py) for
 the miner to gather in; what it held falls (support.py). Only straight digs break parts: digging diagonally
@@ -281,8 +282,8 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
 
 def _dug(hands: Hands, material: int, left: int | None) -> Hands:
     """The hands after a dig of `material` that left `left` of it (None if
-    nothing): a tile dug away entirely is carried, and is in hand."""
+    nothing): a tile dug away entirely is carried; the hand stays."""
     if left is not None:
         return replace(hands, cooldown=DIG_FRAMES)
     kind = inventory.YIELDS[material]
-    return Hands(inventory.gain(hands.counts, kind), DIG_FRAMES, kind, hands.torches)
+    return Hands(inventory.gain(hands.counts, kind), DIG_FRAMES, hands.hand, hands.torches)

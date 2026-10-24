@@ -14,7 +14,7 @@ frame, and the games below show it isn't needed (see
   gems, planks, torches and workbenches (`inventory.py`, step 1, done). Dug material keeps its kind (dug
   grass is soil), and logs gathered in from felled trees are wood. Nothing
   spends wood yet.
-- `hand`: the kind SPACE places: the kind last dug, or chosen in the pack,
+- `hand`: the kind SPACE places: the kind chosen in the pack,
   or cycled to with TAB (the next kind held that places something), or,
   when none of it is left, the first kind carried that places something.
 - The pack (step 2, in part): P pauses the game and shows the kinds held
