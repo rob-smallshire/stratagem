@@ -631,7 +631,7 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     JSR scan_cell
     ORA zp_keys
     STA zp_keys
-    LDY #pack_keys - key_table  \ ... and P and the cursor keys
+    LDY #pack_keys - key_table  \ ... and P, Z and X
     JSR scan_keys
 .read
     STA zp_input
@@ -696,10 +696,6 @@ KEY_M = 101
 KEY_L = 86
 KEY_SPACE = 98
 KEY_T = 35
-KEY_LEFT = 25
-KEY_RIGHT = 121
-KEY_UP = 57
-KEY_DOWN = 41
 KEY_Y = 68
 KEY_U = 53
 KEY_G = 83
@@ -717,8 +713,7 @@ KEY_COPY = 105
     EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, KEY_K, INPUT_UP
     EQUB KEY_M, INPUT_DOWN, KEY_L, INPUT_ACTION, KEY_SPACE, INPUT_PLACE, KEY_T, INPUT_TORCH, &FF
 .pack_keys
-    EQUB KEY_P, INPUT_PACK, KEY_LEFT, INPUT_LEFT, KEY_RIGHT, INPUT_RIGHT, KEY_UP, INPUT_UP
-    EQUB KEY_DOWN, INPUT_DOWN, &FF
+    EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, &FF
 .pack_keys_second
     EQUB KEY_DELETE, KEY_CLEAR, KEY_RETURN, KEY_MAKE, KEY_COPY, KEY_BOOK, &FF
 ASSERT play_keys = play_keys_second + 3

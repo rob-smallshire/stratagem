@@ -292,3 +292,10 @@ A running log of design decisions. Add to it whenever one is made.
   A kind once shown stays shown while the pack is open; one gained joins,
   redrawing the panel. The host redraws only the counts and cells that
   changed, so a key's redraw (about 6,000 cycles) fits inside a frame.
+- **Z and X choose in the pack, not the arrow keys:** they move the miner
+  left and right in play, so moving the hand left and right with them
+  feels natural. They step through the kinds in order, across rows, so
+  there are no keys for up and down (K and M would have been the obvious
+  ones, but M is a cell of the 3 x 3 grid). Both hands are now on the
+  left of the keyboard for choosing and laying out; DELETE, RETURN and
+  COPY stay on the right.

@@ -9,7 +9,8 @@ across: each as its icon, a tile's 8 x 16 pixels, with its count below,
 and the hand marked by arrowheads either side of its count. A kind once
 shown stays shown while the pack is open, so the kinds don't move about as
 counts run out; a kind gained (by making it) joins them, in kind order.
-The arrow keys move the hand across the kinds shown, a key press each step,
+Z and X move the hand back and forth across the kinds shown, in order, a
+key press each step, from the end of one row to the start of the next;
 and only the arrowheads are redrawn (redrawing the panel would show it half
 drawn, for a frame).
 
@@ -39,7 +40,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from stratagem import crafting
-from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.camera import INPUT_LEFT, INPUT_RIGHT
 from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, GRID_MAX, GRID_SIZES, RECIPES, STATION_HAND
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
                                  KIND_TORCH, KIND_WOOD, cycle)
@@ -127,10 +128,6 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         moved -= 1
     if pressed & INPUT_RIGHT and moved < len(kinds) - 1:
         moved += 1
-    if pressed & INPUT_UP and moved >= PACK_COLUMNS:
-        moved -= PACK_COLUMNS
-    if pressed & INPUT_DOWN and moved + PACK_COLUMNS < len(kinds):
-        moved += PACK_COLUMNS
     hand = kinds[moved]
     pack = replace(pack, moved=moved != index)
     before = counts, pack.grid

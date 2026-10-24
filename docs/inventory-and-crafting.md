@@ -18,7 +18,7 @@ frame, and the games below show it isn't needed (see
   or cycled to with TAB (the next kind held that places something), or,
   when none of it is left, the first kind carried that places something.
 - The pack (step 2, in part): P pauses the game and shows the kinds held
-  with their counts across the top of the view; the cursor keys move the
+  with their counts across the top of the view; Z and X move the
   hand (`tube-game.md`, The pack).
 - Torches: counted. The miner starts with 8 (`STARTING_TORCHES`), and T
   drops one, spending it; at most 24 in the world, never picked up.
@@ -301,25 +301,27 @@ recognised, so its result shows.
 
 A shaped grid, as in Minecraft, but each cell has its own key, so laying
 out a recipe is drawing it, with no cursor in the grid (chosen
-2026-10-23). One hand chooses the material with the arrow keys, and the
-other places it:
+2026-10-23). Z and X choose the material, as they move the miner in
+play, and the cell keys place it:
 
 ```
-  cells                   brush                   Master keypad
-   T  Y  U                    [up]                   7  8  9
-    G  H  J          [left]  [down]  [right]         4  5  6
-     B  N  M                                         1  2  3
+  cells            brush               Master keypad
+   T  Y  U                                7  8  9
+    G  H  J       Z  X                    4  5  6
+     B  N  M      back, on                1  2  3
 ```
 
-- The **arrow keys** move the brush, a cursor on the pack's icons (eight
-  across). Every Beeb has them, at the right of the keyboard, and play
-  doesn't use them, so they mean the same everywhere. The left hand takes
-  the cells and the right the arrows, which keeps the hands apart.
+- **Z and X** move the brush, a cursor on the pack's icons (eight
+  across), back and forth in order, from the end of one row to the start
+  of the next. They're the keys that move left and right in play, so they
+  feel natural (chosen 2026-10-24, over the arrow keys, first tried).
+  There are no keys for up and down: M, the obvious one, is a cell of the
+  3 x 3 grid.
 - A cell's key puts one of the brush's material in that cell, taking it
   from the count. The same key with the same brush takes it back out;
   with another brush it swaps.
-- **DELETE** empties the grid back into the pack. (With the right hand on
-  the arrows, DELETE, COPY and RETURN are all within its reach.)
+- **DELETE** empties the grid back into the pack. DELETE, COPY and RETURN
+  are for the right hand.
 - **RETURN** makes the recognised result. Holding it makes more, refilling
   the same shape from the counts, a few a second, until something runs
   short.
@@ -475,8 +477,8 @@ the start to the boots (`STARTING_ABILITIES = 0`).
    TAB cycles the hand in play (done).
 8. Should movement in play be WASD, with dig and place on K and L? It
    breaks with BBC custom (Z X and * ?) but is what players now expect.
-   It's now separate from crafting, which uses the arrows. Try it in the
-   emulator.
+   Crafting now moves the brush with Z and X, so a change here would
+   change that too. Try it in the emulator.
 9. Do mirrored shapes match?
 
 ## Steps
@@ -484,8 +486,9 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 1. Done: inventory by kind (model, then the 6502): dug material keeps its
    kind. Placing puts back the kind in hand. Wood joins the table.
 2. Done: the pack screen: paused, icons and counts, with the brush chosen
-   by the arrow keys as the hand. Plus the cycle key (TAB) and the hand's
-   icon above the miner (an item's picture, for a second, when it changes).
+   by Z and X (first the arrow keys) as the hand. Plus the cycle key (TAB)
+   and the hand's icon above the miner (an item's picture, for a second,
+   when it changes).
 3. Done: the 2 x 2 hand grid on T Y / G H: planks, torches, the
    workbench. The recipe book and COPY. The manual's first pages
    (`docs/manual.md`). Made things go straight into the counts for now,

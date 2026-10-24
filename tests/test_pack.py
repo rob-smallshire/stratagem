@@ -1,5 +1,5 @@
 """The pack screen (pack.py): on the parasite, P opens and closes it, the
-game pausing meanwhile, and the arrow keys move the hand, each frame's
+game pausing meanwhile, and Z and X move the hand, each frame's
 packet carrying what the panel shows (py65, test_daylight.ParasiteGame);
 on the host, render_pack draws the panel (py65); and in the game, the
 panel is drawn, the hand chosen and the view redrawn on closing
@@ -22,7 +22,7 @@ from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, MAILBOX_KEYS, PACKET_PA
                            PACKET_PACK_MOVED, PACKET_REDRAW, ParasiteGame)
 
 INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT_LEFT | INPUT_RIGHT,
-          INPUT_PACK | INPUT_RIGHT, INPUT_RIGHT | INPUT_DOWN]
+          INPUT_PACK | INPUT_RIGHT, INPUT_RIGHT | INPUT_DOWN]     # (up and down do nothing in the pack)
 
 
 def test_the_hand_moves_across_the_kinds_shown():
@@ -221,7 +221,7 @@ def random_hand_grid(rng: random.Random) -> tuple[int, ...]:
 
 
 ITEM_FRAME_FIRST = len(sprites.sprite_frames())
-PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (1, 9), (6, 0)     # Beebium's keyboard matrix: P, cursor left, TAB,
+PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (6, 1), (6, 0)     # Beebium's keyboard matrix: P, Z (left), TAB,
 T_KEY, RETURN_KEY = (2, 3), (4, 9)                       # T, RETURN
 
 

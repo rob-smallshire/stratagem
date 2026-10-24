@@ -28,7 +28,7 @@ The keys are those of `implementation-record.md`, and T:
 | T | Drop a torch where the miner stands (in air: up to 24) |
 | TAB | Cycle the hand to the next kind held that places something |
 | P | Open the pack, pausing the game; P again closes it |
-| Cursor keys | In the pack: move the hand across the kinds shown |
+| Z, X | In the pack: move the hand back and forth across the kinds shown |
 
 Dig down a few tiles to leave the daylight: the miner's light shows below,
 and daylight follows down the shaft.
@@ -189,9 +189,10 @@ each key in a table writes its internal key number (an INKEY number's
 `-n - 1`) to port A and reads its state in bit 7; then lets the scanning
 start again (`&0B`). A key costs about 31 cycles, against about 270 by
 OSBYTE `&81`: the nine keys of play take 370 cycles a frame (2,429
-before), the pack's five 233 (1,368), with interrupts held off for as
-long. Which keys are read, and the bits they set, is a table
-(`key_table`): play's, and the pack's.
+before), the pack's fifteen 519 (P, Z, X, DELETE, RETURN, COPY and the
+nine cell keys; the cells' scan stops at the first held), with
+interrupts held off for as long. Which keys are read, and the bits they
+set, is a table (`key_table`): play's, and the pack's.
 
 ### The pack
 
@@ -206,8 +207,10 @@ row, then, for each row of eight kinds, their icons (a tile's 8 x 16
 pixels), their counts below in a 3 x 7 font, right-aligned, and
 arrowheads either side of the hand's count. The rest of the view is left
 as it is, sprite and items included. While the pack is open the host
-reads P and the cursor keys instead of the game's keys, and a press of a
-cursor key moves the hand a kind (left, right) or a row (up, down); only
+reads P, Z and X instead of the game's keys, and a press of Z or X moves
+the hand a kind back or on, from the end of one row to the start of the
+next (there are no keys for up and down: M is a cell of the 3 x 3 grid);
+only
 the arrowheads are redrawn (`PACKET_PACK_MOVED`), since redrawing the
 panel showed it half drawn for a frame. P again closes the pack: that
 frame is the game's, with no input, and redraws the view whole, as after
