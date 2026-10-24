@@ -4,7 +4,7 @@
 
 The grid is GRID_MAX cells square, by rows; each cell holds a kind or
 EMPTY. A station gives the grid's size: in the hand, 2 x 2, its top left
-cells (T Y / G H). Putting a kind in a cell takes one from its count, and
+cells (R T / F G). Putting a kind in a cell takes one from its count, and
 taking it out gives it back, so the grid's contents are always the
 ingredients of what's made.
 

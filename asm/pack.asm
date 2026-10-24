@@ -1,7 +1,7 @@
 \ The pack screen, on the parasite (tools/stratagem/pack.py, which this does
 \ exactly). PACK opens the pack and pauses the game: each frame's packet is
 \ then the pack's, the kinds shown with their counts and the hand, which the
-\ Z and X move across them, and the crafting grid (crafting.asm), whose
+\ Z X K M move across them, and the crafting grid (crafting.asm), whose
 \ keys come in the second byte of input. PACK again closes it, emptying the
 \ grid back into the counts, and the next frame, the game's, has no input
 \ and redraws the view whole.
@@ -114,6 +114,25 @@
     BCC not_right
     DEX
 .not_right
+    LDA pack_pressed
+    AND #INPUT_UP
+    BEQ not_up
+    CPX #PACK_COLUMNS
+    BCC not_up
+    TXA
+    SBC #PACK_COLUMNS           \ (Carry set)
+    TAX
+.not_up
+    LDA pack_pressed
+    AND #INPUT_DOWN
+    BEQ not_down
+    TXA
+    CLC
+    ADC #PACK_COLUMNS
+    CMP pack_count
+    BCS not_down
+    TAX
+.not_down
     CPX pack_index
     BEQ keys
     LDA pack_kinds,X

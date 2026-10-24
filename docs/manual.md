@@ -27,8 +27,8 @@ In the pack, the world waits:
 
 | Key | |
 |---|---|
-| Z, X | choose what's in your hand |
-| T Y / G H | the cells of the grid: put what's in your hand there, or take it back |
+| Z X K M | choose what's in your hand |
+| R T / F G | the cells of the grid: put what's in your hand there, or take it back |
 | DELETE | empty the grid |
 | RETURN | make what the grid shows; hold it to make more |
 | COPY | lay out again something you've made before |
@@ -45,14 +45,14 @@ out, your hand moves to the next thing you can place.
 ## Making things
 
 Below your pack is a grid, two cells by two, one for each of the keys
-T Y / G H, as they lie on the keyboard:
+R T / F G, as they lie on the keyboard:
 
 ```
-   T  Y
-    G  H
+   R  T
+    F  G
 ```
 
-Choose something with Z and X, then press a cell's key to lay it
+Choose something with Z X K M, then press a cell's key to lay it
 there. Press the key again to take it back. Lay things out in the right
 shape and what they make shows beside the grid: press RETURN to make it.
 The grid fills again from your pack, ready to make another.

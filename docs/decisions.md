@@ -299,3 +299,6 @@ A running log of design decisions. Add to it whenever one is made.
   ones, but M is a cell of the 3 x 3 grid). Both hands are now on the
   left of the keyboard for choosing and laying out; DELETE, RETURN and
   COPY stay on the right.
+- **The grid's keys move a key left, to R T Y / F G H / V B N:** that
+  keeps them clear of Z X and of K M, so all four of play's movement keys
+  move the hand in the pack, up and down a row included.

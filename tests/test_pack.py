@@ -1,5 +1,5 @@
 """The pack screen (pack.py): on the parasite, P opens and closes it, the
-game pausing meanwhile, and Z and X move the hand, each frame's
+game pausing meanwhile, and Z X K M move the hand, each frame's
 packet carrying what the panel shows (py65, test_daylight.ParasiteGame);
 on the host, render_pack draws the panel (py65); and in the game, the
 panel is drawn, the hand chosen and the view redrawn on closing
@@ -22,7 +22,7 @@ from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, MAILBOX_KEYS, PACKET_PA
                            PACKET_PACK_MOVED, PACKET_REDRAW, ParasiteGame)
 
 INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT_LEFT | INPUT_RIGHT,
-          INPUT_PACK | INPUT_RIGHT, INPUT_RIGHT | INPUT_DOWN]     # (up and down do nothing in the pack)
+          INPUT_PACK | INPUT_RIGHT, INPUT_RIGHT | INPUT_DOWN]
 
 
 def test_the_hand_moves_across_the_kinds_shown():
@@ -222,7 +222,7 @@ def random_hand_grid(rng: random.Random) -> tuple[int, ...]:
 
 ITEM_FRAME_FIRST = len(sprites.sprite_frames())
 PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (6, 1), (6, 0)     # Beebium's keyboard matrix: P, Z (left), TAB,
-T_KEY, RETURN_KEY = (2, 3), (4, 9)                       # T, RETURN
+R_KEY, RETURN_KEY = (3, 3), (4, 9)                       # R (the first cell), RETURN
 
 
 def frames(bbc, labels, count: int, keys=(), label: str = "host_frame_shown") -> None:
@@ -280,10 +280,10 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     shown = screen[SCREEN_START:SCREEN_END]
     assert all(shown[a - SCREEN_START] == b for a, b in panel.items()), "the panel wasn't redrawn"
 
-    # Planks: the wood into the grid's first cell (T), then made (RETURN).
+    # Planks: the wood into the grid's first cell (R), then made (RETURN).
     state = Pack(open=True, kinds=tuple(pack.shown(counts, hand)))
     state, counts, hand = pack.step(state, counts, inventory.KIND_WOOD, 0, 1)
-    tap(bbc, labels, T_KEY)
+    tap(bbc, labels, R_KEY)
     panel = pack.panel(screen_start, counts, hand, list(state.kinds), state.grid)
     shown = screen[SCREEN_START:SCREEN_END]
     assert all(shown[a - SCREEN_START] == b for a, b in panel.items()), "the grid wasn't drawn"

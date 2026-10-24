@@ -18,7 +18,7 @@ frame, and the games below show it isn't needed (see
   or cycled to with TAB (the next kind held that places something), or,
   when none of it is left, the first kind carried that places something.
 - The pack (step 2, in part): P pauses the game and shows the kinds held
-  with their counts across the top of the view; Z and X move the
+  with their counts across the top of the view; Z X K M move the
   hand (`tube-game.md`, The pack).
 - Torches: counted. The miner starts with 8 (`STARTING_TORCHES`), and T
   drops one, spending it; at most 24 in the world, never picked up.
@@ -301,22 +301,23 @@ recognised, so its result shows.
 
 A shaped grid, as in Minecraft, but each cell has its own key, so laying
 out a recipe is drawing it, with no cursor in the grid (chosen
-2026-10-23). Z and X choose the material, as they move the miner in
+2026-10-23). Z X K M choose the material, as they move the miner in
 play, and the cell keys place it:
 
 ```
-  cells            brush               Master keypad
-   T  Y  U                                7  8  9
-    G  H  J       Z  X                    4  5  6
-     B  N  M      back, on                1  2  3
+  cells                brush           Master keypad
+   R  T  Y              K                 7  8  9
+    F  G  H           Z   X               4  5  6
+     V  B  N            M                 1  2  3
 ```
 
-- **Z and X** move the brush, a cursor on the pack's icons (eight
-  across), back and forth in order, from the end of one row to the start
-  of the next. They're the keys that move left and right in play, so they
-  feel natural (chosen 2026-10-24, over the arrow keys, first tried).
-  There are no keys for up and down: M, the obvious one, is a cell of the
-  3 x 3 grid.
+- **Z X K M** move the brush, a cursor on the pack's icons (eight
+  across): Z and X back and forth in order, from the end of one row to
+  the start of the next, K and M up and down a row. They're the keys that
+  move the miner in play, so they feel natural (chosen 2026-10-24, over
+  the arrow keys, first tried). The cells are R T Y / F G H / V B N, a
+  key to the left of where they were first planned (T Y U / G H J /
+  B N M), to keep clear of M and K.
 - A cell's key puts one of the brush's material in that cell, taking it
   from the count. The same key with the same brush takes it back out;
   with another brush it swaps.
@@ -333,12 +334,12 @@ play, and the cell keys place it:
   staggered, so the grid leans to the right, but it still reads as a grid
   under the fingers.
 - The crafting screen is a mode of its own, paused, so its keys don't clash
-  with play (T is the torch and M moves down there).
+  with play (T is the torch there).
 
 What's recognised:
 
-- **The grid's size follows the station.** In the hand it's 2 x 2 (T Y /
-  G H). Near a workbench it's 3 x 3. A furnace or an anvil near allows
+- **The grid's size follows the station.** In the hand it's 2 x 2 (R T /
+  F G). Near a workbench it's 3 x 3. A furnace or an anvil near allows
   the recipes that need them. Stations count as near within the miner's
   light window, or a few tiles.
 - **Shapes may sit anywhere** in the grid: it's trimmed to the cells used
@@ -477,7 +478,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
    TAB cycles the hand in play (done).
 8. Should movement in play be WASD, with dig and place on K and L? It
    breaks with BBC custom (Z X and * ?) but is what players now expect.
-   Crafting now moves the brush with Z and X, so a change here would
+   Crafting now moves the brush with Z X K M, so a change here would
    change that too. Try it in the emulator.
 9. Do mirrored shapes match?
 
@@ -486,10 +487,10 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 1. Done: inventory by kind (model, then the 6502): dug material keeps its
    kind. Placing puts back the kind in hand. Wood joins the table.
 2. Done: the pack screen: paused, icons and counts, with the brush chosen
-   by Z and X (first the arrow keys) as the hand. Plus the cycle key (TAB)
+   by Z X K M (first the arrow keys) as the hand. Plus the cycle key (TAB)
    and the hand's icon above the miner (an item's picture, for a second,
    when it changes).
-3. Done: the 2 x 2 hand grid on T Y / G H: planks, torches, the
+3. Done: the 2 x 2 hand grid on R T / F G: planks, torches, the
    workbench. The recipe book and COPY. The manual's first pages
    (`docs/manual.md`). Made things go straight into the counts for now,
    rather than popping out as items when the pack closes.

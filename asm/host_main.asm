@@ -631,7 +631,7 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     JSR scan_cell
     ORA zp_keys
     STA zp_keys
-    LDY #pack_keys - key_table  \ ... and P, Z and X
+    LDY #pack_keys - key_table  \ ... and P, Z X K M
     JSR scan_keys
 .read
     STA zp_input
@@ -696,11 +696,12 @@ KEY_M = 101
 KEY_L = 86
 KEY_SPACE = 98
 KEY_T = 35
+KEY_R = 51
 KEY_Y = 68
-KEY_U = 53
+KEY_F = 67
 KEY_G = 83
 KEY_H = 84
-KEY_J = 69
+KEY_V = 99
 KEY_B = 100
 KEY_N = 85
 KEY_DELETE = 89
@@ -713,12 +714,13 @@ KEY_COPY = 105
     EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, KEY_K, INPUT_UP
     EQUB KEY_M, INPUT_DOWN, KEY_L, INPUT_ACTION, KEY_SPACE, INPUT_PLACE, KEY_T, INPUT_TORCH, &FF
 .pack_keys
-    EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, &FF
+    EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, KEY_K, INPUT_UP
+    EQUB KEY_M, INPUT_DOWN, &FF
 .pack_keys_second
     EQUB KEY_DELETE, KEY_CLEAR, KEY_RETURN, KEY_MAKE, KEY_COPY, KEY_BOOK, &FF
 ASSERT play_keys = play_keys_second + 3
 .cell_keys                      \ By cell, by rows (pack.CELL_KEYS)
-    EQUB KEY_T, KEY_Y, KEY_U, KEY_G, KEY_H, KEY_J, KEY_B, KEY_N, KEY_M, &FF
+    EQUB KEY_R, KEY_T, KEY_Y, KEY_F, KEY_G, KEY_H, KEY_V, KEY_B, KEY_N, &FF
 ASSERT GRID_CELLS = 9
 
 INCLUDE "asm/pixels.asm"
