@@ -33,7 +33,9 @@ passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
 falls. Each dig starts a cooldown. Placing puts a whole block of the kind
 in hand (inventory.py) in an empty tile (AIR or SKY); a torch is placed
-the same way, unless there are TORCH_MAX in the world. If the world has no
+the same way, or, with no such tile, in the miner's own tile (the one
+holding the middle of the player's box), if that is empty, unless there
+are TORCH_MAX in the world. If the world has no
 room for a change, nothing happens.
 """
 
@@ -268,6 +270,9 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             return hands, NONE, None
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
                      and not overlaps_player(player, x, y))
+        if target is None and torch:            # the miner's own tile, if empty
+            own = ((player.px + PLAYER_WIDTH // 2) // TILE_WIDTH, (player.py + PLAYER_HEIGHT // 2) // TILE_HEIGHT)
+            target = own if world.tile_at(*own)[0] in EMPTY else None
         if target is not None and world.set_tile(*target, (inventory.PLACES[hand],
                                                            SHAPE_FULL | background_bits(*target))):
             return Hands(inventory.spend(hands.counts, hand), PLACE_FRAMES, hand, hands.torches + torch), PLACE, target

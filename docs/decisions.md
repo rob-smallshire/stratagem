@@ -314,3 +314,9 @@ A running log of design decisions. Add to it whenever one is made.
   limit of 24 in the world stays (`TORCH_MAX`, now in `inventory.py`).
 - **Planks are red,** like the wood they come from: the first icon, yellow
   with staggered joints, read as bricks. Boards with dark seams now.
+- **A torch with nowhere to go goes in the miner's own tile:** aimed like a
+  block, a torch often had no room (the ground rising ahead at the start,
+  a narrow tunnel), so, as T did, it falls back to the tile at the middle
+  of the miner, if that is empty. It still waits out the dig's cooldown.
+  PGAME has 8 bytes left, so the checks live in PLIGHT (`torch_room`,
+  `torch_own_tile`).

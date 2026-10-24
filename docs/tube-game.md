@@ -83,8 +83,10 @@ Tube host's code and variables have `&00`-`&56`).
 
 A torch is a material (`tiles.TORCH`), passable, and a kind: with the
 torches in hand, SPACE places one as it places a block, in the empty tile
-aimed at (`place` in `asm/actions.asm`, then `torch_place` in
-`asm/torches.asm`). Its light is the miner's flood
+aimed at, or, with none, in the miner's own tile (the one holding the
+middle of the player's box) if that is empty, as the T key once dropped it
+(`place` in `asm/actions.asm`; `torch_room`, `torch_own_tile` and
+`torch_place` in `asm/torches.asm`). Its light is the miner's flood
 from its tile, but fixed and per tile, kept with daylight in the tile
 cache's light plane: the host draws it with the tiles, and the miner's
 light shows only where brighter. Each torch's pool is kept (24 at most), so

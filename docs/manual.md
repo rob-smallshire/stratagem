@@ -18,7 +18,7 @@ In the world:
 | Z, X | left, right |
 | K | jump |
 | L | dig ahead; with K or M, above or below you; with Z or X as well, a sloping tunnel |
-| SPACE | place what's in your hand ahead (a block, or a torch); with K or M, above or below you |
+| SPACE | place what's in your hand ahead (a block, or a torch); with K or M, above or below you. A torch with nowhere else to go goes where you stand |
 | TAB | the next thing in your hand |
 | P | open your pack |
 

@@ -1,6 +1,6 @@
 \ Torches, on the parasite (docs/tube-game.md). One is placed as a block is
-\ (actions.asm), torches being a kind (inventory.py), at most TORCH_MAX in
-\ the world. A torch lights the tiles around it as the miner's light does (the same flood, from the torch's
+\ (actions.asm), torches being a kind (inventory.py), or, with no empty
+\ tile to aim at, in the miner's own tile; at most TORCH_MAX in the world. A torch lights the tiles around it as the miner's light does (the same flood, from the torch's
 \ tile), but its light is fixed, a level per tile, kept with daylight in the
 \ tile cache's light plane: the host draws it with the tiles, and the
 \ miner's light shows only where brighter. Each torch's pool is kept, so that
@@ -33,6 +33,61 @@
     INC torch_count
     CLC
 .done
+    RTS
+}
+
+\ Return carry set if the hand is the torches and there are TORCH_MAX in
+\ the world already.
+.torch_room
+{
+    LDX hand
+    LDA kind_places,X
+    CMP #TILE_TORCH
+    CLC
+    BNE done
+    LDA torch_count
+    CMP #TORCH_MAX
+.done
+    RTS
+}
+
+\ If the hand is the torches, set target_x/y to the tile at the middle of
+\ the player's box, where a torch goes with nowhere else to go, and return
+\ carry clear if it is empty (air or sky); otherwise carry set.
+.torch_own_tile
+{
+    LDX hand
+    LDA kind_places,X
+    CMP #TILE_TORCH
+    BNE none
+    JSR player_pixels
+    JSR middle_column
+    CLC
+    LDA zp_box_y
+    ADC #PLAYER_HEIGHT DIV 2
+    STA zp_temp
+    LDA zp_box_y + 1
+    ADC #0
+    LSR A
+    ROR zp_temp
+    LSR A
+    ROR zp_temp
+    LSR A
+    ROR zp_temp
+    LSR A
+    ROR zp_temp
+    LDA zp_temp
+    STA target_y
+    JSR target_tile
+    CMP #TILE_AIR
+    BEQ empty
+    CMP #TILE_SKY
+    BEQ empty
+.none
+    SEC
+    RTS
+.empty
+    CLC
     RTS
 }
 

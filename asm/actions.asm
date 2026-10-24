@@ -196,7 +196,8 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 \ that kind is left, the hand moves first to the first kind held that
 \ places something; if there is none, or the hand places nothing, nothing
 \ is placed. A torch is added to the torches (torches.asm), unless there
-\ are TORCH_MAX already.
+\ are TORCH_MAX already; with no empty tile to aim at, it goes in the
+\ miner's own tile, if that is empty.
 .place
 {
     LDX hand
@@ -219,18 +220,15 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 .found
     STX hand
 .in_hand
-    LDX hand
-    LDA kind_places,X
-    CMP #TILE_TORCH
-    BNE aim_empty
-    LDA torch_count             \ Room for another torch?
-    CMP #TORCH_MAX
+    JSR torch_room              \ A torch, if there is room for another
     BCS done
-.aim_empty
     LDA #&FF                    \ Aim for an empty tile
     STA want
     JSR aim
-    BCS done
+    BCC aimed
+    JSR torch_own_tile          \ None: a torch goes in the miner's own
+    BCS done                    \ tile, if that is empty
+.aimed
     JSR target_background
     STA zp_world_new_shape      \ SHAPE_FULL with the background
     LDX hand

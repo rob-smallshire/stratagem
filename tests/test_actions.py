@@ -132,7 +132,8 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
     """Placing puts down the kind in hand; with none of it left, the first
     kind held that places something, which the hand moves to; with nothing
     to place, or a hand that places nothing (wood), nothing; a torch,
-    unless there are TORCH_MAX in the world. The 6502 does
+    unless there are TORCH_MAX in the world, in the miner's own tile if
+    there's no other. The 6502 does
     as the model, from random places and hands."""
     labels = game_build.labels["PARASITE"]
     harness = PlayerHarness(machine, labels)
@@ -159,10 +160,13 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
         seen["moved" if hands.hand != before.hand else "places nothing" if before.hand not in inventory.PLACES
              else "nothing held" if not any(before.counts[k] for k in inventory.PLACES) else "kept"] += 1
         if inventory.PLACES.get(hands.hand) == TORCH:
-            torches["placed" if action == actions.PLACE else "full" if before.torches == inventory.TORCH_MAX
-                    else "not placed"] += 1
+            own = ((state.px + player.PLAYER_WIDTH // 2) // player.TILE_WIDTH,
+                   (state.py + player.PLAYER_HEIGHT // 2) // player.TILE_HEIGHT)
+            torches["own tile" if action == actions.PLACE and target == own
+                    else "placed" if action == actions.PLACE
+                    else "full" if before.torches == inventory.TORCH_MAX else "not placed"] += 1
     assert min(seen.values()) >= 5 and len(seen) == 4, seen
-    assert min(torches.values()) >= 5 and len(torches) == 3, torches
+    assert min(torches.values()) >= 5 and len(torches) == 4, torches
 
 
 @pytest.mark.parametrize("keys", [pytest.param(INPUT_LEFT | INPUT_DOWN, marks=pytest.mark.slow),

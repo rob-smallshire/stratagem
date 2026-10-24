@@ -24,9 +24,10 @@ SCRIPTS = {
     "tunnel-right-and-down": DIG_DEEP + [(80, ["X", "L"]), (60, ["X", "M", "L"]), (30, ["Z"]), (20, ["K"]),
                                          (20, [])],
     "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
-    # A torch placed behind the miner, turned round in the tunnel.
-    "place-torches": DIG_DEEP + [(60, ["X", "L"]), (2, ["Z"]), (3, [TORCHES, " "]), (20, []), (80, ["X", "L"]),
-                                 (20, []),
+    # Torches placed in the tunnel, with no room ahead: in the miner's own
+    # tile, if empty, once the dig's cooldown is over.
+    "place-torches": DIG_DEEP + [(60, ["X", "L"]), (10, []), (3, [TORCHES, " "]), (20, []), (80, ["X", "L"]),
+                                 (10, []), (3, [TORCHES, " "]), (20, []),
                                 (60, ["Z"]), (30, ["M", "L"]), (20, [])],
     # The tree beside the start (column 127): its root dug, it falls, and
     # the logs it throws out are gathered in to the miner.
@@ -145,7 +146,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
 
 STORE_SLOT_BYTES = 128      # asm/tube_layout.asm
 CHUNK_SIZE, CHUNKS_ACROSS = 8, 32
-STORE_SCRIPT = [(150, ["M", "L"]), (60, ["X", "L"]), (2, ["Z"]), (3, [TORCHES, " "]), (30, ["Z", "L"]), (10, [])]
+STORE_SCRIPT = [(150, ["M", "L"]), (60, ["X", "L"]), (10, []), (2, [TORCHES, " "]), (30, ["Z", "L"]), (10, [])]
 
 
 def keys_down(bbc, game_build, keys) -> None:
