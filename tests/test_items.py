@@ -126,7 +126,10 @@ class PacketCheck:
                   and top < item.py + items.ITEM_HEIGHT and item.py < bottom)
             expected.append((column, line, first + kind | (ITEM_BY_MINER if by else 0)))
         tool = memory[game.labels["belt"] + game.byte("belt_slot")]
-        self.hand = items.show_hand(self.hand, game.byte("hand"), tool, bool(game.byte("tool_pressed")))
+        if tool != items.NO_TOOL and not memory[game.labels["inventory"] + tool]:
+            tool = items.NO_TOOL                # none of it left: bare hands
+        chosen = bool(game.byte("tool_pressed") or game.byte("zp_tool_broke"))
+        self.hand = items.show_hand(self.hand, game.byte("hand"), tool, chosen)
         assert game.byte("hand_timer") == self.hand.timer
         hero = Player(x=word(memory, game.labels["zp_player_x"]), y=word(memory, game.labels["zp_player_y"]))
         for column, line, kind in items.hand_shown(self.hand, hero, camera_x, camera_y):
@@ -200,12 +203,45 @@ def test_a_tool_chosen_is_shown_above_the_miner():
     game.memory[labels["belt"] + 2] = KIND_WOOD_PICK
     check_packet = PacketCheck(game)
     again = items.HAND_FRAMES + 10                  # 3 again, the pickaxe in hand: shown again
-    for frame in range(2 * items.HAND_FRAMES + 40):
-        game.memory[MAILBOX_TOOLS] = 3 if frame in (5, again) else 1 if frame == again + items.HAND_FRAMES + 5 else 0
+    empty = again + items.HAND_FRAMES + 5           # 1, an empty slot: bare hands, shown
+    for frame in range(3 * items.HAND_FRAMES + 40):
+        game.memory[MAILBOX_TOOLS] = 3 if frame in (5, again) else 1 if frame == empty else 0
         game.frame(0)
         check_packet(game)
     assert game.byte("belt_slot") == 0
-    assert check_packet.hand_frames == 2 * items.HAND_FRAMES
+    assert check_packet.hand_frames == 3 * items.HAND_FRAMES
+
+
+@pytest.mark.parametrize("spare", [0, 1])
+def test_a_tool_that_breaks_is_shown(spare):
+    """A wooden pickaxe one dig from breaking, in the tool hand: digging
+    down, it breaks, and what's now in use is shown, as items.show_hand
+    says: bare hands, or, with a spare, the next pickaxe."""
+    from stratagem import actions
+    from stratagem.build import build
+    from stratagem.camera import INPUT_ACTION, INPUT_DOWN
+    from stratagem.inventory import KIND_WOOD_PICK
+    from test_daylight import MAILBOX_TOOLS
+    game = ParasiteGame(build())
+    labels = game.labels
+    game.memory[labels["belt"] + 1] = KIND_WOOD_PICK
+    game.memory[labels["inventory"] + KIND_WOOD_PICK] = 1 + spare
+    game.memory[labels["tool_digs"]] = actions.DURABILITY[KIND_WOOD_PICK] - 1
+    game.memory[MAILBOX_TOOLS] = 2
+    game.frame(0)
+    game.memory[MAILBOX_TOOLS] = 0
+    for frame in range(items.HAND_FRAMES + 5):          # the pickaxe chosen, shown, and gone
+        game.frame(0)
+    check_packet = PacketCheck(game)
+    broke = None
+    for frame in range(30):
+        game.frame(INPUT_DOWN | INPUT_ACTION)
+        check_packet(game)
+        if broke is None and game.memory[labels["inventory"] + KIND_WOOD_PICK] == spare:
+            broke = frame
+            assert game.byte("hand_kind") == (KIND_WOOD_PICK if spare else items.NO_TOOL)
+    assert broke is not None, "the pickaxe didn't break"
+    assert check_packet.hand_frames >= 25, "what's in use wasn't shown"
 
 
 @pytest.mark.parametrize("seed", [1988, 1, 2, 3])

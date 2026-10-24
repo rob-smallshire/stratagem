@@ -125,8 +125,9 @@ The tool shows above you for a moment whenever you press its number. The belt is
 Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.
 
-Tools wear out, and break without warning. Make another of the same kind
-and its slot on your belt works again.
+Tools wear out. When one breaks, what you're now holding shows above you:
+another of the same kind if you have one, or a blue outline, your bare
+hands. Make another and its slot on your belt works again.
 
 There is more to make than this. The old miners are said to have made
 much better tools than these, and left word of them in the deep places.

@@ -52,6 +52,7 @@
 .pack_input
 {
     LDA #0
+    STA zp_tool_broke           \ (A new frame)
     STA pack_draw
     STA pack_moved
     STA pack_changed

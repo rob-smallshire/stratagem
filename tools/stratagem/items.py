@@ -42,7 +42,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from stratagem.camera import MAX_STEP_X
-from stratagem.inventory import KIND_BENCH, KIND_SOIL, KIND_WOOD
+from stratagem.inventory import KIND_BENCH, KIND_COUNT, KIND_SOIL, KIND_WOOD
 from stratagem.player import GRAVITY, PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.screen import VIEW_COLUMNS, VIEW_ROWS
 from stratagem.tiles import BENCH, CANOPY_LEFT, QUARTER_LINES, QUARTER_PIXELS, QUARTERS, ROOT, TRUNK, TRUNK_KNOT, solid_quarter_cells
@@ -62,6 +62,7 @@ GATHER_MAX = 4              # pixels and lines a frame
 FLYING, RESTING, GATHERING = 0, 1, 2
 WOOD = KIND_WOOD             # the kinds of item are the inventory's (inventory.py)
 NO_TOOL = 0xFF               # bare hands (crafting.EMPTY)
+EMPTY_PICTURE = KIND_COUNT   # the picture shown for bare hands, after the kinds' (sprites.py)
 DROPS = {ROOT: WOOD, TRUNK: WOOD, TRUNK_KNOT: WOOD, BENCH: KIND_BENCH}     # what each material drops
 assert CANOPY_LEFT not in DROPS
 VIEW_LINES = VIEW_ROWS * 8
@@ -198,12 +199,13 @@ HAND_GAP = 2                # lines between it and the miner's head
 
 @dataclass(frozen=True)
 class HandShown:
-    """The hand, or the tool in the tool hand, shown above the miner, as an
-    item's picture (sprites.py), after the items, for HAND_FRAMES frames
-    once it changes: the hand by TAB, placing with none left, or the pack;
-    the tool by a belt key (pack.py), even if it chose the tool already in
-    hand, unless bare hands. If both change in a frame, the hand is
-    shown."""
+    """The hand, or the tool in use, shown above the miner, as an item's
+    picture (sprites.py), after the items, for HAND_FRAMES frames once it
+    changes: the hand by TAB, placing with none left, or the pack; the tool
+    by a belt key (pack.py), even if it chose the tool already in hand, or
+    by wearing out (actions.py): bare hands as EMPTY_PICTURE, a blue
+    outline, like an empty cell in the pack. If both change in a frame, the
+    hand is shown."""
     last: int = KIND_SOIL       # the hand as last seen
     timer: int = 0              # frames left to show it
     tool: int = NO_TOOL         # the tool as last seen
@@ -211,11 +213,12 @@ class HandShown:
 
 
 def show_hand(state: HandShown, hand: int, tool: int = NO_TOOL, chosen: bool = False) -> HandShown:
-    """A game frame's change to what is shown, given the hand, the tool, and
-    whether a belt key was pressed."""
+    """A game frame's change to what is shown, given the hand, the tool in
+    use (NO_TOOL: bare hands), and whether a belt key was pressed or a tool
+    broke."""
     changed = False
     if tool != state.tool or chosen:
-        state = replace(state, tool=tool, kind=tool, timer=0 if tool == NO_TOOL else HAND_FRAMES)
+        state = replace(state, tool=tool, kind=tool, timer=HAND_FRAMES)
         changed = True
     if hand != state.last:
         state = replace(state, last=hand, kind=hand, timer=HAND_FRAMES)
@@ -228,7 +231,7 @@ def hand_shown(state: HandShown, player: Player, camera_x: int, camera_y: int) -
     column = (player.px >> 1) - camera_x
     line = player.py - ITEM_HEIGHT - HAND_GAP - camera_y * 8
     if state.timer and _in_view(column, line):
-        return [(column, line, state.kind)]
+        return [(column, line, EMPTY_PICTURE if state.kind == NO_TOOL else state.kind)]
     return []
 
 

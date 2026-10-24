@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
                                  KIND_STONE_PICK, KIND_TORCH, KIND_WOOD_PICK)
-from stratagem.items import ITEM_HEIGHT, ITEM_WIDTH, WOOD
+from stratagem.items import EMPTY_PICTURE, ITEM_HEIGHT, ITEM_WIDTH, WOOD
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, Player
 from stratagem.screen import mode2_byte
 
@@ -175,8 +175,19 @@ def frame_pixels(pose: str, facing_left: bool) -> list[list[int]]:
     return [row[::-1] for row in rows] if facing_left else rows
 
 
+# Bare hands, shown as a tool: a blue outline, as an empty cell in the pack.
+_EMPTY_HANDS = """
+BBBBBB
+B....B
+B....B
+B....B
+BBBBBB
+"""
+
+
 def item_pixels(kind: int) -> list[list[int]]:
-    rows = [[_COLOURS[c] for c in line] for line in _ITEMS[kind].split()]
+    art = _EMPTY_HANDS if kind == EMPTY_PICTURE else _ITEMS[kind]
+    rows = [[_COLOURS[c] for c in line] for line in art.split()]
     assert len(rows) == ITEM_HEIGHT and all(len(row) == ITEM_WIDTH for row in rows), kind
     return rows
 
@@ -210,8 +221,9 @@ def sprite_frames() -> list[bytes]:
 
 
 def item_frames() -> list[bytes]:
-    """Each kind of item's frame, its mask and data, by kind."""
-    return [encode_frame(item_pixels(kind)) for kind in sorted(_ITEMS)]
+    """Each kind of item's frame, its mask and data, by kind, then bare
+    hands' (items.EMPTY_PICTURE)."""
+    return [encode_frame(item_pixels(kind)) for kind in [*sorted(_ITEMS), EMPTY_PICTURE]]
 
 
 def frame_for(player: Player) -> int:

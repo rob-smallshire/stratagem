@@ -374,3 +374,7 @@ A running log of design decisions. Add to it whenever one is made.
   Showing both hands all the time, beside the miner, was considered and
   set aside for now: about twice the host's cost every frame, and the
   pictures would lie over a tunnel's walls.
+- **Bare hands are shown, as a blue outline:** like the pack's empty cells.
+  Choosing an empty slot shows it, and so does a tool breaking with none of
+  its kind left, which otherwise went unnoticed; a break with a spare shows
+  the spare.

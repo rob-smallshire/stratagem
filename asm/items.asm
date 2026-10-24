@@ -11,7 +11,7 @@
 \ (items_emit).
 
 ASSERT ITEM_MAX_FALL <= 4 * 16  \ A quarter-cell a frame, at most
-ASSERT WOOD = KIND_WOOD AND ITEM_FRAME_COUNT = KIND_COUNT  \ Item kinds are the inventory's
+ASSERT WOOD = KIND_WOOD AND ITEM_FRAME_COUNT = KIND_COUNT + 1  \ Item kinds are the inventory's, then bare hands
 ASSERT ITEM_OFFSET_X * 16 < 128
 
 \ Material A broke at tile (X, Y): throw out what it drops, if anything.
@@ -1022,29 +1022,38 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 
 \ After the items, the hand, or the tool in the tool hand, shown above the
 \ miner as its kind's item for HAND_FRAMES frames once it changes
-\ or a belt key chooses it again (items.show_hand: the hand if both do; bare
-\ hands, nothing), marked as by
+\ or a belt key chooses it again, or it breaks (items.show_hand: the hand if
+\ both do; bare hands as a blue outline), marked as by
 \ the miner, so that it is drawn each frame as he moves. Y is where it goes
 \ in the packet, and is moved on past it.
 .hand_emit
 {
-    LDX belt_slot               \ The tool changed?
-    LDA belt,X
-    LDX #0                      \ (X: non-zero if anything changed)
+    LDX belt_slot               \ The tool in use: the tool hand's, if any
+    LDA belt,X                  \ of it is left, or bare hands
+    CMP #CELL_EMPTY
+    BEQ in_use
+    TAX
+    LDA inventory,X
+    BNE held
+    LDA #CELL_EMPTY
+    BNE in_use                  \ Always branches
+.held
+    TXA
+.in_use
+    LDX #0                      \ Changed? (X: non-zero if anything did)
     CMP tool_last
     BNE tool_changed
-    LDX tool_pressed            \ Or chosen again, by a belt key
+    LDX tool_pressed            \ Or chosen again, by a belt key, or broken
+    BNE chosen
+    LDX zp_tool_broke
     BEQ tool_same
+.chosen
     LDX #0
 .tool_changed
     STA tool_last
     STA hand_kind
     DEX
-    CMP #CELL_EMPTY
     LDA #HAND_FRAMES
-    BCC tool_timer              \ (A tool's kind is below CELL_EMPTY)
-    LDA #0
-.tool_timer
     STA hand_timer
 .tool_same
     LDA hand                    \ The hand changed?
@@ -1118,7 +1127,11 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
     LDA zp_temp2
     STA (para_write),Y
     INY
-    LDA hand_kind
+    LDA hand_kind               \ Bare hands: EMPTY_PICTURE
+    CMP #CELL_EMPTY
+    BNE picture
+    LDA #EMPTY_PICTURE
+.picture
     CLC
     ADC #ITEM_FRAME_FIRST
     ORA #ITEM_BY_MINER

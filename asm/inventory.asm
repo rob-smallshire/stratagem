@@ -103,6 +103,8 @@
 .done
     RTS
 .broken
+    LDA #&FF                    \ Shown (items.asm)
+    STA zp_tool_broke
     LDA #0
     STA tool_digs - TOOL_FIRST,Y
     TYA
