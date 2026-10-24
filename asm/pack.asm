@@ -133,6 +133,14 @@
     BCS not_down
     TAX
 .not_down
+    LDA pack_keys_pressed       \ TAB: the next kind, round again
+    AND #KEY_NEXT
+    BEQ not_next
+    INX
+    CPX pack_count
+    BCC not_next
+    LDX #0
+.not_next
     CPX pack_index
     BEQ keys
     LDA pack_kinds,X
@@ -170,7 +178,7 @@
     RTS
 }
 
-\ The grid's keys this frame: a cell's (pack_cell), DELETE, RETURN (again
+\ The grid's keys this frame: a cell's (pack_cell), DELETE, L (again
 \ every MAKE_REPEAT frames while held, after MAKE_DELAY) and COPY. Set
 \ pack_changed if the counts or the grid changed.
 .craft_keys

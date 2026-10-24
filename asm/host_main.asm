@@ -705,7 +705,6 @@ KEY_V = 99
 KEY_B = 100
 KEY_N = 85
 KEY_DELETE = 89
-KEY_RETURN = 73
 KEY_COPY = 105
 .key_table
 .play_keys_second
@@ -717,7 +716,7 @@ KEY_COPY = 105
     EQUB KEY_P, INPUT_PACK, KEY_Z, INPUT_LEFT, KEY_X, INPUT_RIGHT, KEY_K, INPUT_UP
     EQUB KEY_M, INPUT_DOWN, &FF
 .pack_keys_second
-    EQUB KEY_DELETE, KEY_CLEAR, KEY_RETURN, KEY_MAKE, KEY_COPY, KEY_BOOK, &FF
+    EQUB KEY_DELETE, KEY_CLEAR, KEY_L, KEY_MAKE, KEY_COPY, KEY_BOOK, KEY_TAB, KEY_NEXT, &FF
 ASSERT play_keys = play_keys_second + 3
 .cell_keys                      \ By cell, by rows (pack.CELL_KEYS)
     EQUB KEY_R, KEY_T, KEY_Y, KEY_F, KEY_G, KEY_H, KEY_V, KEY_B, KEY_N, &FF

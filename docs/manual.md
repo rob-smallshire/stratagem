@@ -27,9 +27,10 @@ In the pack, the world waits:
 | Key | |
 |---|---|
 | Z X K M | choose what's in your hand |
+| TAB | the next thing in your pack, round again |
 | R T / F G | the cells of the grid: put what's in your hand there, or take it back |
 | DELETE | empty the grid |
-| RETURN | make what the grid shows; hold it to make more |
+| L | make what the grid shows; hold it to make more |
 | COPY | lay out again something you've made before |
 | P | close your pack |
 
@@ -53,7 +54,7 @@ R T / F G, as they lie on the keyboard:
 
 Choose something with Z X K M, then press a cell's key to lay it
 there. Press the key again to take it back. Lay things out in the right
-shape and what they make shows beside the grid: press RETURN to make it.
+shape and what they make shows beside the grid: press L to make it.
 The grid fills again from your pack, ready to make another.
 
 A shape can sit anywhere in the grid, but it can't be turned round.

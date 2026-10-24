@@ -17,7 +17,7 @@ would show it half drawn, for a frame).
 
 Below the kinds is the crafting grid (crafting.py), the hand's 2 x 2, and
 what it makes. The hand is the brush: a cell's key (R T / F G) puts a kind
-in its cell or takes it out; DELETE empties the grid; RETURN makes what it
+in its cell or takes it out; DELETE empties the grid; L makes what it
 lays out, again every MAKE_REPEAT frames while held, after MAKE_DELAY; COPY
 lays out the next recipe in the book. A change redraws the counts, the grid
 and the result (the panel whole if a kind joins those shown). PACK again
@@ -53,10 +53,11 @@ INPUT_PACK = 128                    # P: open or close the pack
 KEY_CYCLE = 1                       # TAB, in the second byte of input in play: cycle the hand
 KEY_CELL = 0x0F                     # in the pack, the second byte: the cell's key held (1 on), or 0
 KEY_CLEAR = 0x10                    # DELETE
-KEY_MAKE = 0x20                     # RETURN
+KEY_MAKE = 0x20                     # L: make
 KEY_BOOK = 0x40                     # COPY: the recipe book
+KEY_NEXT = 0x80                     # TAB: the hand to the next kind shown
 CELL_KEYS = "RTYFGHVBN"             # by cell
-MAKE_DELAY = 20                     # frames RETURN is held before it repeats...
+MAKE_DELAY = 20                     # frames L is held before it repeats...
 MAKE_REPEAT = 8                     # ... and then between makes
 
 PACK_COLUMNS = 8                    # kinds across
@@ -93,7 +94,7 @@ class Pack:
     grid: tuple[int, ...] = EMPTY_GRID
     book: int = 0                   # the recipes made, a bit each (crafting.py)
     copied: int = len(RECIPES) - 1  # the recipe COPY laid out last
-    repeat: int = 0                 # frames until RETURN, held, makes again
+    repeat: int = 0                 # frames until L, held, makes again
     station: int = STATION_HAND
 
 
@@ -140,6 +141,8 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         moved -= PACK_COLUMNS
     if pressed & INPUT_DOWN and moved + PACK_COLUMNS < len(kinds):
         moved += PACK_COLUMNS
+    if pressed_keys & KEY_NEXT and kinds:
+        moved = (moved + 1) % len(kinds)
     hand = kinds[moved] if kinds else hand
     pack = replace(pack, moved=moved != index)
     before = counts, pack.grid

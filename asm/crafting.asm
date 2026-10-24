@@ -212,7 +212,7 @@ ASSERT GRID_MAX = 3
     RTS
 }
 
-\ RETURN: if the grid lays out a recipe, make it: its count of what it
+\ L (make): if the grid lays out a recipe, make it: its count of what it
 \ makes, into the counts; put it in the book; and lay its shape out again
 \ from the counts.
 .craft_make

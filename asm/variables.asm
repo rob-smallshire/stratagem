@@ -35,7 +35,7 @@ GUARD &0800
 .craft_grid      SKIP GRID_CELLS \ A kind or CELL_EMPTY each, by rows
 .craft_book      SKIP 1      \ A bit for each recipe made
 .craft_copied    SKIP 1      \ The recipe COPY laid out last
-.craft_repeat    SKIP 1      \ Frames until RETURN, held, makes again
+.craft_repeat    SKIP 1      \ Frames until L, held, makes again
 .craft_cell      SKIP 1      \ Workspace
 .craft_k         SKIP 1
 .craft_row       SKIP 1

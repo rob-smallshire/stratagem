@@ -192,8 +192,8 @@ latch bit 3, `3` to port B), sets port A's direction to `&7F`, and for
 each key in a table writes its internal key number (an INKEY number's
 `-n - 1`) to port A and reads its state in bit 7; then lets the scanning
 start again (`&0B`). A key costs about 31 cycles. Play's eight keys take
-342 cycles a frame, and the pack's seventeen 575 (P, Z X K M, DELETE,
-RETURN, COPY and the nine cell keys; the cells' scan stops at the first
+342 cycles a frame, and the pack's eighteen 602 (P, Z X K M, TAB,
+DELETE, L, COPY and the nine cell keys; the cells' scan stops at the first
 held), with interrupts held off for as long. Which keys are read, and the
 bits they set, is a table (`key_table`): play's, and the pack's. (The game
 first read its keys with OSBYTE `&81`, at about 270 cycles a key; see
@@ -244,15 +244,16 @@ Below the kinds the pack shows the crafting grid (`crafting.py`,
 2 x 2 for now, and what it makes. The hand is the brush: a cell's key
 (R T / F G, as they lie on the keyboard) puts one of the hand's kind in
 the cell, from its count, or takes it back, or swaps it; DELETE empties
-the grid; RETURN makes what it lays out, and lays the shape out again
+the grid; L makes what it lays out, and lays the shape out again
 from the counts, as far as they go (held, again every 8 frames, after 20);
 COPY lays out the next recipe in the book, each recipe made once. Closing
 the pack empties the grid back into the counts. The recipes so far:
 planks (4) from wood, torches (2) from ore over wood, the workbench from
 four planks (`docs/manual.md` shows them as the player sees them).
 
-- **Keys:** in the pack, the host reads DELETE, RETURN and COPY into the
-  second byte of input (`KEY_CLEAR`, `KEY_MAKE`, `KEY_BOOK`), and the
+- **Keys:** in the pack, the host reads DELETE, L, COPY and TAB into the
+  second byte of input (`KEY_CLEAR`, `KEY_MAKE`, `KEY_BOOK`, `KEY_NEXT`:
+  TAB moves the hand to the next kind shown, round again), and the
   first cell key held as a number in its low four bits (`scan_cell`, 1 on,
   0 none), so nine cells fit beside them; the parasite takes a change of
   that number as a press.

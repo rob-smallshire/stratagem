@@ -320,3 +320,8 @@ A running log of design decisions. Add to it whenever one is made.
   of the miner, if that is empty. It still waits out the dig's cooldown.
   PGAME has 8 bytes left, so the checks live in PLIGHT (`torch_room`,
   `torch_own_tile`).
+- **L makes, and TAB chooses, in the pack:** L, the act key in play (dig),
+  makes what the grid lays out, in place of RETURN; TAB moves the hand to
+  the next kind shown, round again, as it cycles the hand in play, but to
+  any kind, wood and planks included, since those are what's crafted
+  with. More of the pack's keys are now play's.

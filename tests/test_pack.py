@@ -16,7 +16,7 @@ from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.inventory import KIND_COUNT
 from stratagem.crafting import GRID_CELLS
-from stratagem.pack import INPUT_PACK, KEY_BOOK, KEY_CLEAR, KEY_CYCLE, KEY_MAKE, Pack
+from stratagem.pack import INPUT_PACK, KEY_BOOK, KEY_CLEAR, KEY_CYCLE, KEY_MAKE, KEY_NEXT, Pack
 from stratagem.screen import SCREEN_END, SCREEN_START
 from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, MAILBOX_KEYS, PACKET_PACK, PACKET_PACK_CHANGED, PACKET_PACK_DRAW,
                            PACKET_PACK_MOVED, PACKET_REDRAW, ParasiteGame)
@@ -36,12 +36,18 @@ def test_the_hand_moves_across_the_kinds_shown():
     assert not held.moved and hand == 2
     closed, counts, hand = pack.step(held, counts, hand, INPUT_PACK)
     assert not closed.open and closed.closed and hand == 2
+    released, counts, hand = pack.step(closed, counts, hand, 0)
+    opened, counts, hand = pack.step(released, counts, hand, INPUT_PACK)
+    for want in (4, 0, 2):                                  # TAB: the next kind shown, round again
+        opened, counts, hand = pack.step(opened, counts, hand, 0, KEY_NEXT)
+        assert hand == want and opened.moved
+        opened, counts, hand = pack.step(opened, counts, hand, 0, 0)
     empty, counts, hand = pack.step(Pack(), (0,) * KIND_COUNT, inventory.KIND_SOIL, INPUT_PACK)
     assert empty.kinds == () and hand == inventory.KIND_SOIL  # nothing held: the hand stays
 
 
 def test_planks_made_in_the_pack():
-    """Wood in hand, T puts it in the grid, which shows planks; RETURN makes
+    """Wood in hand, R puts it in the grid, which shows planks; L makes
     them, and they join the kinds shown; closing the pack empties the grid
     back into the counts."""
     counts = (2, 5) + (0,) * (KIND_COUNT - 2)
@@ -93,7 +99,8 @@ def send(game, inputs: int, keys: int = 0) -> list[int]:
     return packet
 
 
-KEYS = [0, 0, KEY_CYCLE, 1, 2, 4, 5, 3, 9, KEY_CLEAR, KEY_MAKE, KEY_MAKE, KEY_BOOK, 1 | KEY_MAKE, 2 | KEY_BOOK]
+KEYS = [0, 0, KEY_CYCLE, 1, 2, 4, 5, 3, 9, KEY_CLEAR, KEY_MAKE, KEY_MAKE, KEY_BOOK, 1 | KEY_MAKE, 2 | KEY_BOOK,
+        KEY_NEXT, KEY_NEXT | 4]
 
 
 def test_parasite_pack_matches_model(game_build):
@@ -226,7 +233,7 @@ def random_hand_grid(rng: random.Random) -> tuple[int, ...]:
 
 ITEM_FRAME_FIRST = len(sprites.sprite_frames())
 PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (6, 1), (6, 0)     # Beebium's keyboard matrix: P, Z (left), TAB,
-R_KEY, RETURN_KEY = (3, 3), (4, 9)                       # R (the first cell), RETURN
+R_KEY, MAKE_KEY = (3, 3), (5, 6)                         # R (the first cell), L (make)
 
 
 def frames(bbc, labels, count: int, keys=(), label: str = "host_frame_shown") -> None:
@@ -284,7 +291,7 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     shown = screen[SCREEN_START:SCREEN_END]
     assert all(shown[a - SCREEN_START] == b for a, b in panel.items()), "the panel wasn't redrawn"
 
-    # Planks: the wood into the grid's first cell (R), then made (RETURN).
+    # Planks: the wood into the grid's first cell (R), then made (L).
     state = Pack(open=True, kinds=tuple(pack.shown(counts)))
     state, counts, hand = pack.step(state, counts, inventory.KIND_WOOD, 0, 1)
     tap(bbc, labels, R_KEY)
@@ -292,7 +299,7 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     shown = screen[SCREEN_START:SCREEN_END]
     assert all(shown[a - SCREEN_START] == b for a, b in panel.items()), "the grid wasn't drawn"
     state, counts, hand = pack.step(state, counts, hand, 0, KEY_MAKE)
-    tap(bbc, labels, RETURN_KEY)
+    tap(bbc, labels, MAKE_KEY)
     assert parasite[plabels["inventory"] + inventory.KIND_PLANKS] == 4, "no planks were made"
     panel = pack.panel(screen_start, counts, hand, list(state.kinds), state.grid)
     shown = screen[SCREEN_START:SCREEN_END]

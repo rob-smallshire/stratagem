@@ -323,9 +323,12 @@ play, and the cell keys place it:
 - A cell's key puts one of the brush's material in that cell, taking it
   from the count. The same key with the same brush takes it back out;
   with another brush it swaps.
-- **DELETE** empties the grid back into the pack. DELETE, COPY and RETURN
-  are for the right hand.
-- **RETURN** makes the recognised result. Holding it makes more, refilling
+- **TAB** moves the brush to the next kind shown, round again, as it
+  cycles the hand in play (but to any kind, not only those placed).
+- **DELETE** empties the grid back into the pack. DELETE and COPY are for
+  the right hand.
+- **L** makes the recognised result, as it digs in play (chosen
+  2026-10-24, over RETURN, first tried). Holding it makes more, refilling
   the same shape from the counts, a few a second, until something runs
   short.
 - **COPY** steps through the recipe book (below), filling the grid with
