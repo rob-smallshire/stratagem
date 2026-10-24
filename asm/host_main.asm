@@ -204,14 +204,14 @@ GUARD USER_END
     RTS
 }
 
-\ Read the input and write it to the parasite's mailbox, after the second
-\ byte of input and before the count of packets read.
+\ Read the input and write it to the parasite's mailbox: the function key,
+\ the second byte of input, the input, and the count of packets read.
 .host_send_input
 {
     JSR read_input
     INC host_frames
     JSR host_claim
-    LDA #LO(MAILBOX_KEYS)
+    LDA #LO(MAILBOX_TOOLS)
     STA host_transfer
     LDA #0
     STA host_transfer + 1
@@ -219,6 +219,8 @@ GUARD USER_END
     LDX #LO(host_transfer)
     LDY #HI(host_transfer)
     JSR TUBE_ENTRY
+    LDA zp_tools
+    JSR host_write_byte
     LDA zp_keys
     JSR host_write_byte
     LDA zp_input
@@ -262,6 +264,15 @@ GUARD USER_END
     STA host_pack_made
     READ_BYTE
     STA host_pack_made_count
+    LDX #0
+.belt
+    READ_BYTE
+    STA host_pack_belt,X
+    INX
+    CPX #BELT_SLOTS
+    BNE belt
+    READ_BYTE
+    STA host_pack_slot
     JSR host_release
     JSR host_send_input
     LDA #19                     \ Wait for vertical sync
@@ -619,16 +630,27 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     STA SYSTEM_VIA_DDRA         \ (bit 7)
     BIT host_flags
     BVS pack
-    LDY #play_keys_second - key_table  \ In play: TAB in the second byte
+    LDA host_frames             \ In play: the function keys, every fourth
+    AND #3                      \ frame
+    BNE no_tools
+    LDY #fn_keys - key_table
+    JSR scan_first
+    STA zp_tools
+.no_tools
+    LDY #play_keys_second - key_table  \ TAB in the second byte
     JSR scan_keys
     STA zp_keys
     JSR scan_keys               \ (play_keys follows)
     JMP read
 .pack
-    LDY #pack_keys_second - key_table  \ In the pack: the grid's keys in the
-    JSR scan_keys               \ second byte, a cell's key's number (1 on)
-    STA zp_keys                 \ in its low bits...
-    JSR scan_cell
+    LDY #fn_keys - key_table    \ In the pack: the function keys, every frame,
+    JSR scan_first
+    STA zp_tools
+    LDY #pack_keys_second - key_table  \ the grid's keys in the second byte,
+    JSR scan_keys               \ a cell's key's number (1 on) in its low
+    STA zp_keys                 \ bits...
+    LDY #cell_keys - key_table
+    JSR scan_first
     ORA zp_keys
     STA zp_keys
     LDY #pack_keys - key_table  \ ... and P, Z X K M
@@ -666,15 +688,16 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     RTS
 }
 
-\ Return in A the number of the first of the grid's cell keys pressed,
-\ from 1, or 0 if none.
-.scan_cell
+\ Return in A the number of the first key pressed of those in key_table
+\ from Y up to an &FF, from 1, or 0 if none.
+.scan_first
 {
     LDX #0
 .loop
-    LDA cell_keys,X
+    LDA key_table,Y
     BMI none
     STA SYSTEM_VIA_A_NO_HANDSHAKE
+    INY
     INX
     BIT SYSTEM_VIA_A_NO_HANDSHAKE
     BPL loop
@@ -721,6 +744,9 @@ ASSERT play_keys = play_keys_second + 3
 .cell_keys                      \ By cell, by rows (pack.CELL_KEYS)
     EQUB KEY_R, KEY_T, KEY_Y, KEY_F, KEY_G, KEY_H, KEY_V, KEY_B, KEY_N, &FF
 ASSERT GRID_CELLS = 9
+.fn_keys                        \ f0 to f9, the belt's slots (pack.FN_KEYS)
+    EQUB 32, 113, 114, 115, 20, 116, 117, 22, 118, 119, &FF
+ASSERT BELT_SLOTS = 10
 
 INCLUDE "asm/pixels.asm"
 INCLUDE "asm/scroll.asm"

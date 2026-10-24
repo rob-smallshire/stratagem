@@ -20,6 +20,7 @@ In the world:
 | L | dig ahead; with K or M, above or below you; with Z or X as well, a sloping tunnel |
 | SPACE | place what's in your hand ahead (a block, or a torch); with K or M, above or below you. A torch with nowhere else to go goes where you stand |
 | TAB | the next thing in your hand |
+| f0 to f9 | take a tool from your belt into your tool hand; an empty slot is your bare hands |
 | P | open your pack |
 
 In the pack, the world waits:
@@ -32,6 +33,7 @@ In the pack, the world waits:
 | DELETE | empty the grid |
 | L | make what the grid shows; hold it to make more |
 | COPY | lay out again something you've made before |
+| f0 to f9 | with a tool in your hand, put it on your belt there, or take it off |
 | P | close your pack |
 
 ## Your pack
@@ -110,6 +112,17 @@ At a workbench:
 ```
 
 **A stone pickaxe**, the same with a head of stone.
+
+## Your tool belt
+
+You have two hands. One holds what SPACE places; the other holds a tool,
+which L digs with. Your tools hang on a belt of ten slots, one for each of
+the red function keys, f0 to f9. In your pack, choose a tool, then press a
+function key to hang it there; out in the world, press that key to take it
+in hand. The belt is shown along the bottom of your pack.
+
+Tools wear out, and break without warning. Make another of the same kind
+and its slot on your belt works again.
 
 There is more to make than this. The old miners are said to have made
 much better tools than these, and left word of them in the deep places.

@@ -340,3 +340,10 @@ A running log of design decisions. Add to it whenever one is made.
   picture is the pack's icon. Dug, it breaks whole and comes back as an
   item, as a tree's part gives wood. "Near" is within 3 tiles across and 2
   up or down of the miner's tile, found once, on opening the pack.
+- **Two hands and a tool belt on the function keys:** L digs with the
+  tool in the tool hand, SPACE places the hand, so digging and building
+  never fight over one hand, as they do in Minecraft. The belt's ten slots
+  are the red function keys, a Beeb's natural tool bar: loaded in the pack
+  (a function key with a tool as the hand), chosen in play. Play reads the
+  function keys only every fourth frame, which costs 72 cycles a frame on
+  average rather than 288. A slot holds a kind, not one tool.

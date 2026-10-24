@@ -747,6 +747,7 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     LDA pack_grid_top
     CLC
     ADC pack_grid_rows
+    ADC #ROWS_PER_BELT          \ (Carry clear)
     STA pack_row_end
     LDA #PANEL_TOP
     STA pack_row
@@ -797,13 +798,19 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     INC pack_slot
     BNE slot                    \ Always branches
 .grid
-    LDA #&FE                    \ None of the grid as drawn: draw it all
-    STA pack_drawn_made
+    LDA #&FE                    \ None of the grid or the belt as drawn:
+    STA pack_drawn_made         \ draw it all, the belt's numbers and
+    STA pack_belt_whole         \ arrowheads too
     LDX #GRID_CELLS - 1
 .undrawn
     STA pack_drawn_grid,X
     DEX
     BPL undrawn
+    LDX #BELT_SLOTS - 1
+.undrawn_belt
+    STA pack_drawn_belt,X
+    DEX
+    BPL undrawn_belt
     JMP pack_grid
 }
 ASSERT KIND_COUNT < &FE
@@ -814,6 +821,7 @@ ASSERT ROWS_PER_GRID_ROW = 3
 .render_pack_changed
 {
     LDA #0
+    STA pack_belt_whole
     STA pack_slot
 .loop
     LDA pack_slot
@@ -835,12 +843,17 @@ ASSERT ROWS_PER_GRID_ROW = 3
     \ Fall through
 }
 
+\ Draw the grid and the belt below it (pack_belt).
+.pack_grid
+    JSR pack_grid_cells
+    JMP pack_belt
+
 \ Draw the grid, below the kinds, host_pack_size cells square, each its
 \ kind's icon or a socket, GRID_PITCH cells apart and ROWS_PER_GRID_ROW
 \ rows; and after it what it makes, as a slot with an arrowhead pointing
 \ at its count, or blank cells. Only what differs from pack_drawn_grid and
 \ pack_drawn_made is drawn.
-.pack_grid
+.pack_grid_cells
 {
     JSR pack_grid_top_row
     LDX host_pack_size
@@ -953,6 +966,80 @@ ASSERT ROWS_PER_GRID_ROW = 3
     RTS
 }
 ASSERT GRID_PITCH = 5
+
+\ Draw the belt, below the grid: BELT_SLOTS slots BELT_PITCH cells apart,
+\ each a tool's icon or a socket, those that differ from pack_drawn_belt;
+\ and, if pack_belt_whole, each slot's function key's number below it, and
+\ arrowheads either side of the tool hand's.
+.pack_belt
+{
+    LDA pack_grid_top
+    CLC
+    ADC pack_grid_rows
+    STA pack_top
+    ADC #2                      \ (Carry clear)
+    STA pack_count_row
+    LDA #BELT_LEFT
+    STA pack_left
+    LDA #0
+    STA pack_grid_cell
+.slot
+    LDX pack_grid_cell
+    LDA host_pack_belt,X
+    CMP pack_drawn_belt,X
+    BEQ numbers
+    STA pack_drawn_belt,X
+    LDY pack_left
+    INY
+    STY pack_icon_left
+    TAY
+    CPY #CELL_EMPTY
+    BNE tool
+    LDA #LO(pack_socket)
+    STA zp_tile
+    LDA #HI(pack_socket)
+    STA zp_tile + 1
+    JSR pack_icon
+    JMP numbers
+.tool
+    JSR pack_kind_icon
+.numbers
+    LDA pack_belt_whole
+    BEQ next
+    LDA pack_grid_cell          \ Its key's number
+    JSR pack_digit
+    LDA pack_left
+    CLC
+    ADC #2
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #3
+    JSR pack_put_count
+    LDA pack_grid_cell
+    CMP host_pack_slot
+    BNE next
+    LDA #LO(pack_marks)         \ The tool hand's: arrowheads
+    STA zp_tile
+    LDA #HI(pack_marks)
+    STA zp_tile + 1
+    LDA pack_left
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #5
+    JSR pack_put_count
+.next
+    LDA pack_left
+    CLC
+    ADC #BELT_PITCH
+    STA pack_left
+    INC pack_grid_cell
+    LDA pack_grid_cell
+    CMP #BELT_SLOTS
+    BNE slot
+    RTS
+}
 
 \ Set pack_grid_top to the grid's first row, below the kinds, and
 \ pack_grid_rows to its rows.
@@ -1227,6 +1314,8 @@ ASSERT GRID_PITCH = 5
 .pack_drawn_grid    SKIP GRID_CELLS \ ... the grid...
 .pack_drawn_made    SKIP 1      \ ... and what it makes, and how many
 .pack_drawn_made_count SKIP 1
+.pack_drawn_belt    SKIP BELT_SLOTS \ The belt as drawn
+.pack_belt_whole    SKIP 1      \ Non-zero: draw the belt's numbers and arrowheads
 
 \ Clear the whole screen to colour 0.
 .render_clear

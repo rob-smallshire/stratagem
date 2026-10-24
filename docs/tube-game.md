@@ -192,8 +192,8 @@ latch bit 3, `3` to port B), sets port A's direction to `&7F`, and for
 each key in a table writes its internal key number (an INKEY number's
 `-n - 1`) to port A and reads its state in bit 7; then lets the scanning
 start again (`&0B`). A key costs about 31 cycles. Play's eight keys take
-342 cycles a frame, and the pack's eighteen 602 (P, Z X K M, TAB,
-DELETE, L, COPY and the nine cell keys; the cells' scan stops at the first
+353 cycles a frame, and the pack's twenty-eight 911 (P, Z X K M, TAB,
+DELETE, L, COPY, the nine cell keys and the ten function keys; the cells' scan stops at the first
 held), with interrupts held off for as long. Which keys are read, and the
 bits they set, is a table (`key_table`): play's, and the pack's. (The game
 first read its keys with OSBYTE `&81`, at about 270 cycles a key; see
@@ -308,6 +308,34 @@ area room for more item pictures.
   ends at `&3F80`, 128 bytes short of the screen. `place` moved from
   PGAME to PLIGHT (`asm/place.asm`) to make room for the material tables'
   new entries.
+
+### The tool belt
+
+The miner has two hands: the hand, which SPACE places, and the tool hand,
+which L digs with. The tool hand holds one of the belt's ten slots, f0 to
+f9, each empty or holding a kind of tool (`pack.py`: `Pack.belt`,
+`Pack.slot`; `belt`, `belt_slot` on the parasite). In play, a function key
+takes its slot into the tool hand (an empty slot is bare hands); in the
+pack, with a tool as the hand, a function key loads its slot with that
+kind, or empties it if it holds it already. A slot holds a kind, so when
+the last of a kind breaks, its slot stands empty-handed until another is
+made. The tool chosen is shown above the miner for a second, as the hand is
+(`items.show_hand`: the hand if both change at once; nothing for bare
+hands). The pack shows the belt below the grid: each slot's icon or a
+socket, its key's number below it, and arrowheads either side of the tool
+hand's.
+
+- Keys: the host reads the function keys every fourth frame in play, every
+  frame in the pack, as the number of the first held (1 on, f0 first), into
+  a fourth byte of the mailbox (`MAILBOX_TOOLS`, `&8C`; `MAILBOX_FETCHED`
+  moved to `&8B`).
+- Costs, measured: the host's key scan in play is 353 cycles on three
+  frames in four and 641 on the fourth (425 on average); in the pack, 911.
+  Drawing the panel whole at a bench (ten kinds, the 3 x 3 grid and the
+  belt) takes 173,631 to 216,093 cycles, about five frames, on opening; a
+  key's redraw 2,576 to 9,195 (5,690 on average).
+- Memory: the render region's code area has 799 bytes left, MAIN's code
+  about 160 before its page.
 
 ### In front and behind
 

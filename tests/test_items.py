@@ -100,7 +100,8 @@ class PacketCheck:
     is redrawn under them."""
 
     def __init__(self, game):
-        self.hand = items.HandShown(game.byte("hand_last"), game.byte("hand_timer"))
+        self.hand = items.HandShown(game.byte("hand_last"), game.byte("hand_timer"), game.byte("tool_last"),
+                                    game.byte("hand_kind"))
         self.hand_frames = 0
         self.last = (word(game.memory, game.labels["item_miner_x"]) >> 5,   # the miner's sprite
                      word(game.memory, game.labels["item_miner_y"]) >> 4)   # last frame
@@ -124,7 +125,8 @@ class PacketCheck:
             by = (left < (item.px >> 1) + sprites.SPRITE_COLUMNS and item.px >> 1 < right
                   and top < item.py + items.ITEM_HEIGHT and item.py < bottom)
             expected.append((column, line, first + kind | (ITEM_BY_MINER if by else 0)))
-        self.hand = items.show_hand(self.hand, game.byte("hand"))
+        tool = memory[game.labels["belt"] + game.byte("belt_slot")]
+        self.hand = items.show_hand(self.hand, game.byte("hand"), tool)
         assert game.byte("hand_timer") == self.hand.timer
         hero = Player(x=word(memory, game.labels["zp_player_x"]), y=word(memory, game.labels["zp_player_y"]))
         for column, line, kind in items.hand_shown(self.hand, hero, camera_x, camera_y):
@@ -183,6 +185,25 @@ def test_the_hand_is_shown_above_the_miner_when_it_changes():
         game.frame(0)
         check_packet(game)
     assert game.byte("hand") == KIND_STONE
+    assert check_packet.hand_frames == items.HAND_FRAMES
+
+
+def test_a_tool_chosen_is_shown_above_the_miner():
+    """f2 takes the belt's third slot, a wooden pickaxe, into the tool hand:
+    it is shown for HAND_FRAMES frames; f0, an empty slot, bare hands,
+    shows nothing."""
+    from stratagem.build import build
+    from stratagem.inventory import KIND_WOOD_PICK
+    from test_daylight import MAILBOX_TOOLS
+    game = ParasiteGame(build())
+    labels = game.labels
+    game.memory[labels["belt"] + 2] = KIND_WOOD_PICK
+    check_packet = PacketCheck(game)
+    for frame in range(items.HAND_FRAMES + 40):
+        game.memory[MAILBOX_TOOLS] = 3 if frame == 5 else 1 if frame == items.HAND_FRAMES + 20 else 0
+        game.frame(0)
+        check_packet(game)
+    assert game.byte("belt_slot") == 0
     assert check_packet.hand_frames == items.HAND_FRAMES
 
 

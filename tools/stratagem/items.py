@@ -61,6 +61,7 @@ REST_FRAMES = 25            # half a second
 GATHER_MAX = 4              # pixels and lines a frame
 FLYING, RESTING, GATHERING = 0, 1, 2
 WOOD = KIND_WOOD             # the kinds of item are the inventory's (inventory.py)
+NO_TOOL = 0xFF               # bare hands (crafting.EMPTY)
 DROPS = {ROOT: WOOD, TRUNK: WOOD, TRUNK_KNOT: WOOD, BENCH: KIND_BENCH}     # what each material drops
 assert CANOPY_LEFT not in DROPS
 VIEW_LINES = VIEW_ROWS * 8
@@ -197,18 +198,27 @@ HAND_GAP = 2                # lines between it and the miner's head
 
 @dataclass(frozen=True)
 class HandShown:
-    """The hand shown above the miner, as an item's picture (sprites.py),
-    after the items, for HAND_FRAMES frames once it changes: by TAB, a dig
-    of another kind, placing with none left, or the pack."""
+    """The hand, or the tool in the tool hand, shown above the miner, as an
+    item's picture (sprites.py), after the items, for HAND_FRAMES frames
+    once it changes: the hand by TAB, placing with none left, or the pack;
+    the tool by a function key (pack.py), unless bare hands. If both change
+    in a frame, the hand is shown."""
     last: int = KIND_SOIL       # the hand as last seen
     timer: int = 0              # frames left to show it
+    tool: int = NO_TOOL         # the tool as last seen
+    kind: int = KIND_SOIL       # what's shown
 
 
-def show_hand(state: HandShown, hand: int) -> HandShown:
-    """A game frame's change to what is shown, given the hand."""
+def show_hand(state: HandShown, hand: int, tool: int = NO_TOOL) -> HandShown:
+    """A game frame's change to what is shown, given the hand and the tool."""
+    changed = False
+    if tool != state.tool:
+        state = replace(state, tool=tool, kind=tool, timer=0 if tool == NO_TOOL else HAND_FRAMES)
+        changed = True
     if hand != state.last:
-        return HandShown(hand, HAND_FRAMES)
-    return replace(state, timer=max(state.timer - 1, 0))
+        state = replace(state, last=hand, kind=hand, timer=HAND_FRAMES)
+        changed = True
+    return state if changed else replace(state, timer=max(state.timer - 1, 0))
 
 
 def hand_shown(state: HandShown, player: Player, camera_x: int, camera_y: int) -> list[tuple[int, int, int]]:
@@ -216,7 +226,7 @@ def hand_shown(state: HandShown, player: Player, camera_x: int, camera_y: int) -
     column = (player.px >> 1) - camera_x
     line = player.py - ITEM_HEIGHT - HAND_GAP - camera_y * 8
     if state.timer and _in_view(column, line):
-        return [(column, line, state.last)]
+        return [(column, line, state.kind)]
     return []
 
 

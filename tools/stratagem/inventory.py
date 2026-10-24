@@ -24,6 +24,8 @@ from stratagem.tiles import BENCH, GEM, GRASS, ORE, SOIL, STONE, TORCH
  KIND_STONE_PICK) = range(10)
 KIND_COUNT = 10
 TOOLS = [KIND_WOOD_PICK, KIND_STONE_PICK]            # kinds held in the tool hand, not placed
+TOOL_FIRST = TOOLS[0]
+assert TOOLS == list(range(TOOL_FIRST, KIND_COUNT))  # the last kinds
 COUNT_MAX = 99
 STARTING_TORCHES = 8
 TORCH_MAX = 24                      # torches in the world at once

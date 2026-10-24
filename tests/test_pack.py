@@ -18,7 +18,7 @@ from stratagem.inventory import KIND_COUNT
 from stratagem.crafting import GRID_CELLS
 from stratagem.pack import INPUT_PACK, KEY_BOOK, KEY_CLEAR, KEY_CYCLE, KEY_MAKE, KEY_NEXT, Pack
 from stratagem.screen import SCREEN_END, SCREEN_START
-from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, MAILBOX_KEYS, PACKET_PACK, PACKET_PACK_CHANGED, PACKET_PACK_DRAW,
+from test_daylight import (MAILBOX_FRAME, MAILBOX_INPUT, MAILBOX_KEYS, MAILBOX_TOOLS, PACKET_PACK, PACKET_PACK_CHANGED, PACKET_PACK_DRAW,
                            PACKET_PACK_MOVED, PACKET_REDRAW, ParasiteGame)
 
 INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT_LEFT | INPUT_RIGHT,
@@ -86,9 +86,10 @@ def test_tab_cycles_the_hand_through_kinds_placed():
     assert hand == inventory.KIND_ORE
 
 
-def send(game, inputs: int, keys: int = 0) -> list[int]:
+def send(game, inputs: int, keys: int = 0, tools: int = 0) -> list[int]:
     """One frame, the game's or the pack's: returns its packet."""
     memory, labels = game.memory, game.labels
+    memory[MAILBOX_TOOLS] = tools
     memory[MAILBOX_KEYS] = keys
     memory[MAILBOX_INPUT] = inputs
     memory[MAILBOX_FRAME] = memory[labels["para_sent"]]
@@ -109,27 +110,35 @@ def test_parasite_pack_matches_model(game_build):
     rng = random.Random(1984)
     state = Pack()
     inputs = 0
-    seen = {"opened": 0, "moved": 0, "closed": 0, "paused": 0, "cycled": 0, "changed": 0, "joined": 0, "made": 0}
-    keys = 0
+    seen = {"opened": 0, "moved": 0, "closed": 0, "paused": 0, "cycled": 0, "changed": 0, "joined": 0, "made": 0,
+            "loaded": 0, "chosen": 0}
+    keys = tools = 0
     for frame in range(3000):
         if not state.open and rng.random() < 0.1:
             for kind in range(KIND_COUNT):
                 memory[labels["inventory"] + kind] = rng.choice([0, 0, 1, 2, rng.randrange(100), 99])
             memory[labels["inventory"] + inventory.KIND_WOOD] = rng.choice([1, 2, 5, 99])     # to make things of
             memory[labels["inventory"] + inventory.KIND_PLANKS] = rng.choice([0, 0, 3, 98])
-            memory[labels["hand"]] = rng.randrange(KIND_COUNT)
+            memory[labels["hand"]] = rng.choice([*range(KIND_COUNT), *inventory.TOOLS])
         if rng.random() < 0.2:
             inputs = rng.choice(INPUTS + [INPUT_LEFT] * 4)      # often towards the wood
         if rng.random() < 0.6:
             keys = rng.choice(KEYS)
+        if rng.random() < 0.3:
+            tools = rng.choice([0, 0, rng.randrange(1, pack.BELT_SLOTS + 1)])
         counts = tuple(memory[labels["inventory"] + kind] for kind in range(KIND_COUNT))
         hand = memory[labels["hand"]]
         player = memory[labels["zp_player_x"]:labels["zp_player_x"] + 4]
         game_frame = memory[labels["zp_frame"]]
         was_open = state.open
         made = was_open and keys & KEY_MAKE and pack.result(state.grid) is not None
-        state, counts_after, hand_after = pack.step(state, counts, hand, inputs, keys)
-        packet = send(game, inputs, keys)
+        before = state
+        state, counts_after, hand_after = pack.step(state, counts, hand, inputs, keys, tools=tools)
+        packet = send(game, inputs, keys, tools)
+        assert tuple(memory[labels["belt"]:labels["belt"] + pack.BELT_SLOTS]) == state.belt, f"frame {frame}"
+        assert memory[labels["belt_slot"]] == state.slot, f"frame {frame}"
+        seen["loaded"] += state.belt != before.belt
+        seen["chosen"] += state.slot != before.slot
         assert bool(memory[labels["pack_open"]]) == state.open, f"frame {frame}"
         if was_open or state.open:
             assert tuple(memory[labels["inventory"] + kind] for kind in range(KIND_COUNT)) == counts_after, \
@@ -148,6 +157,8 @@ def test_parasite_pack_matches_model(game_build):
             result = pack.result(state.grid)
             assert packet[pairs:pairs + 1 + GRID_CELLS + 2] == [2, *state.grid, *(result or (pack.EMPTY, 0))], \
                 f"frame {frame}"
+            belt = pairs + 1 + GRID_CELLS + 2
+            assert packet[belt:belt + pack.BELT_SLOTS + 1] == [*state.belt, state.slot], f"frame {frame}"
             assert memory[labels["zp_frame"]] == game_frame, "the game ran in the pack"
             assert memory[labels["zp_player_x"]:labels["zp_player_x"] + 4] == player
             seen["opened"] += state.draw and not was_open
@@ -165,7 +176,27 @@ def test_parasite_pack_matches_model(game_build):
                 assert packet[0] & PACKET_REDRAW, "the view wasn't redrawn on closing"
                 assert memory[labels["zp_input"]] == 0, "the closing frame had input"
                 seen["closed"] += 1
-    assert min(seen.values()) >= 10 or seen["joined"] >= 5 and sorted(seen.values())[1] >= 10, seen
+    joined = seen.pop("joined")             # rare here: see test_parasite_planks_join_the_kinds_shown
+    assert min(seen.values()) >= 10 and joined, seen
+
+
+def test_parasite_planks_join_the_kinds_shown(game_build):
+    """Wood only, in hand: R and L make planks, which join the kinds shown,
+    the panel drawn again, as the model says."""
+    game = ParasiteGame(game_build)
+    memory, labels = game.memory, game.labels
+    counts = (3,) + (0,) * (KIND_COUNT - 1)
+    memory[labels["inventory"]:labels["inventory"] + KIND_COUNT] = counts
+    memory[labels["hand"]] = inventory.KIND_WOOD
+    state, hand = Pack(), inventory.KIND_WOOD
+    for inputs, keys in [(INPUT_PACK, 0), (0, 0), (0, 1), (0, 0), (0, KEY_MAKE), (0, 0)]:
+        state, counts, hand = pack.step(state, counts, hand, inputs, keys)
+        packet = send(game, inputs, keys)
+        assert packet[0] & PACKET_PACK_DRAW == (PACKET_PACK_DRAW if state.draw else 0)
+        kinds = state.kinds
+        assert packet[1:3 + 2 * len(kinds)] == [len(kinds), kinds.index(hand), *[b for k in kinds for b in (k, counts[k])]]
+    assert state.kinds == (inventory.KIND_WOOD, inventory.KIND_PLANKS)
+    assert memory[labels["inventory"] + inventory.KIND_PLANKS] == 4
 
 
 def test_panel_matches_model(game_build):
@@ -175,7 +206,7 @@ def test_panel_matches_model(game_build):
     memory = machine.mpu.memory
     rng = random.Random(1066)
 
-    def show(counts, hand, kinds, grid, station) -> None:
+    def show(counts, hand, kinds, grid, station, belt, slot) -> None:
         memory[labels["host_pack_count"]] = len(kinds)
         memory[labels["host_pack_index"]] = kinds.index(hand) if kinds else 0
         for i, kind in enumerate(kinds):
@@ -185,6 +216,11 @@ def test_panel_matches_model(game_build):
         memory[labels["host_pack_grid"]:labels["host_pack_grid"] + GRID_CELLS] = grid
         made = pack.result(grid, station) or (pack.EMPTY, 0)
         memory[labels["host_pack_made"]], memory[labels["host_pack_made_count"]] = made
+        memory[labels["host_pack_belt"]:labels["host_pack_belt"] + pack.BELT_SLOTS] = belt
+        memory[labels["host_pack_slot"]] = slot
+
+    def random_belt():
+        return tuple(rng.choice([pack.EMPTY, *inventory.TOOLS]) for _ in range(pack.BELT_SLOTS))
 
     def check(expected, before, trial, what) -> None:
         for address in range(SCREEN_START, SCREEN_END):
@@ -202,25 +238,28 @@ def test_panel_matches_model(game_build):
         hand = rng.choice(kinds) if kinds else 0
         station = rng.choice([crafting.STATION_HAND, crafting.STATION_BENCH])
         grid = random_hand_grid(rng, station)
+        belt, slot = random_belt(), rng.randrange(pack.BELT_SLOTS)
         before = bytes(rng.randrange(256) for _ in range(SCREEN_END - SCREEN_START))
         memory[SCREEN_START:SCREEN_END] = before
         memory[labels["zp_screen_start"]] = screen_start & 0xFF
         memory[labels["zp_screen_start"] + 1] = screen_start >> 8
-        show(counts, hand, kinds, grid, station)
+        show(counts, hand, kinds, grid, station, belt, slot)
         machine.call(labels["render_pack"])
-        check(pack.panel(screen_start, counts, hand, grid=grid, station=station), before, trial, "drawn")
+        check(pack.panel(screen_start, counts, hand, grid=grid, station=station, belt=belt, tool_slot=slot), before,
+              trial, "drawn")
         # The hand moves: only the arrowheads are redrawn.
         hand = rng.choice(kinds) if kinds else hand
-        show(counts, hand, kinds, grid, station)
+        show(counts, hand, kinds, grid, station, belt, slot)
         machine.call(labels["render_pack_marks"])
-        check(pack.panel(screen_start, counts, hand, kinds, grid, station), before, trial, "moved")
+        check(pack.panel(screen_start, counts, hand, kinds, grid, station, belt, slot), before, trial, "moved")
         # The counts and the grid change: they are redrawn.
         counts = tuple(count if rng.random() < 0.5 else rng.choice([0, 1, 9, 10, rng.randrange(100), 99])
                        for count in counts)
         grid = random_hand_grid(rng, station)
-        show(counts, hand, kinds, grid, station)
+        belt = random_belt()
+        show(counts, hand, kinds, grid, station, belt, slot)
         machine.call(labels["render_pack_changed"])
-        check(pack.panel(screen_start, counts, hand, kinds, grid, station), before, trial, "changed")
+        check(pack.panel(screen_start, counts, hand, kinds, grid, station, belt, slot), before, trial, "changed")
 
 
 def random_hand_grid(rng: random.Random, station: int = crafting.STATION_HAND) -> tuple[int, ...]:
@@ -235,6 +274,7 @@ def random_hand_grid(rng: random.Random, station: int = crafting.STATION_HAND) -
 ITEM_FRAME_FIRST = len(sprites.sprite_frames())
 PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (6, 1), (6, 0)     # Beebium's keyboard matrix: P, Z (left), TAB,
 R_KEY, MAKE_KEY = (3, 3), (5, 6)                         # R (the first cell), L (make)
+F1_KEY = (7, 1)                                          # f1, the belt's second slot
 
 
 def frames(bbc, labels, count: int, keys=(), label: str = "host_frame_shown") -> None:
@@ -333,3 +373,27 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
         actual = screen[SCREEN_START:SCREEN_END]
         differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
         assert differences[:8] == [], f"{len(differences)} screen bytes differ with the hand shown"
+
+    # The belt: a wooden pickaxe, in hand in the pack, loaded into f1; then,
+    # in play, f1 takes it into the tool hand.
+    bus = bbc.connect_coprocessor().memory.address.bus
+    bus[plabels["inventory"] + inventory.KIND_WOOD_PICK] = 1
+    bus[plabels["hand"]] = inventory.KIND_WOOD_PICK
+    tap(bbc, labels, PACK_KEY)
+    tap(bbc, labels, F1_KEY)
+    belt = (pack.EMPTY, inventory.KIND_WOOD_PICK) + (pack.EMPTY,) * (pack.BELT_SLOTS - 2)
+    assert tuple(parasite[plabels["belt"] + i] for i in range(pack.BELT_SLOTS)) == belt, "f1 didn't load the belt"
+    counts = tuple(parasite[plabels["inventory"] + kind] for kind in range(KIND_COUNT))
+    screen_start = peek[labels["zp_screen_start"]] | peek[labels["zp_screen_start"] + 1] << 8
+    panel = pack.panel(screen_start, counts, inventory.KIND_WOOD_PICK, belt=belt)
+    shown = screen[SCREEN_START:SCREEN_END]
+    differences = [hex(a) for a, b in panel.items() if shown[a - SCREEN_START] != b]
+    assert differences[:8] == [], f"{len(differences)} screen bytes differ with the belt loaded"
+    bbc.keyboard.matrix_down(*PACK_KEY)
+    frames(bbc, labels, 1)
+    bbc.keyboard.matrix_up(*PACK_KEY)
+    frames(bbc, labels, 2)
+    bbc.keyboard.matrix_down(*F1_KEY)
+    frames(bbc, labels, 6)                  # the function keys are read every fourth frame
+    bbc.keyboard.matrix_up(*F1_KEY)
+    assert parasite[plabels["belt_slot"]] == 1, "f1 didn't take the pickaxe into the tool hand"

@@ -44,7 +44,7 @@ from stratagem import crafting
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, GRID_MAX, GRID_SIZES, RECIPES, STATION_HAND
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
-                                 KIND_STONE_PICK, KIND_TORCH, KIND_WOOD, KIND_WOOD_PICK, cycle)
+                                 KIND_STONE_PICK, KIND_TORCH, KIND_WOOD, KIND_WOOD_PICK, TOOLS, cycle)
 from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, encode_tile, mode2_byte
 from stratagem.tiles import (AIR, BENCH, BLACK, GEM, ORE, RED, SHAPE_FULL, SOIL, STONE, TILE_COLOUR_BASE, TORCH, TRUNK, WHITE,
                              YELLOW, tile_bytes)
@@ -69,6 +69,12 @@ ROWS_PER_SLOT_ROW = 4
 assert PANEL_LEFT >= 0
 GRID_PITCH = 5                      # cells across from one grid cell to the next
 ROWS_PER_GRID_ROW = 3
+BELT_SLOTS = 10                     # f0 to f9
+BELT_PITCH = 6                      # cells across from one slot of the belt to the next
+BELT_LEFT = PANEL_LEFT + (PANEL_COLUMNS - BELT_SLOTS * BELT_PITCH) // 2
+ROWS_PER_BELT = 4
+EMPTY_BELT = (EMPTY,) * BELT_SLOTS
+FN_KEYS = ["f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9"]
 
 
 def grid_left(size: int) -> int:
@@ -96,6 +102,14 @@ class Pack:
     copied: int = len(RECIPES) - 1  # the recipe COPY laid out last
     repeat: int = 0                 # frames until L, held, makes again
     station: int = STATION_HAND
+    belt: tuple[int, ...] = EMPTY_BELT  # a tool's kind (inventory.TOOLS) or EMPTY, by function key
+    slot: int = 0                   # the belt's slot in the tool hand
+    held_tools: int = 0             # the function key held last frame (1 on), or 0
+
+
+def tool(pack: Pack) -> int:
+    """The kind in the tool hand: the belt's slot's, or EMPTY, bare hands."""
+    return pack.belt[pack.slot]
 
 
 def shown(counts: tuple[int, ...], kinds: tuple[int, ...] = ()) -> list[int]:
@@ -110,22 +124,29 @@ def hand_shown(kinds: tuple[int, ...] | list[int], hand: int) -> int:
     return hand if hand in kinds or not kinds else kinds[0]
 
 
-def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0, station: int = STATION_HAND
-         ) -> tuple[Pack, tuple[int, ...], int]:
+def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0, station: int = STATION_HAND,
+         tools: int = 0) -> tuple[Pack, tuple[int, ...], int]:
     """One frame's input to the pack, before the game's: `inputs` and the
     second byte, `keys`, and the station the miner is at, if the pack opens
     (crafting.station_near). Returns the pack, the counts and the hand; the
     game runs this frame only if the pack isn't open. In play, TAB
-    (KEY_CYCLE) cycles the hand (inventory.cycle)."""
+    (KEY_CYCLE) cycles the hand (inventory.cycle). `tools` is the function
+    key held (1 on, f0 first), or 0: in play, a press takes the belt's slot
+    into the tool hand; in the pack, with a tool in hand, it loads the slot
+    with it, or empties it if it holds it already."""
     pressed = inputs & ~pack.held
     pressed_keys = keys & ~pack.held_keys
     cell = keys & KEY_CELL if keys & KEY_CELL != pack.held_keys & KEY_CELL else 0     # a cell's key, newly
-    pack = replace(pack, held=inputs, held_keys=keys, draw=False, moved=False, changed=False, closed=False)
+    slot = tools - 1 if tools and tools != pack.held_tools else None                # a function key, newly
+    pack = replace(pack, held=inputs, held_keys=keys, held_tools=tools, draw=False, moved=False, changed=False,
+                   closed=False)
     if not pack.open:
         if pressed & INPUT_PACK:
             kinds = tuple(shown(counts))
             return (replace(pack, open=True, draw=True, kinds=kinds, station=station), counts,
                     hand_shown(kinds, hand))
+        if slot is not None:
+            pack = replace(pack, slot=slot)
         if pressed_keys & KEY_CYCLE:
             return pack, counts, cycle(counts, hand)
         return pack, counts, hand
@@ -147,8 +168,10 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         moved = (moved + 1) % len(kinds)
     hand = kinds[moved] if kinds else hand
     pack = replace(pack, moved=moved != index)
-    before = counts, pack.grid
-    grid, book, copied, repeat = pack.grid, pack.book, pack.copied, pack.repeat
+    before = counts, pack.grid, pack.belt
+    grid, book, copied, repeat, belt = pack.grid, pack.book, pack.copied, pack.repeat, pack.belt
+    if slot is not None and hand in TOOLS:
+        belt = belt[:slot] + (EMPTY if belt[slot] == hand else hand,) + belt[slot + 1:]
     if cell and crafting.in_grid(cell - 1, pack.station):
         counts, grid = crafting.put(counts, grid, cell - 1, hand)
     if pressed_keys & KEY_CLEAR:
@@ -165,8 +188,8 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         counts, grid, copied = crafting.copy(counts, grid, book, copied, pack.station)
     now = tuple(shown(counts, kinds))
     hand = hand_shown(now, hand)
-    pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now,
-                   changed=(counts, grid) != before, draw=now != kinds)
+    pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now, belt=belt,
+                   changed=(counts, grid, belt) != before, draw=now != kinds)
     return pack, counts, hand
 
 
@@ -311,7 +334,7 @@ def kind_rows(kinds: int) -> int:
 
 
 def panel_rows(kinds: int, station: int = STATION_HAND) -> int:
-    return kind_rows(kinds) + ROWS_PER_GRID_ROW * GRID_SIZES[station]
+    return kind_rows(kinds) + ROWS_PER_GRID_ROW * GRID_SIZES[station] + ROWS_PER_BELT
 
 
 def result(grid: tuple[int, ...], station: int = STATION_HAND) -> tuple[int, int] | None:
@@ -321,9 +344,11 @@ def result(grid: tuple[int, ...], station: int = STATION_HAND) -> tuple[int, int
 
 
 def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int] | None = None,
-          grid: tuple[int, ...] = EMPTY_GRID, station: int = STATION_HAND) -> dict[int, int]:
+          grid: tuple[int, ...] = EMPTY_GRID, station: int = STATION_HAND, belt: tuple[int, ...] = EMPTY_BELT,
+          tool_slot: int = 0) -> dict[int, int]:
     """The screen bytes the panel draws, by address: of `kinds`, or, by
-    default, those shown on opening with `hand`, and of the grid."""
+    default, those shown on opening with `hand`, of the grid, and of the
+    belt, with tool_slot marked."""
     kinds = shown(counts) if kinds is None else kinds
     image = {}
     for row in range(PANEL_TOP, PANEL_TOP + panel_rows(len(kinds), station)):
@@ -372,4 +397,17 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
     made = result(grid, station)
     if made is not None:
         slot(left + size * GRID_PITCH, grid_top, made[0], made[1], "right", "blank")
+
+    belt_top = grid_top + ROWS_PER_GRID_ROW * size
+    for index, kind in enumerate(belt):
+        left = BELT_LEFT + index * BELT_PITCH
+        picture = socket() if kind == EMPTY else icon(kind)
+        for cell in range(8):
+            put(left + 1 + cell % 4, belt_top + cell // 4, picture[cell * 8:cell * 8 + 8])
+        number = digit(index)
+        put(left + 2, belt_top + 2, number[:8])
+        put(left + 3, belt_top + 2, number[8:])
+        if index == tool_slot:
+            put(left, belt_top + 2, mark("right"))
+            put(left + 5, belt_top + 2, mark("left"))
     return image

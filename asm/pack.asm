@@ -16,9 +16,19 @@
     STA craft_grid,X
     DEX
     BPL empty
+    LDX #BELT_SLOTS - 1
+.each_slot
+    STA belt,X
+    DEX
+    BPL each_slot
+    STA tool_last
+    LDA #KIND_SOIL
+    STA hand_kind
     LDA #RECIPE_COUNT - 1
     STA craft_copied
     LDA #0
+    STA belt_slot
+    STA tools_held
     STA craft_book
     STA craft_repeat
     STA pack_open
@@ -53,6 +63,13 @@
     LDA #0
     STA pack_cell
 .cell
+    LDA MAILBOX_TOOLS           \ A function key, if not held last frame
+    CMP tools_held
+    STA tools_held
+    BNE tool
+    LDA #0
+.tool
+    STA tool_pressed
     LDA pack_keys_held          \ And of the second byte
     EOR #&FF
     AND MAILBOX_KEYS
@@ -76,6 +93,11 @@
     JSR pack_shown
     JMP sent
 .game
+    LDX tool_pressed            \ A function key: its slot in the tool hand
+    BEQ no_tool
+    DEX
+    STX belt_slot
+.no_tool
     LDA pack_keys_pressed       \ TAB: the hand to the next kind
     AND #KEY_CYCLE
     BEQ play
@@ -192,6 +214,24 @@
     STA pack_before + KIND_COUNT,X
     DEX
     BPL grid
+    LDX #BELT_SLOTS - 1
+.each_slot
+    LDA belt,X
+    STA pack_before + KIND_COUNT + GRID_CELLS,X
+    DEX
+    BPL each_slot
+    LDX tool_pressed            \ A function key, with a tool in hand: into
+    BEQ no_tool                 \ its slot, or out if there already
+    LDA hand
+    CMP #TOOL_FIRST
+    BCC no_tool
+    DEX
+    CMP belt,X
+    BNE load
+    LDA #CELL_EMPTY
+.load
+    STA belt,X
+.no_tool
     LDX pack_cell               \ A cell's key, if it is in the grid
     BEQ no_cell
     DEX
@@ -244,6 +284,13 @@
     BNE changed
     DEX
     BPL grid_changed
+    LDX #BELT_SLOTS - 1
+.belt_changed
+    LDA belt,X
+    CMP pack_before + KIND_COUNT + GRID_CELLS,X
+    BNE changed
+    DEX
+    BPL belt_changed
     RTS
 .changed
     LDA #&FF
@@ -365,6 +412,17 @@
     STA (para_packet),Y
     INY
     LDA recipe_count,X
+    STA (para_packet),Y
+    INY
+    LDX #0                      \ The belt, and the slot in the tool hand
+.each_slot
+    LDA belt,X
+    STA (para_packet),Y
+    INY
+    INX
+    CPX #BELT_SLOTS
+    BNE each_slot
+    LDA belt_slot
     STA (para_packet),Y
     JMP para_send
 }

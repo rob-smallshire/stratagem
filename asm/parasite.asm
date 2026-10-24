@@ -9,7 +9,7 @@
 \
 \ The parasite's memory:
 \
-\   &0000-&0064  the game's zero page (zeropage.asm; &65-&8B free)
+\   &0000-&0064  the game's zero page (zeropage.asm; &65-&8A free)
 \   &008C-&008F  the mailbox the host writes
 \   &0090-&00E5  the light's zero page
 \   &00E6-&00ED  the packet's pointers (&EE upwards is the parasite OS's)
