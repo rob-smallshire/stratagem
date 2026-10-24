@@ -10,12 +10,6 @@
 \ A = 0.
 .pack_init
 {
-    LDA #0                      \ Each kind of tool unworn
-    LDX #KIND_COUNT - TOOL_FIRST - 1
-.unworn
-    STA tool_digs,X
-    DEX
-    BPL unworn
     LDA #CELL_EMPTY
     LDX #GRID_CELLS - 1
 .empty
@@ -37,6 +31,17 @@
     STA tools_held
     STA zp_place_wait
     STA zp_hand_tool
+    LDX #BELT_SLOTS - 1         \ Nothing worn
+.unworn_belt
+    STA belt_wear,X
+    DEX
+    BPL unworn_belt
+    LDX #KIND_COUNT - TOOL_FIRST - 1
+.unworn_pack
+    STA pack_wear_low,X
+    STA pack_wear_high,X
+    DEX
+    BPL unworn_pack
     JSR tool_update             \ Bare hands
     LDA #0
     STA craft_book
@@ -133,6 +138,7 @@
     RTS
 .moves
     LDX pack_index
+    STX pack_was
     LDA pack_pressed
     AND #INPUT_LEFT
     BEQ not_left
@@ -179,13 +185,17 @@
     BEQ keys
     LDA pack_kinds,X
     STA hand
-    LDA #&FF
-    STA pack_moved
 .keys
     JSR craft_keys
     LDA pack_count              \ A kind gained joins those shown: draw the
     PHA                         \ panel again
     JSR pack_shown
+    LDA pack_index              \ The hand's place changed: its arrowheads
+    CMP pack_was
+    BEQ same_place
+    LDA #&FF
+    STA pack_moved
+.same_place
     PLA
     CMP pack_count
     BEQ sent
@@ -235,21 +245,7 @@
     STA pack_before + KIND_COUNT + GRID_CELLS,X
     DEX
     BPL each_slot
-    LDX tool_pressed            \ A belt key: with a tool as the hand, it
-    BEQ no_tool                 \ into the slot, or out if there already;
-    CPX #SHOW_TOOL              \ the slot into the tool hand (0 nothing)
-    BEQ no_tool
-    DEX
-    STX belt_slot
-    LDA hand
-    CMP #TOOL_FIRST
-    BCC no_tool
-    CMP belt,X
-    BNE load
-    LDA #CELL_EMPTY
-.load
-    STA belt,X
-.no_tool
+    JSR belt_key                \ A belt key
     LDX pack_cell               \ A cell's key, if it is in the grid
     BEQ no_cell
     DEX
@@ -313,6 +309,82 @@
 .changed
     LDA #&FF
     STA pack_changed
+    RTS
+}
+
+\ A belt key pressed (tool_pressed; 0 does nothing here): its slot into the
+\ tool hand, after moving a tool between it and the pack. A tool on the belt
+\ goes back to the pack, unless full, into the hand, its wear added to the
+\ pack's total for its kind; into an empty slot, a tool as the hand comes
+\ from the pack, if any, as worn as one tool can be from that total.
+.belt_key
+{
+    LDX tool_pressed
+    BEQ exit
+    CPX #SHOW_TOOL
+    BNE key
+.exit
+    RTS
+.key
+    DEX
+    STX belt_slot
+    STX craft_cell
+    LDA belt,X
+    CMP #CELL_EMPTY
+    BEQ take
+    TAY                         \ Its tool back to the pack, unless full,
+    LDA inventory,Y             \ in hand, its wear to the pack's total
+    CMP #COUNT_MAX
+    BCS done
+    TYA
+    STA hand
+    TAX
+    INC inventory,X
+    LDX craft_cell
+    LDA belt_wear,X
+    CLC
+    ADC pack_wear_low - TOOL_FIRST,Y
+    STA pack_wear_low - TOOL_FIRST,Y
+    LDA #0
+    ADC pack_wear_high - TOOL_FIRST,Y
+    STA pack_wear_high - TOOL_FIRST,Y
+    LDA #CELL_EMPTY
+    STA belt,X
+    LDA #0
+    STA belt_wear,X
+    BEQ done                    \ Always branches
+.take
+    LDY hand                    \ Empty: the hand's tool from the pack, if
+    CPY #TOOL_FIRST             \ any, as worn as one can be from the total
+    BCC done
+    LDA inventory,Y
+    BEQ done
+    LDA tool_durability - TOOL_FIRST,Y
+    SEC
+    SBC #1
+    STA craft_k                 \ (Its wear: the least of that and the total)
+    LDA pack_wear_high - TOOL_FIRST,Y
+    BNE most
+    LDA pack_wear_low - TOOL_FIRST,Y
+    CMP craft_k
+    BCS most
+    STA craft_k
+.most
+    LDA pack_wear_low - TOOL_FIRST,Y
+    SEC
+    SBC craft_k
+    STA pack_wear_low - TOOL_FIRST,Y
+    LDA pack_wear_high - TOOL_FIRST,Y
+    SBC #0
+    STA pack_wear_high - TOOL_FIRST,Y
+    LDX craft_cell
+    LDA craft_k
+    STA belt_wear,X
+    TYA
+    STA belt,X
+    TAX
+    DEC inventory,X
+.done
     RTS
 }
 

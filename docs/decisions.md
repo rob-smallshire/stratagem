@@ -385,3 +385,11 @@ A running log of design decisions. Add to it whenever one is made.
   0 gave the impression, at a glance, that it was held. It keeps its place,
   so nothing shuffles, but is drawn as the blue outline that means empty
   elsewhere, with no count.
+- **The belt holds tools, not kinds:** a slot held a kind, so one pickaxe
+  made could hang in three slots. Now a belt key in the pack moves a tool
+  between the pack and the slot, out of the pack's counts and back, and
+  each slot's tool has its own wear; one that breaks leaves its slot empty.
+  The pack keeps a total of its tools' wear for each kind: one given back
+  adds to it, one taken carries as much as it can. So the digs left in all
+  your tools of a kind are exactly kept, nothing is repaired by moving it,
+  and nothing is lost.

@@ -46,7 +46,6 @@ GUARD &0800
 ASSERT belt_slot = belt + BELT_SLOTS
 .tools_held      SKIP 1      \ The belt key held last frame (1 on), or 0
 .tool_pressed    SKIP 1      \ A belt key pressed this frame (1 on), or 0
-.tool_digs       SKIP KIND_COUNT - TOOL_FIRST \ Digs on the one in use, by kind of tool
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
 .target_x        SKIP 1      \ The tile aimed at

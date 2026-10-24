@@ -127,8 +127,6 @@ class PacketCheck:
                   and top < item.py + items.ITEM_HEIGHT and item.py < bottom)
             expected.append((column, line, first + kind | (ITEM_BY_MINER if by else 0)))
         tool = memory[game.labels["belt"] + game.byte("belt_slot")]
-        if tool != items.NO_TOOL and not memory[game.labels["inventory"] + tool]:
-            tool = items.NO_TOOL                # none of it left: bare hands
         chosen = bool(game.byte("tool_pressed") or game.byte("zp_tool_broke"))
         self.hand = items.show_hand(self.hand, game.byte("hand"), tool, chosen)
         assert game.byte("hand_timer") == self.hand.timer
@@ -235,11 +233,10 @@ def test_0_shows_the_tool_in_use_again():
     assert check_packet.numbers == 2 * items.HAND_FRAMES
 
 
-@pytest.mark.parametrize("spare", [0, 1])
-def test_a_tool_that_breaks_is_shown(spare):
+def test_a_tool_that_breaks_is_shown():
     """A wooden pickaxe one dig from breaking, in the tool hand: digging
-    down, it breaks, and what's now in use is shown, as items.show_hand
-    says: bare hands, or, with a spare, the next pickaxe."""
+    down, it breaks, its belt slot is empty, and bare hands are shown, as
+    items.show_hand says."""
     from stratagem import actions
     from stratagem.build import build
     from stratagem.camera import INPUT_ACTION, INPUT_DOWN
@@ -248,8 +245,7 @@ def test_a_tool_that_breaks_is_shown(spare):
     game = ParasiteGame(build())
     labels = game.labels
     game.memory[labels["belt"] + 1] = KIND_WOOD_PICK
-    game.memory[labels["inventory"] + KIND_WOOD_PICK] = 1 + spare
-    game.memory[labels["tool_digs"]] = actions.DURABILITY[KIND_WOOD_PICK] - 1
+    game.memory[labels["belt_wear"] + 1] = actions.DURABILITY[KIND_WOOD_PICK] - 1
     game.memory[MAILBOX_TOOLS] = 2
     game.frame(0)
     game.memory[MAILBOX_TOOLS] = 0
@@ -260,9 +256,9 @@ def test_a_tool_that_breaks_is_shown(spare):
     for frame in range(30):
         game.frame(INPUT_DOWN | INPUT_ACTION)
         check_packet(game)
-        if broke is None and game.memory[labels["inventory"] + KIND_WOOD_PICK] == spare:
+        if broke is None and game.memory[labels["belt"] + 1] == items.NO_TOOL:
             broke = frame
-            assert game.byte("hand_kind") == (KIND_WOOD_PICK if spare else items.NO_TOOL)
+            assert game.byte("hand_kind") == items.NO_TOOL
     assert broke is not None, "the pickaxe didn't break"
     assert check_packet.hand_frames >= 25, "what's in use wasn't shown"
 

@@ -36,8 +36,7 @@ def write_hands(machine, labels, hands: Hands) -> None:
     memory[labels["torch_count"]] = hands.torches
     memory[labels["belt"]] = hands.tool
     memory[labels["belt_slot"]] = 0
-    for index, wear in enumerate(hands.wear):
-        memory[labels["tool_digs"] + index] = wear
+    memory[labels["belt_wear"]] = hands.wear
     memory[labels["zp_place_wait"]] = 0xFF if hands.wait else 0
     machine.call(labels["tool_update"])
 
@@ -45,7 +44,7 @@ def write_hands(machine, labels, hands: Hands) -> None:
 def read_hands(memory, labels) -> Hands:
     counts = tuple(memory[labels["inventory"] + kind] for kind in range(inventory.KIND_COUNT))
     tool = memory[labels["belt"] + memory[labels["belt_slot"]]]
-    wear = tuple(memory[labels["tool_digs"] + i] for i in range(len(inventory.TOOLS)))
+    wear = memory[labels["belt_wear"] + memory[labels["belt_slot"]]]
     return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]], memory[labels["torch_count"]], tool, wear,
                  bool(memory[labels["zp_place_wait"]]))
 
@@ -65,15 +64,12 @@ def random_hands(rng: random.Random, kinds=sorted(inventory.PLACES)) -> Hands:
                  rng.random() < 0.2)
 
 
-def random_tool(rng: random.Random, counts: list[int]) -> tuple[int, tuple[int, ...]]:
-    """A tool hand, often a pickaxe, sometimes with none of it left (setting
-    counts), and its wear, often about to break."""
+def random_tool(rng: random.Random, counts: list[int]) -> tuple[int, int]:
+    """A tool hand, often a pickaxe, and its wear, often about to break."""
     tool = rng.choice([actions.NO_TOOL, *inventory.TOOLS, *inventory.TOOLS])
-    for kind in inventory.TOOLS:
-        counts[kind] = rng.choice([0, 1, 1, 2])
-    wear = tuple(rng.choice([0, rng.randrange(actions.DURABILITY[kind]), actions.DURABILITY[kind] - 1])
-                 for kind in inventory.TOOLS)
-    return tool, wear
+    if tool == actions.NO_TOOL:
+        return tool, 0
+    return tool, rng.choice([0, rng.randrange(actions.DURABILITY[tool]), actions.DURABILITY[tool] - 1])
 
 
 def assert_tile_matches(machine, labels, world, target) -> None:
@@ -132,7 +128,7 @@ def test_actions_match_model(machine, game_build):
             assert actual == expected, f"from {state} with inputs {inputs}"
             before = hands
             hands, action, target = actions.act(hands, expected, inputs, world)
-            broken += any(hands.counts[k] < before.counts[k] for k in inventory.TOOLS)
+            broken += before.tool != actions.NO_TOOL and hands.tool == actions.NO_TOOL
             assert read_hands(memory, labels) == hands
             assert memory[labels["action"]] == action, f"at {expected} with inputs {inputs}"
             if target is not None:

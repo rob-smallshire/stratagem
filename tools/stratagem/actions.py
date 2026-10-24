@@ -83,14 +83,14 @@ class Hands:
     cooldown: int = 0
     hand: int = inventory.KIND_SOIL             # the kind placing puts down
     torches: int = 0                            # placed in the world (asm/torches.asm)
-    tool: int = NO_TOOL                         # the kind in the tool hand
-    wear: tuple[int, ...] = (0,) * len(inventory.TOOLS)    # digs on the one in use, by kind of tool
+    tool: int = NO_TOOL                         # the tool in the tool hand: its kind (a belt slot's, pack.py)
+    wear: int = 0                               # ... and the digs it has done
     wait: bool = False                          # the hand moved on: SPACE must be pressed again
 
 
 def tool_in_use(hands: Hands) -> int:
-    """The tool a dig uses: the tool hand's, if any of it is left."""
-    return hands.tool if hands.tool != NO_TOOL and hands.counts[hands.tool] else NO_TOOL
+    """The tool a dig uses: the tool hand's (NO_TOOL, bare hands)."""
+    return hands.tool
 
 
 def quarters(hands: Hands) -> dict[int, int]:
@@ -320,16 +320,13 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
 def _dug(hands: Hands, material: int, left: int | None) -> Hands:
     """The hands after a dig of `material` that left `left` of it (None if
     nothing): a tile dug away entirely is carried; the hand stays. The tool
-    in use wears: at its DURABILITY'th dig it breaks, one fewer of it."""
+    in use wears: at its DURABILITY'th dig it breaks, and is gone from the
+    tool hand (its belt slot)."""
     hands = replace(hands, cooldown=DIG_FRAMES)
     tool = tool_in_use(hands)
     if tool != NO_TOOL:
-        index = inventory.TOOLS.index(tool)
-        wear = hands.wear[index] + 1
-        counts = hands.counts
-        if wear >= DURABILITY[tool]:
-            wear, counts = 0, inventory.spend(counts, tool)
-        hands = replace(hands, counts=counts, wear=hands.wear[:index] + (wear,) + hands.wear[index + 1:])
+        wear = hands.wear + 1
+        hands = replace(hands, wear=wear) if wear < DURABILITY[tool] else replace(hands, tool=NO_TOOL, wear=0)
     if left is not None:
         return hands
     return replace(hands, counts=inventory.gain(hands.counts, inventory.YIELDS[material]))

@@ -37,11 +37,16 @@ drawn as a slot, after them, with an arrowhead pointing at its count, in
 the grid's first row of icons.
 
 Below the grid is the tool belt: BELT_SLOTS slots on the keys 1 to 9, each
-a kind of tool or empty. A belt key takes its slot into the tool hand, in
-play or in the pack; in the pack, with a tool as the hand, it first hangs
-the tool there, or takes it off if it is there already. The belt is drawn
-as icons (sockets where empty), BELT_PITCH cells apart, each with its key's
-number below and arrowheads either side of the tool hand's.
+holding a tool or empty. A belt key takes its slot into the tool hand, in
+play or in the pack; in the pack it first moves a tool between the pack
+and the slot: one holding a tool gives it back to the pack, and the hand
+moves to its kind; an empty one, with a tool as the hand, takes one of
+that kind from the pack. The pack keeps the digs done by the tools in it
+as a total for each kind (`wear`): a tool given back adds its wear, and one
+taken gets as much of the total as one tool can carry, so no tool is
+repaired, and worn ones come out first. The belt is drawn as icons (sockets
+where empty), BELT_PITCH cells apart, each with its key's number below and
+arrowheads either side of the tool hand's.
 """
 
 from __future__ import annotations
@@ -52,7 +57,9 @@ from stratagem import crafting
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, GRID_MAX, GRID_SIZES, RECIPES, STATION_HAND
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
-                                 KIND_STONE_PICK, KIND_TORCH, KIND_WOOD, KIND_WOOD_PICK, TOOLS, cycle)
+                                 KIND_STONE_PICK, KIND_TORCH, KIND_WOOD, KIND_WOOD_PICK, TOOLS, COUNT_MAX, cycle, gain,
+                                 spend)
+from stratagem.actions import DURABILITY
 from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, encode_tile, mode2_byte
 from stratagem.tiles import (AIR, BENCH, BLACK, GEM, ORE, RED, SHAPE_FULL, SOIL, STONE, TILE_COLOUR_BASE, TORCH, TRUNK, WHITE,
                              YELLOW, tile_bytes)
@@ -111,9 +118,15 @@ class Pack:
     copied: int = len(RECIPES) - 1  # the recipe COPY laid out last
     repeat: int = 0                 # frames until L, held, makes again
     station: int = STATION_HAND
-    belt: tuple[int, ...] = EMPTY_BELT  # a tool's kind (inventory.TOOLS) or EMPTY, by belt key
+    belt: tuple[int, ...] = EMPTY_BELT  # a tool, its kind (inventory.TOOLS), or EMPTY, by belt key...
+    belt_wear: tuple[int, ...] = (0,) * BELT_SLOTS  # ... and the digs each has done (actions.py)
+    wear: tuple[int, ...] = (0,) * len(TOOLS)   # the digs done by the tools in the pack, by kind, in all
     slot: int = 0                   # the belt's slot in the tool hand
     held_tools: int = 0             # the belt key held last frame (1 on), or 0
+
+
+def _set(values: tuple[int, ...], index: int, value: int) -> tuple[int, ...]:
+    return values[:index] + (value,) + values[index + 1:]
 
 
 def tool(pack: Pack) -> int:
@@ -176,12 +189,24 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
     if pressed_keys & KEY_NEXT and kinds:
         moved = (moved + 1) % len(kinds)
     hand = kinds[moved] if kinds else hand
-    pack = replace(pack, moved=moved != index)
     before = counts, pack.grid, pack.belt, pack.slot
     grid, book, copied, repeat, belt, tool_slot = pack.grid, pack.book, pack.copied, pack.repeat, pack.belt, pack.slot
+    belt_wear, totals = pack.belt_wear, pack.wear
     if slot is not None:
-        if hand in TOOLS:
-            belt = belt[:slot] + (EMPTY if belt[slot] == hand else hand,) + belt[slot + 1:]
+        kind = belt[slot]
+        if kind != EMPTY:                       # a tool off the belt, into the pack, in hand
+            if counts[kind] < COUNT_MAX:
+                t = TOOLS.index(kind)
+                counts = gain(counts, kind)
+                totals = _set(totals, t, totals[t] + belt_wear[slot])
+                belt, belt_wear = _set(belt, slot, EMPTY), _set(belt_wear, slot, 0)
+                hand = kind
+        elif hand in TOOLS and counts[hand]:    # one onto it, as worn as one can be from the total
+            t = TOOLS.index(hand)
+            worn = min(totals[t], DURABILITY[hand] - 1)
+            counts = spend(counts, hand)
+            totals = _set(totals, t, totals[t] - worn)
+            belt, belt_wear = _set(belt, slot, hand), _set(belt_wear, slot, worn)
         tool_slot = slot
     if cell and crafting.in_grid(cell - 1, pack.station):
         counts, grid = crafting.put(counts, grid, cell - 1, hand)
@@ -199,6 +224,7 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         counts, grid, copied = crafting.copy(counts, grid, book, copied, pack.station)
     now = tuple(shown(counts, kinds))
     hand = hand_shown(now, hand)
+    pack = replace(pack, moved=(now.index(hand) if now else 0) != index, belt_wear=belt_wear, wear=totals)
     pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now, belt=belt, slot=tool_slot,
                    changed=(counts, grid, belt, tool_slot) != before, draw=now != kinds)
     return pack, counts, hand

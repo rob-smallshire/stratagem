@@ -45,10 +45,10 @@
 .starting_counts                \ The counts the miner starts with
     COUNTS_AT_START
 
-\ The tool in use: the tool hand's (the belt's slot), if any of it is left,
-\ or bare hands. Copy its quarters a dig removes, by material, into
-\ material_quarters (actions.TOOL_QUARTERS): at the start, when a function
-\ key chooses a slot, when the pack closes and when a tool breaks.
+\ The tool in use: the tool hand's, the belt's slot's (or bare hands). Copy
+\ its quarters a dig removes, by material, into material_quarters
+\ (actions.TOOL_QUARTERS): at the start, when a belt key chooses a slot,
+\ when the pack closes and when a tool breaks.
 .tool_update
 {
     LDY #0                      \ Bare hands: the first row
@@ -56,11 +56,7 @@
     LDA belt,X
     CMP #CELL_EMPTY
     BEQ row
-    TAX
-    LDA inventory,X
-    BEQ row
-    TXA                         \ Row kind - TOOL_FIRST + 1
-    SEC
+    SEC                         \ Row kind - TOOL_FIRST + 1
     SBC #TOOL_FIRST - 1
     TAX
 .times
@@ -82,8 +78,9 @@
     RTS
 }
 
-\ A dig, not a tree's part's chop (chopped), wears the tool in use: at its
-\ durability'th dig it breaks, one fewer of it (actions._dug).
+\ A dig, not a tree's part's chop (chopped), wears the tool in use, its
+\ belt slot's: at its durability'th dig it breaks, and the slot is empty
+\ (actions._dug).
 .tool_wear
 {
     LDA chopped
@@ -92,24 +89,19 @@
     LDY belt,X
     CPY #CELL_EMPTY
     BEQ done
-    LDA inventory,Y
-    BEQ done
-    LDA tool_digs - TOOL_FIRST,Y
-    CLC
-    ADC #1
+    INC belt_wear,X
+    LDA belt_wear,X
     CMP tool_durability - TOOL_FIRST,Y
     BCS broken
-    STA tool_digs - TOOL_FIRST,Y
 .done
     RTS
 .broken
     LDA #&FF                    \ Shown (items.asm)
     STA zp_tool_broke
+    LDA #CELL_EMPTY
+    STA belt,X
     LDA #0
-    STA tool_digs - TOOL_FIRST,Y
-    TYA
-    TAX
-    DEC inventory,X
+    STA belt_wear,X
     JMP tool_update
 }
 

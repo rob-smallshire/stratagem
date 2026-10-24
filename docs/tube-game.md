@@ -315,17 +315,22 @@ area room for more item pictures.
 
 The miner has two hands: the hand, which SPACE places, and the tool hand,
 which L digs with. The tool hand holds one of the belt's nine slots, on
-the keys 1 to 9, each empty or holding a kind of tool (`pack.py`:
-`Pack.belt`, `Pack.slot`; `belt`, `belt_slot` on the parasite). A belt key
-takes its slot into the tool hand, in play or in the pack (an empty slot
-is bare hands); in the pack, with a tool as the hand, it first hangs the
-tool in the slot, or takes it off if it is there already. A slot holds a
-kind, so when
-the last of a kind breaks, its slot stands empty-handed until another is
-made. The tool in use is shown above the miner for a second, as the hand is,
-whenever its belt key is pressed, even if it is already in hand, and when
-it breaks: the next of its kind, or, with none left, bare hands, shown as a
-blue outline like the pack's empty cells (`items.show_hand`,
+the keys 1 to 9, each empty or holding a tool, its own, out of the pack's
+counts, with the digs it has done (`pack.py`: `Pack.belt`,
+`Pack.belt_wear`, `Pack.slot`; `belt`, `belt_wear`, `belt_slot` on the
+parasite). A belt key takes its slot into the tool hand, in play or in the
+pack (an empty slot is bare hands); in the pack it first moves a tool:
+from a slot holding one back into the pack, the hand moving to its kind;
+or, into an empty slot, one of the hand's kind from the pack. The pack
+keeps a total of the digs done by its tools of each kind (`Pack.wear`;
+`pack_wear_low` and `_high`, two bytes, since 99 stone pickaxes can have
+done 12,771): a tool given back adds its wear, and one taken gets as much
+of the total as one tool can carry, one dig short of breaking, so moving
+tools never repairs them, and worn ones come out first. The tool in use is
+shown above the miner for a second, as the hand is, whenever its belt key
+is pressed, even if it is already in hand, and when it breaks, its slot
+then empty: bare hands, shown as a blue outline like the pack's empty
+cells (`items.show_hand`,
 `items.EMPTY_PICTURE`: the hand if both change at once). A tool is shown
 with its belt slot's number beside it, one more item picture (the numbers
 1 to 9 are item frames, `items.NUMBER_FIRST`); 0 shows the tool in use
@@ -368,10 +373,9 @@ still breaks whole at one, by hand, which is the way to wood, planks, a
 workbench and a wooden pickaxe. The wooden pickaxe digs as the miner did
 before tools.
 
-Each dig of the ground (not a chop) wears the tool in use: its kind's dig
-count goes up, and at its durability (60 for wood, 130 for stone) it
-breaks, one fewer of that kind, the count starting again for the next.
-Nothing shows the wear.
+Each dig of the ground (not a chop) wears the tool in use, its belt slot's:
+at its durability (60 for wood, 130 for stone) it breaks, and the slot is
+empty. Nothing shows the wear.
 
 - On the parasite, PGAME's `material_quarters` is the tool in use's row,
   copied from PLIGHT's `tool_quarters` by `tool_update` at the start, when a

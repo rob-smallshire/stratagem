@@ -34,7 +34,7 @@ In the pack, the world waits:
 | DELETE | empty the grid |
 | L | make what the grid shows; hold it to make more |
 | COPY | lay out again something you've made before |
-| 1 to 9 | take that slot of your belt into your tool hand; with a tool in your hand, hang it there first (or take it off) |
+| 1 to 9 | take that slot of your belt into your tool hand: an empty slot first takes a tool of the kind in your hand from your pack; a full one puts its tool back in your pack, in your hand |
 | P | close your pack |
 
 ## Your pack
@@ -120,16 +120,19 @@ At a workbench:
 You have two hands. One holds what SPACE places; the other holds a tool,
 which L digs with. Your tools hang on a belt of nine slots, one for each
 of the number keys 1 to 9. In your pack, choose a tool, then press a number
-to hang it there; out in the world, press that number to take it in hand.
-The tool shows above you for a moment, with its number beside it, whenever
-you press its number; 0 shows the tool you're holding. The belt is shown along the bottom of your pack.
+to take one out of your pack and hang it there; press the number again to
+put it back. Out in the world, press that number to take it in hand. The
+tool shows above you for a moment, with its number beside it, whenever you
+press its number; 0 shows the tool you're holding. The belt is shown along
+the bottom of your pack.
 
 Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.
 
-Tools wear out. When one breaks, what you're now holding shows above you:
-another of the same kind if you have one, or a blue outline, your bare
-hands. Make another and its slot on your belt works again.
+Tools wear out. When one breaks it's gone from your belt, and a blue
+outline, your bare hands, shows above you: hang another there from your
+pack. A tool put back in your pack doesn't mend; the worn ones come out
+first.
 
 There is more to make than this. The old miners are said to have made
 much better tools than these, and left word of them in the deep places.

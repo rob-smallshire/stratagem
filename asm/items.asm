@@ -1030,18 +1030,8 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 \ in the packet, and is moved on past it.
 .hand_emit
 {
-    LDX belt_slot               \ The tool in use: the tool hand's, if any
-    LDA belt,X                  \ of it is left, or bare hands
-    CMP #CELL_EMPTY
-    BEQ in_use
-    TAX
-    LDA inventory,X
-    BNE held
-    LDA #CELL_EMPTY
-    BNE in_use                  \ Always branches
-.held
-    TXA
-.in_use
+    LDX belt_slot               \ The tool in use: the belt's slot's
+    LDA belt,X
     LDX #0                      \ Changed? (X: non-zero if anything did)
     CMP tool_last
     BNE tool_changed

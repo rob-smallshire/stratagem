@@ -5,6 +5,7 @@ player is in, never a cavity beyond solid ground.
 """
 
 from collections import deque
+from dataclasses import replace
 
 import pytest
 
@@ -98,6 +99,7 @@ def test_every_dig_opens_space_next_to_the_player(direction):
                     for tx in range(hero.px // TILE_WIDTH - 2, hero.px // TILE_WIDTH + 3)
                     for ty in range(hero.py // TILE_HEIGHT - 2, hero.py // TILE_HEIGHT + 4)
                     if 0 <= tx < 256 and 0 <= ty < 256}
+            hands = replace(hands, wear=0)      # a pickaxe that doesn't wear out: wear isn't tested here
             hands, action, target = actions.act(hands, hero, keys, world)
             if action != actions.DIG:
                 continue
@@ -141,6 +143,7 @@ def tunnel(world, direction: str, x: int, floor: int, frames: int) -> tuple[int,
     for _ in range(frames):
         before = hero
         hero = player.step(hero, keys, world.tile_at)
+        hands = replace(hands, wear=0)          # a pickaxe that doesn't wear out: wear isn't tested here
         hands, _, _ = actions.act(hands, hero, keys, world)
         biggest = max(biggest, abs(hero.py - before.py))
     across = (hero.px - x0) * (1 if "right" in direction else -1)

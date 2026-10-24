@@ -283,6 +283,10 @@ ORG plight_end
 GUARD &F800
 .pack_before        SKIP KIND_COUNT + GRID_CELLS + BELT_SLOTS + 1 \ The counts, grid,
                                 \ belt and its slot before the pack's keys
+.belt_wear          SKIP BELT_SLOTS \ The digs each tool on the belt has done (pack.asm)
+.pack_wear_low      SKIP KIND_COUNT - TOOL_FIRST \ The digs done by the tools in the
+.pack_wear_high     SKIP KIND_COUNT - TOOL_FIRST \ pack, by kind, in all
+.pack_was           SKIP 1      \ The hand's place among the kinds before keys
 .craft_cell         SKIP 1      \ Crafting's workspace (crafting.asm)
 .craft_k            SKIP 1
 .craft_row          SKIP 1

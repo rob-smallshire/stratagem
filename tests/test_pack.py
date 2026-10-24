@@ -6,6 +6,7 @@ panel is drawn, the hand chosen and the view redrawn on closing
 (Beebium)."""
 
 import random
+from dataclasses import replace
 
 import pytest
 
@@ -14,6 +15,7 @@ from mos6502 import Machine6502
 from stratagem import crafting, inventory, pack, sprites
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.actions import DURABILITY
 from stratagem.inventory import KIND_COUNT
 from stratagem.crafting import GRID_CELLS
 from stratagem.pack import INPUT_PACK, KEY_BOOK, KEY_CLEAR, KEY_CYCLE, KEY_MAKE, KEY_NEXT, Pack
@@ -111,7 +113,7 @@ def test_parasite_pack_matches_model(game_build):
     state = Pack()
     inputs = 0
     seen = {"opened": 0, "moved": 0, "closed": 0, "paused": 0, "cycled": 0, "changed": 0, "joined": 0, "made": 0,
-            "loaded": 0, "chosen": 0}
+            "loaded": 0, "returned": 0, "chosen": 0}
     keys = tools = 0
     for frame in range(4000):
         if not state.open and rng.random() < 0.1:
@@ -120,6 +122,14 @@ def test_parasite_pack_matches_model(game_build):
             memory[labels["inventory"] + inventory.KIND_WOOD] = rng.choice([1, 2, 5, 99])     # to make things of
             memory[labels["inventory"] + inventory.KIND_PLANKS] = rng.choice([0, 0, 3, 98])
             memory[labels["hand"]] = rng.choice([*range(KIND_COUNT), *inventory.TOOLS])
+            belt = tuple(rng.choice([pack.EMPTY, *inventory.TOOLS]) for _ in range(pack.BELT_SLOTS))
+            belt_wear = tuple(0 if k == pack.EMPTY else rng.randrange(DURABILITY[k]) for k in belt)
+            wear = tuple(rng.choice([0, rng.randrange(300), rng.randrange(20000)]) for _ in inventory.TOOLS)
+            memory[labels["belt"]:labels["belt"] + pack.BELT_SLOTS] = belt
+            memory[labels["belt_wear"]:labels["belt_wear"] + pack.BELT_SLOTS] = belt_wear
+            for t, total in enumerate(wear):
+                memory[labels["pack_wear_low"] + t], memory[labels["pack_wear_high"] + t] = total & 0xFF, total >> 8
+            state = replace(state, belt=belt, belt_wear=belt_wear, wear=wear)
         if rng.random() < 0.2:
             inputs = rng.choice(INPUTS + [INPUT_LEFT] * 4)      # often towards the wood
         if rng.random() < 0.6:
@@ -136,8 +146,12 @@ def test_parasite_pack_matches_model(game_build):
         state, counts_after, hand_after = pack.step(state, counts, hand, inputs, keys, tools=tools)
         packet = send(game, inputs, keys, tools)
         assert tuple(memory[labels["belt"]:labels["belt"] + pack.BELT_SLOTS]) == state.belt, f"frame {frame}"
+        assert tuple(memory[labels["belt_wear"]:labels["belt_wear"] + pack.BELT_SLOTS]) == state.belt_wear
+        assert tuple(memory[labels["pack_wear_low"] + t] | memory[labels["pack_wear_high"] + t] << 8
+                     for t in range(len(inventory.TOOLS))) == state.wear, f"frame {frame}"
         assert memory[labels["belt_slot"]] == state.slot, f"frame {frame}"
-        seen["loaded"] += state.belt != before.belt
+        seen["loaded"] += state.belt.count(pack.EMPTY) < before.belt.count(pack.EMPTY)
+        seen["returned"] += state.belt.count(pack.EMPTY) > before.belt.count(pack.EMPTY)
         seen["chosen"] += state.slot != before.slot
         assert bool(memory[labels["pack_open"]]) == state.open, f"frame {frame}"
         if was_open or state.open:
@@ -385,7 +399,8 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     assert parasite[plabels["belt_slot"]] == 1, "2 didn't take the pickaxe into the tool hand"
     counts = tuple(parasite[plabels["inventory"] + kind] for kind in range(KIND_COUNT))
     screen_start = peek[labels["zp_screen_start"]] | peek[labels["zp_screen_start"] + 1] << 8
-    panel = pack.panel(screen_start, counts, inventory.KIND_WOOD_PICK, belt=belt, tool_slot=1)
+    kinds = pack.shown(counts, (inventory.KIND_WOOD_PICK,))     # its kind still shown, at 0, a socket
+    panel = pack.panel(screen_start, counts, inventory.KIND_WOOD_PICK, kinds, belt=belt, tool_slot=1)
     shown = screen[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in panel.items() if shown[a - SCREEN_START] != b]
     assert differences[:8] == [], f"{len(differences)} screen bytes differ with the belt loaded"

@@ -268,10 +268,8 @@ def collect_marks(bbc: Beebium, hit_address: int, id_address: int, count: int) -
 
 
 def pickaxe_hands():
-    """Hands with wooden pickaxes in the tool hand, enough not to run out:
-    digging as fast as before tools (actions.TOOL_QUARTERS)."""
+    """Hands with a wooden pickaxe in the tool hand: digging as fast as
+    before tools (actions.TOOL_QUARTERS), until it breaks."""
     from stratagem import inventory
     from stratagem.actions import Hands
-    counts = list(inventory.STARTING)
-    counts[inventory.KIND_WOOD_PICK] = inventory.COUNT_MAX
-    return Hands(counts=tuple(counts), tool=inventory.KIND_WOOD_PICK)
+    return Hands(tool=inventory.KIND_WOOD_PICK)
