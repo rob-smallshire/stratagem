@@ -10,8 +10,8 @@ frame, and the games below show it isn't needed (see
 
 ## Where we are
 
-- `inventory`: a count (up to 99) of each kind: wood, soil, stone, ore
-  and gems (`inventory.py`, step 1, done). Dug material keeps its kind (dug
+- `inventory`: a count (up to 99) of each kind: wood, soil, stone, ore,
+  gems, planks, torches and workbenches (`inventory.py`, step 1, done). Dug material keeps its kind (dug
   grass is soil), and logs gathered in from felled trees are wood. Nothing
   spends wood yet.
 - `hand`: the kind SPACE places: the kind last dug, or chosen in the pack,
@@ -20,8 +20,8 @@ frame, and the games below show it isn't needed (see
 - The pack (step 2, in part): P pauses the game and shows the kinds held
   with their counts across the top of the view; the cursor keys move the
   hand (`tube-game.md`, The pack).
-- Torches: dropped with T, at most 24 in the world, never picked up; not
-  counted as held.
+- Torches: counted. The miner starts with 8 (`STARTING_TORCHES`), and T
+  drops one, spending it; at most 24 in the world, never picked up.
 - Dropped items exist as sprites that burst out and are gathered in. The
   same machinery can show anything small near the miner for a moment.
 - Keys: Z X K M (move), L (dig, act), SPACE (place), T (torch).

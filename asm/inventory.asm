@@ -42,3 +42,5 @@
     MATERIAL_YIELDS
 .kind_places                    \ The material each kind places, &FF if none
     KIND_PLACES
+.starting_counts                \ The counts the miner starts with
+    COUNTS_AT_START

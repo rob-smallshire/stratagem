@@ -25,9 +25,11 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.inventory import KIND_COUNT, KIND_GEM, KIND_ORE, KIND_SOIL, KIND_STONE, KIND_WOOD, cycle
-from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, mode2_byte
-from stratagem.tiles import AIR, GEM, ORE, SHAPE_FULL, SOIL, STONE, TRUNK, tile_bytes
+from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
+                                 KIND_TORCH, KIND_WOOD, cycle)
+from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, encode_tile, mode2_byte
+from stratagem.tiles import (AIR, BLACK, GEM, ORE, RED, SHAPE_FULL, SOIL, STONE, TILE_COLOUR_BASE, TORCH, TRUNK, WHITE,
+                             YELLOW, tile_bytes)
 
 INPUT_PACK = 128                    # P: open or close the pack
 KEY_CYCLE = 1                       # TAB, in the second byte of input: cycle the hand
@@ -91,14 +93,60 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
     return replace(pack, moved=moved != index), kinds[moved]
 
 
-# The icons: each kind's picture, a tile's 64 bytes (screen.encode_tile).
-ICON_TILES = {KIND_WOOD: (TRUNK, SHAPE_FULL), KIND_SOIL: (SOIL, SHAPE_FULL), KIND_STONE: (STONE, SHAPE_FULL),
-              KIND_ORE: (ORE, SHAPE_FULL), KIND_GEM: (GEM, SHAPE_FULL)}
-assert set(ICON_TILES) == set(range(KIND_COUNT)) and AIR == 0     # (a piece's backdrop: the cave)
+# The icons: each kind's picture, a tile's 64 bytes (screen.encode_tile):
+# a material's whole tile, which the render region's material pages hold
+# already (ICON_MATERIALS), a piece's over the cave, or a picture of its own.
+ICON_MATERIALS = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM}
+ICON_PIECES = {KIND_WOOD: TRUNK, KIND_TORCH: TORCH}
+ICON_ART = {
+    KIND_PLANKS: """
+YYYYYRYY
+YYYYYRYY
+YYYYYRYY
+RRRRRRRR
+YYRYYYYY
+YYRYYYYY
+YYRYYYYY
+RRRRRRRR
+YYYYYYRY
+YYYYYYRY
+YYYYYYRY
+RRRRRRRR
+YRYYYYYY
+YRYYYYYY
+YRYYYYYY
+RRRRRRRR
+""",
+    KIND_BENCH: """
+........
+...WWW..
+....R...
+....R...
+YYYYYYYY
+YYYYYYYY
+RRRRRRRR
+.R....R.
+.R....R.
+.R....R.
+.RRRRRR.
+.R....R.
+.R....R.
+.R....R.
+.R....R.
+........
+""",
+}
+OWN_ICONS = sorted(set(range(KIND_COUNT)) - set(ICON_MATERIALS))    # those pack_icons holds, in order
+assert set(ICON_MATERIALS) | set(ICON_PIECES) | set(ICON_ART) == set(range(KIND_COUNT)) and AIR == 0
+_ART_COLOURS = {".": BLACK, "R": RED, "Y": YELLOW, "W": WHITE}
 
 
 def icon(kind: int) -> bytes:
-    return tile_bytes(ICON_TILES[kind])
+    if kind in ICON_MATERIALS:
+        return tile_bytes((ICON_MATERIALS[kind], SHAPE_FULL))
+    if kind in ICON_PIECES:
+        return tile_bytes((ICON_PIECES[kind], SHAPE_FULL))      # (a piece's backdrop: the cave)
+    return encode_tile([[TILE_COLOUR_BASE + _ART_COLOURS[c] for c in line] for line in ICON_ART[kind].split()])
 
 
 # Digits, three pixels wide and seven lines high, in a cell pair (two

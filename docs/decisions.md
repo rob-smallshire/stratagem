@@ -275,3 +275,10 @@ A running log of design decisions. Add to it whenever one is made.
   reading bit 7, as the MOS does inside, costs about 31; the keys are a
   table, read with interrupts held off and the MOS's scanning stopped,
   then restarted. The MOS still sees the keyboard between frames.
+- **Crafting's first kinds:** planks, torches and the workbench join the
+  inventory as kinds 5 to 7, so they show in the pack. Torches are counted:
+  T spends one, and the miner starts with 8 (`STARTING_TORCHES`), enough
+  to reach ore and wood for more. Soil, stone, ore and gems use their
+  tile's graphics in the render region's material pages as their icons, so
+  only the other kinds' icons take room (a table of addresses, by kind,
+  finds each).

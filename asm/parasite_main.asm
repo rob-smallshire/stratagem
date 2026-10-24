@@ -23,10 +23,12 @@
     STA zp_player_vy
     STA zp_player_on_ground
     LDX #KIND_COUNT - 1
-.clear_inventory
+.start_inventory
+    LDA starting_counts,X
     STA inventory,X
     DEX
-    BPL clear_inventory
+    BPL start_inventory
+    LDA #0
     STA cooldown
     STA pack_open
     STA pack_held

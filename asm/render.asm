@@ -94,11 +94,16 @@ ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
         EQUB HI(item_saves + item * ITEM_BYTES)
     NEXT
 
-\ The pack's panel (render_pack): each kind's icon (a tile's 64 bytes), the
-\ digits (two cells each) and the arrowheads (pointing right, then left,
-\ then two blank cells).
+\ The pack's panel (render_pack): the icons of kinds that aren't materials
+\ (a tile's 64 bytes each; a material's is its whole tile in
+\ material_pages), each kind's icon's address, the digits (two cells each)
+\ and the arrowheads (pointing right, then left, then two blank cells).
 .pack_icons
     PACK_ICONS
+.pack_icon_low
+    PACK_ICON_LOW
+.pack_icon_high
+    PACK_ICON_HIGH
 .pack_digits
     PACK_DIGITS
 .pack_marks
@@ -804,21 +809,11 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     RTS
 .draw_slot
     JSR pack_place
-    LDX pack_slot               \ The icon: pack_icons + kind * 64, its
-    LDA host_pack_kinds,X       \ cells four across, two down
-    LDY #0
-    STY zp_tile + 1
-    LDY #6
-.times_64
-    ASL A
-    ROL zp_tile + 1
-    DEY
-    BNE times_64
-    CLC
-    ADC #LO(pack_icons)
+    LDX pack_slot               \ The icon, its cells four across, two
+    LDY host_pack_kinds,X       \ down
+    LDA pack_icon_low,Y
     STA zp_tile
-    LDA zp_tile + 1
-    ADC #HI(pack_icons)
+    LDA pack_icon_high,Y
     STA zp_tile + 1
     LDA #0
     STA pack_cell

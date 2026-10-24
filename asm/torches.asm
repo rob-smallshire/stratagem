@@ -31,11 +31,13 @@
     RTS
 }
 
-\ Drop a torch into the tile at the middle of the player's box, if it is
-\ empty and there is room for another torch. The tile's change floods it
-\ (torch_tile_changed).
+\ Drop a torch into the tile at the middle of the player's box, if one is
+\ carried, the tile is empty and there is room for another torch, spending
+\ it. The tile's change floods it (torch_tile_changed).
 .torch_drop
 {
+    LDA inventory + KIND_TORCH
+    BEQ done
     LDA torch_count
     CMP #TORCH_MAX
     BCS done
@@ -92,6 +94,7 @@
     LDA target_y
     STA torch_y,X
     INC torch_count
+    DEC inventory + KIND_TORCH
 .done
     RTS
 }

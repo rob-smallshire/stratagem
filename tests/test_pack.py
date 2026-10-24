@@ -25,7 +25,7 @@ INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT
 
 
 def test_the_hand_moves_across_the_kinds_shown():
-    counts = (3, 0, 12, 0, 99)
+    counts = (3, 0, 12, 0, 99, 0, 0, 0)
     assert pack.shown(counts, inventory.KIND_SOIL) == [0, 1, 2, 4]
     opened, hand = pack.step(Pack(), counts, 1, INPUT_PACK)
     assert opened.open and opened.draw and hand == 1
@@ -38,11 +38,11 @@ def test_the_hand_moves_across_the_kinds_shown():
 
 
 def test_tab_cycles_the_hand_through_kinds_placed():
-    counts = (7, 3, 0, 2, 0)        # wood, soil, no stone, ore, no gems
+    counts = (7, 3, 0, 2, 0, 0, 0, 0)       # wood, soil, no stone, ore, nothing else
     assert inventory.cycle(counts, inventory.KIND_SOIL) == inventory.KIND_ORE
     assert inventory.cycle(counts, inventory.KIND_ORE) == inventory.KIND_SOIL      # round again, past the wood
     assert inventory.cycle(counts, inventory.KIND_WOOD) == inventory.KIND_SOIL
-    assert inventory.cycle((7, 0, 0, 0, 0), inventory.KIND_SOIL) == inventory.KIND_SOIL    # nothing to place
+    assert inventory.cycle((7,) + (0,) * (KIND_COUNT - 1), inventory.KIND_SOIL) == inventory.KIND_SOIL    # nothing to place
     state, hand = pack.step(Pack(), counts, inventory.KIND_SOIL, 0, KEY_CYCLE)
     assert hand == inventory.KIND_ORE
     state, hand = pack.step(state, counts, hand, 0, KEY_CYCLE)      # held, not pressed again

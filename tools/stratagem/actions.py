@@ -60,7 +60,7 @@ NONE, DIG, PLACE = 0, 1, 2
 
 @dataclass(frozen=True)
 class Hands:
-    counts: tuple[int, ...] = inventory.EMPTY   # of each kind (inventory.py)
+    counts: tuple[int, ...] = inventory.STARTING    # of each kind (inventory.py)
     cooldown: int = 0
     hand: int = inventory.KIND_SOIL             # the kind placing puts down
 
