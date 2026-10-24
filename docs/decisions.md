@@ -282,3 +282,13 @@ A running log of design decisions. Add to it whenever one is made.
   tile's graphics in the render region's material pages as their icons, so
   only the other kinds' icons take room (a table of addresses, by kind,
   finds each).
+- **The hand's grid:** the grid holds what's been taken from the counts,
+  so a recipe's cost is its shape, and closing the pack gives it back.
+  Shapes match anywhere in the grid, not mirrored (the torch, ore over
+  wood, would read the same either way). Made things go straight into
+  the counts, not out as items: the game is paused, and the counts
+  changing is feedback enough. The cell keys come as a number (the first
+  held), not bits, so nine cells and three more keys fit in one byte.
+  A kind once shown stays shown while the pack is open; one gained joins,
+  redrawing the panel. The host redraws only the counts and cells that
+  changed, so a key's redraw (about 6,000 cycles) fits inside a frame.

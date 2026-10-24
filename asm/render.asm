@@ -108,6 +108,10 @@ ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
     PACK_DIGITS
 .pack_marks
     PACK_MARKS
+.pack_socket                    \ An empty cell of the grid
+    PACK_SOCKET
+.grid_lefts                     \ The grid's first column, by its size
+    GRID_LEFTS
 
 CLEAR RENDER_CODE, RENDER_END
 ORG RENDER_CODE
@@ -754,20 +758,14 @@ ENDMACRO
 \ host_pack_kinds, host_pack_counts and host_pack_index: across the top of
 \ the view, a blank row, then for each row of kinds their icons, two rows,
 \ and their counts below, with arrowheads either side of the hand's count,
-\ and a blank row.
+\ and a blank row; then the grid (pack_grid).
 ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
 .render_pack
 {
-    LDA host_pack_count         \ The panel's rows, cleared
+    JSR pack_grid_top_row       \ The panel's rows, cleared
+    LDA pack_grid_top
     CLC
-    ADC #PACK_COLUMNS - 1
-    LSR A
-    LSR A
-    LSR A
-    ASL A
-    ASL A
-    SEC
-    ADC #PANEL_TOP
+    ADC pack_grid_rows
     STA pack_row_end
     LDA #PANEL_TOP
     STA pack_row
@@ -805,19 +803,220 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
 .slot
     LDA pack_slot
     CMP host_pack_count
-    BNE draw_slot
-    RTS
-.draw_slot
+    BEQ grid
     JSR pack_place
     LDX pack_slot               \ The icon, its cells four across, two
     LDY host_pack_kinds,X       \ down
+    JSR pack_kind_icon
+    LDX pack_slot
+    LDA host_pack_counts,X
+    STA pack_drawn_counts,X
+    JSR pack_count
+    JSR pack_slot_marks
+    INC pack_slot
+    BNE slot                    \ Always branches
+.grid
+    LDA #&FE                    \ None of the grid as drawn: draw it all
+    STA pack_drawn_made
+    LDX #GRID_CELLS - 1
+.undrawn
+    STA pack_drawn_grid,X
+    DEX
+    BPL undrawn
+    JMP pack_grid
+}
+ASSERT KIND_COUNT < &FE
+ASSERT ROWS_PER_GRID_ROW = 3
+
+\ Redraw the counts of the pack's panel that have changed since drawn, and
+\ its grid, the counts or the grid having changed.
+.render_pack_changed
+{
+    LDA #0
+    STA pack_slot
+.loop
+    LDA pack_slot
+    CMP host_pack_count
+    BEQ done
+    TAX
+    LDA host_pack_counts,X
+    CMP pack_drawn_counts,X
+    BEQ next
+    STA pack_drawn_counts,X
+    JSR pack_place
+    LDX pack_slot
+    LDA host_pack_counts,X
+    JSR pack_count
+.next
+    INC pack_slot
+    BNE loop                    \ Always branches
+.done
+    \ Fall through
+}
+
+\ Draw the grid, below the kinds, host_pack_size cells square, each its
+\ kind's icon or a socket, GRID_PITCH cells apart and ROWS_PER_GRID_ROW
+\ rows; and after it what it makes, as a slot with an arrowhead pointing
+\ at its count, or blank cells. Only what differs from pack_drawn_grid and
+\ pack_drawn_made is drawn.
+.pack_grid
+{
+    JSR pack_grid_top_row
+    LDX host_pack_size
+    LDA grid_lefts,X
+    STA pack_grid_left
+    LDA pack_grid_top
+    STA pack_top
+    LDA #0
+    STA pack_grid_cell
+.row
+    LDA pack_grid_left
+    STA pack_icon_left
+    LDA host_pack_size
+    STA pack_grid_column
+.cell
+    LDX pack_grid_cell          \ Unless as drawn already
+    LDA host_pack_grid,X
+    CMP pack_drawn_grid,X
+    BEQ next
+    STA pack_drawn_grid,X
+    TAY
+    CPY #CELL_EMPTY
+    BNE kind
+    LDA #LO(pack_socket)
+    STA zp_tile
+    LDA #HI(pack_socket)
+    STA zp_tile + 1
+    JSR pack_icon
+    JMP next
+.kind
+    JSR pack_kind_icon
+.next
+    LDA pack_icon_left
+    CLC
+    ADC #GRID_PITCH
+    STA pack_icon_left
+    INC pack_grid_cell
+    DEC pack_grid_column
+    BNE cell
+    LDA pack_grid_cell          \ The next row's first cell
+    SEC
+    SBC host_pack_size
+    CLC
+    ADC #GRID_MAX
+    STA pack_grid_cell
+    LDA pack_top
+    CLC
+    ADC #ROWS_PER_GRID_ROW
+    STA pack_top
+    SEC
+    SBC pack_grid_top
+    CMP pack_grid_rows
+    BNE row
+    LDA pack_icon_left          \ What it makes: past the last column
+    STA pack_left
+    STA pack_icon_left
+    INC pack_icon_left
+    LDA pack_grid_top
+    STA pack_top
+    CLC
+    ADC #2
+    STA pack_count_row
+    LDA host_pack_made          \ Unless as drawn already
+    CMP pack_drawn_made
+    BNE made
+    LDA host_pack_made_count
+    CMP pack_drawn_made_count
+    BNE made
+    RTS
+.made
+    LDA host_pack_made
+    STA pack_drawn_made
+    LDA host_pack_made_count
+    STA pack_drawn_made_count
+    LDY host_pack_made
+    CPY #CELL_EMPTY
+    BEQ nothing
+    JSR pack_kind_icon
+    LDA host_pack_made_count
+    JSR pack_count
+    LDA #LO(pack_marks)         \ An arrowhead pointing at the count, and a
+    STA zp_tile                 \ blank cell after it
+    LDA #HI(pack_marks)
+    STA zp_tile + 1
+    LDA pack_left
+    JSR pack_put_count
+    JSR pack_blank_tile
+    LDA pack_left
+    CLC
+    ADC #5
+    JMP pack_put_count
+.nothing
+    LDA #&FF                    \ Blank cells, the icon's and the count row's
+    STA pack_blanking
+    JSR pack_icon
+    LDA #0
+    STA pack_blanking
+    LDA #SLOT_CELLS - 2
+    STA pack_grid_column
+.blank
+    JSR pack_blank_tile
+    LDA pack_left
+    CLC
+    ADC pack_grid_column
+    SEC
+    SBC #1
+    JSR pack_put_count
+    DEC pack_grid_column
+    BNE blank
+    RTS
+}
+ASSERT GRID_PITCH = 5
+
+\ Set pack_grid_top to the grid's first row, below the kinds, and
+\ pack_grid_rows to its rows.
+.pack_grid_top_row
+{
+    LDA host_pack_count
+    CLC
+    ADC #PACK_COLUMNS - 1
+    LSR A
+    LSR A
+    LSR A
+    ASL A
+    ASL A
+    SEC
+    ADC #PANEL_TOP
+    STA pack_grid_top
+    LDA host_pack_size          \ ROWS_PER_GRID_ROW = 3
+    ASL A
+    ADC host_pack_size          \ (Carry clear)
+    STA pack_grid_rows
+    RTS
+}
+
+\ Draw kind Y's icon, from column pack_icon_left (pack_left + 1 if from
+\ pack_place) and row pack_top.
+.pack_kind_icon
+{
     LDA pack_icon_low,Y
     STA zp_tile
     LDA pack_icon_high,Y
     STA zp_tile + 1
+    \ Fall through
+}
+
+\ Draw the icon at zp_tile, its cells four across, two down, from column
+\ pack_icon_left and row pack_top; or blank cells, if pack_blanking.
+.pack_icon
+{
     LDA #0
     STA pack_cell
-.icon_cell
+.loop
+    LDA pack_blanking
+    BEQ put
+    JSR pack_blank_tile
+.put
     LDA pack_cell
     LSR A
     LSR A
@@ -826,15 +1025,20 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     TAY
     LDA pack_cell
     AND #3
-    SEC
-    ADC pack_left
+    CLC
+    ADC pack_icon_left
     JSR pack_put
     INC pack_cell
     LDA pack_cell
     CMP #8
-    BNE icon_cell
-    LDX pack_slot               \ The count: tens, unless none, and units
-    LDA host_pack_counts,X
+    BNE loop
+    RTS
+}
+
+\ Draw count A in the slot at pack_left: its tens, or blank cells if
+\ none, and its units.
+.pack_count
+{
     LDX #0
 .tens
     CMP #10
@@ -847,6 +1051,10 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     TXA
     BEQ no_tens
     JSR pack_digit
+    JMP tens_cells
+.no_tens
+    JSR pack_blank_tile         \ (Two blank cells there)
+.tens_cells
     LDA pack_left
     CLC
     ADC #1
@@ -855,7 +1063,6 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     CLC
     ADC #2
     JSR pack_put_count
-.no_tens
     LDA pack_units
     JSR pack_digit
     LDA pack_left
@@ -865,10 +1072,17 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     LDA pack_left
     CLC
     ADC #4
-    JSR pack_put_count
-    JSR pack_slot_marks
-    INC pack_slot
-    JMP slot
+    JMP pack_put_count
+}
+
+\ Point zp_tile at the blank cells, two of them.
+.pack_blank_tile
+{
+    LDA #LO(pack_marks + 2 * CELL_BYTES)
+    STA zp_tile
+    LDA #HI(pack_marks + 2 * CELL_BYTES)
+    STA zp_tile + 1
+    RTS
 }
 
 \ Redraw the arrowheads of the pack's panel, the hand having moved.
@@ -888,8 +1102,9 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     RTS
 }
 
-\ Set pack_left, pack_top and pack_count_row for slot pack_slot: its
-\ arrowhead's column, its icon's top row and its count's row.
+\ Set pack_left, pack_icon_left, pack_top and pack_count_row for slot
+\ pack_slot: its arrowhead's column, its icon's, its icon's top row and its
+\ count's row.
 .pack_place
 {
     LDA pack_slot
@@ -900,6 +1115,8 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     CLC
     ADC #PANEL_LEFT + 1
     STA pack_left
+    STA pack_icon_left
+    INC pack_icon_left
     LDA pack_slot
     LSR A
     LSR A
@@ -1018,6 +1235,17 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
 .pack_count_row     SKIP 1
 .pack_cell          SKIP 1
 .pack_units         SKIP 1
+.pack_icon_left     SKIP 1
+.pack_blanking      SKIP 1      \ Non-zero: pack_icon draws blank cells
+.pack_grid_top      SKIP 1
+.pack_grid_rows     SKIP 1
+.pack_grid_left     SKIP 1
+.pack_grid_cell     SKIP 1
+.pack_grid_column   SKIP 1
+.pack_drawn_counts  SKIP KIND_COUNT \ The counts as drawn, by slot...
+.pack_drawn_grid    SKIP GRID_CELLS \ ... the grid...
+.pack_drawn_made    SKIP 1      \ ... and what it makes, and how many
+.pack_drawn_made_count SKIP 1
 
 \ Clear the whole screen to colour 0.
 .render_clear

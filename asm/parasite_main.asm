@@ -30,9 +30,7 @@
     BPL start_inventory
     LDA #0
     STA cooldown
-    STA pack_open
-    STA pack_held
-    STA pack_keys_held
+    JSR pack_init               \ (Returns A = 0)
     STA hand_timer
     STA zp_player_jump_held
     STA zp_player_air_jumps

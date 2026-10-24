@@ -48,9 +48,13 @@ PACKET_STRIPS = 12              \ Then that many strips of new tiles: down
 PACKET_REDRAW = &80
 PACKET_PACK = &40               \ The pack's packet instead (pack.asm): then
                                 \ the count of kinds shown, the hand's place
-                                \ among them, and each kind and its count
+                                \ among them, each kind and its count, the
+                                \ grid's size, its GRID_CELLS cells, and
+                                \ what it makes and how many (CELL_EMPTY, 0:
+                                \ nothing)
 PACKET_PACK_DRAW = &20          \ In the pack's: draw the panel...
-PACKET_PACK_MOVED = &10         \ ... or the hand's arrowheads, moved
+PACKET_PACK_MOVED = &10         \ ... or the hand's arrowheads, moved...
+PACKET_PACK_CHANGED = &08       \ ... and the counts and the grid, changed
 TILE_BYTES_SENT = 3              \ (A piece's tile may follow PIECE_COMPOSE,
 PIECE_COMPOSE = &FF             \ its slot, piece and backdrop: pieces.asm)
 CHANGES_PER_FRAME = 3           \ Changed tiles in a packet, at most

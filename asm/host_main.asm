@@ -229,9 +229,9 @@ GUARD USER_END
 }
 
 \ The pack's packet (pack.asm), after its flags: the kinds shown, their
-\ counts and the hand's place. At vertical sync draw the panel, or the
-\ hand's arrowheads, if the packet says so; the view is left as it is
-\ around it, and nothing moves.
+\ counts and the hand's place, and the grid and what it makes. At vertical
+\ sync draw the panel, or the hand's arrowheads and the counts and grid, as
+\ the packet says; the view is left as it is around it, and nothing moves.
 .host_pack_frame
 {
     READ_BYTE
@@ -249,6 +249,19 @@ GUARD USER_END
     INX
     BNE loop                    \ Always branches
 .read
+    READ_BYTE
+    STA host_pack_size
+    LDX #0
+.grid
+    READ_BYTE
+    STA host_pack_grid,X
+    INX
+    CPX #GRID_CELLS
+    BNE grid
+    READ_BYTE
+    STA host_pack_made
+    READ_BYTE
+    STA host_pack_made_count
     JSR host_release
     JSR host_send_input
     LDA #19                     \ Wait for vertical sync
@@ -261,8 +274,13 @@ GUARD USER_END
 .not_drawn
     LDA host_flags
     AND #PACKET_PACK_MOVED
-    BEQ done
+    BEQ not_moved
     JSR call_render_pack_marks
+.not_moved
+    LDA host_flags
+    AND #PACKET_PACK_CHANGED
+    BEQ done
+    JSR call_render_pack_changed
 .done
     INC host_frame_count
 .*host_pack_shown               \ Tests stop here
@@ -607,9 +625,13 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     JSR scan_keys               \ (play_keys follows)
     JMP read
 .pack
-    LDA #0                      \ In the pack: P and the cursor keys
+    LDY #pack_keys_second - key_table  \ In the pack: the grid's keys in the
+    JSR scan_keys               \ second byte, a cell's key's number (1 on)
+    STA zp_keys                 \ in its low bits...
+    JSR scan_cell
+    ORA zp_keys
     STA zp_keys
-    LDY #pack_keys - key_table
+    LDY #pack_keys - key_table  \ ... and P and the cursor keys
     JSR scan_keys
 .read
     STA zp_input
@@ -644,6 +666,25 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     RTS
 }
 
+\ Return in A the number of the first of the grid's cell keys pressed,
+\ from 1, or 0 if none.
+.scan_cell
+{
+    LDX #0
+.loop
+    LDA cell_keys,X
+    BMI none
+    STA SYSTEM_VIA_A_NO_HANDSHAKE
+    INX
+    BIT SYSTEM_VIA_A_NO_HANDSHAKE
+    BPL loop
+    TXA
+    RTS
+.none
+    LDA #0
+    RTS
+}
+
 \ Keys, as internal key numbers (an INKEY number's -n - 1), and the bits
 \ they set.
 KEY_TAB = 96
@@ -659,6 +700,16 @@ KEY_LEFT = 25
 KEY_RIGHT = 121
 KEY_UP = 57
 KEY_DOWN = 41
+KEY_Y = 68
+KEY_U = 53
+KEY_G = 83
+KEY_H = 84
+KEY_J = 69
+KEY_B = 100
+KEY_N = 85
+KEY_DELETE = 89
+KEY_RETURN = 73
+KEY_COPY = 105
 .key_table
 .play_keys_second
     EQUB KEY_TAB, KEY_CYCLE, &FF
@@ -668,7 +719,12 @@ KEY_DOWN = 41
 .pack_keys
     EQUB KEY_P, INPUT_PACK, KEY_LEFT, INPUT_LEFT, KEY_RIGHT, INPUT_RIGHT, KEY_UP, INPUT_UP
     EQUB KEY_DOWN, INPUT_DOWN, &FF
+.pack_keys_second
+    EQUB KEY_DELETE, KEY_CLEAR, KEY_RETURN, KEY_MAKE, KEY_COPY, KEY_BOOK, &FF
 ASSERT play_keys = play_keys_second + 3
+.cell_keys                      \ By cell, by rows (pack.CELL_KEYS)
+    EQUB KEY_T, KEY_Y, KEY_U, KEY_G, KEY_H, KEY_J, KEY_B, KEY_N, KEY_M, &FF
+ASSERT GRID_CELLS = 9
 
 INCLUDE "asm/pixels.asm"
 INCLUDE "asm/scroll.asm"

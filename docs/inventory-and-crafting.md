@@ -26,8 +26,8 @@ frame, and the games below show it isn't needed (see
   same machinery can show anything small near the miner for a moment.
 - Keys: Z X K M (move), L (dig, act), SPACE (place), T (torch).
 
-So the miner carries things, but can't see what, choose what, or make
-anything.
+- Crafting (step 3): the pack's 2 x 2 grid makes planks, torches and the
+  workbench (`tube-game.md`, Crafting; `docs/manual.md`).
 
 ## How other games do it
 
@@ -486,8 +486,10 @@ the start to the boots (`STARTING_ABILITIES = 0`).
 2. Done: the pack screen: paused, icons and counts, with the brush chosen
    by the arrow keys as the hand. Plus the cycle key (TAB) and the hand's
    icon above the miner (an item's picture, for a second, when it changes).
-3. The 2 x 2 hand grid on T Y / G H: planks, torches, the workbench.
-   The recipe book and COPY. The manual's first pages.
+3. Done: the 2 x 2 hand grid on T Y / G H: planks, torches, the
+   workbench. The recipe book and COPY. The manual's first pages
+   (`docs/manual.md`). Made things go straight into the counts for now,
+   rather than popping out as items when the pack closes.
 4. The workbench as a piece, and the 3 x 3 grid near it: ladders,
    platforms, doors, the stone pickaxe and its faster digging.
 5. The furnace and anvil, bars, the iron pickaxe, finds in the world, and

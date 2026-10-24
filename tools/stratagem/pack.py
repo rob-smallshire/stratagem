@@ -1,30 +1,46 @@
-"""A model of the pack screen (asm/pack.asm on the parasite, render_pack in
-asm/render.asm on the host), exactly as the 6502 does it.
+"""A model of the pack screen (asm/pack.asm and asm/crafting.asm on the
+parasite, render_pack in asm/render.asm on the host), exactly as the 6502
+does it.
 
 PACK (P) opens the pack, and the game pauses: nothing moves, and each
 frame's packet is a short one, the pack's. It shows the kinds held (a count
-above 0) and the kind in hand, whatever its count, in kind order, as they
-are on opening (nothing changes them while the game is paused), eight
+above 0) and the kind in hand, whatever its count, in kind order, eight
 across: each as its icon, a tile's 8 x 16 pixels, with its count below,
-and the hand marked by arrowheads either side of its count. The arrow keys
-move the hand across the kinds shown, a key press each step, and only the
-arrowheads are redrawn (redrawing the panel would show it half drawn, for
-a frame); PACK again
-closes the pack, and the view is redrawn whole, as after a jump of the
-camera, on a frame with no other input.
+and the hand marked by arrowheads either side of its count. A kind once
+shown stays shown while the pack is open, so the kinds don't move about as
+counts run out; a kind gained (by making it) joins them, in kind order.
+The arrow keys move the hand across the kinds shown, a key press each step,
+and only the arrowheads are redrawn (redrawing the panel would show it half
+drawn, for a frame).
+
+Below the kinds is the crafting grid (crafting.py), the hand's 2 x 2, and
+what it makes. The hand is the brush: a cell's key (T Y / G H) puts a kind
+in its cell or takes it out; DELETE empties the grid; RETURN makes what it
+lays out, again every MAKE_REPEAT frames while held, after MAKE_DELAY; COPY
+lays out the next recipe in the book. A change redraws the counts, the grid
+and the result (the panel whole if a kind joins those shown). PACK again
+closes the pack, emptying the grid back into the counts, and the view is
+redrawn whole, as after a jump of the camera, on a frame with no other
+input.
 
 The panel is drawn over the view, PANEL_TOP rows down, PANEL_COLUMNS cells
 wide and centred: a blank row, then for each row of kinds two rows of
-icons, a row of counts and a blank row. A slot is SLOT_CELLS cells across:
-a blank cell, an arrowhead's cell, the icon's four (the count's two digits
-below it), an arrowhead's cell and a blank cell.
+icons, a row of counts and a blank row; then for each row of the grid, two
+rows of icons and a blank row. A slot is SLOT_CELLS cells across: a blank
+cell, an arrowhead's cell, the icon's four (the count's two digits below
+it), an arrowhead's cell and a blank cell. The grid's cells are
+GRID_PITCH cells apart, an empty cell drawn as a socket, and the result is
+drawn as a slot, after them, with an arrowhead pointing at its count, in
+the grid's first row of icons.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from stratagem import crafting
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, GRID_MAX, GRID_SIZES, RECIPES, STATION_HAND
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
                                  KIND_TORCH, KIND_WOOD, cycle)
 from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, encode_tile, mode2_byte
@@ -32,7 +48,14 @@ from stratagem.tiles import (AIR, BLACK, GEM, ORE, RED, SHAPE_FULL, SOIL, STONE,
                              YELLOW, tile_bytes)
 
 INPUT_PACK = 128                    # P: open or close the pack
-KEY_CYCLE = 1                       # TAB, in the second byte of input: cycle the hand
+KEY_CYCLE = 1                       # TAB, in the second byte of input in play: cycle the hand
+KEY_CELL = 0x0F                     # in the pack, the second byte: the cell's key held (1 on), or 0
+KEY_CLEAR = 0x10                    # DELETE
+KEY_MAKE = 0x20                     # RETURN
+KEY_BOOK = 0x40                     # COPY: the recipe book
+CELL_KEYS = "TYUGHJBNM"             # by cell
+MAKE_DELAY = 20                     # frames RETURN is held before it repeats...
+MAKE_REPEAT = 8                     # ... and then between makes
 
 PACK_COLUMNS = 8                    # kinds across
 SLOT_CELLS = 8
@@ -41,10 +64,18 @@ PANEL_LEFT = (VIEW_COLUMNS - PANEL_COLUMNS) // 2
 PANEL_TOP = 1
 ROWS_PER_SLOT_ROW = 4
 assert PANEL_LEFT >= 0
+GRID_PITCH = 5                      # cells across from one grid cell to the next
+ROWS_PER_GRID_ROW = 3
+
+
+def grid_left(size: int) -> int:
+    """The grid's first column: the grid and its result, centred."""
+    return PANEL_LEFT + (PANEL_COLUMNS - (GRID_PITCH * size + SLOT_CELLS - 2)) // 2
 
 PANEL_COLOUR = 0                    # black, in the sprite colour group
 DIGIT_COLOUR = 7                    # white
 MARK_COLOUR = 3                     # yellow
+SOCKET_COLOUR = 4                   # blue
 
 
 @dataclass(frozen=True)
@@ -53,32 +84,42 @@ class Pack:
     held: int = 0                   # the input last frame, for key presses
     draw: bool = False              # the panel needs drawing this frame
     moved: bool = False             # the hand moved: redraw the arrowheads
+    changed: bool = False           # the counts or the grid changed: redraw them
     closed: bool = False            # it closed this frame: redraw the view
     kinds: tuple[int, ...] = ()     # the kinds shown, since it opened
     held_keys: int = 0              # the second byte of input last frame
+    grid: tuple[int, ...] = EMPTY_GRID
+    book: int = 0                   # the recipes made, a bit each (crafting.py)
+    copied: int = len(RECIPES) - 1  # the recipe COPY laid out last
+    repeat: int = 0                 # frames until RETURN, held, makes again
+    station: int = STATION_HAND
 
 
-def shown(counts: tuple[int, ...], hand: int) -> list[int]:
-    """The kinds the pack shows, in order."""
-    return [kind for kind in range(KIND_COUNT) if counts[kind] or kind == hand]
+def shown(counts: tuple[int, ...], hand: int, kinds: tuple[int, ...] = ()) -> list[int]:
+    """The kinds the pack shows, in order: those held, the hand and those
+    shown already."""
+    return [kind for kind in range(KIND_COUNT) if counts[kind] or kind == hand or kind in kinds]
 
 
-def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0) -> tuple[Pack, int]:
+def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0
+         ) -> tuple[Pack, tuple[int, ...], int]:
     """One frame's input to the pack, before the game's: `inputs` and the
-    second byte, `keys`. Returns the pack and the hand; the game runs this
-    frame only if the pack isn't open. In play, TAB (KEY_CYCLE) cycles the
-    hand (inventory.cycle)."""
+    second byte, `keys`. Returns the pack, the counts and the hand; the
+    game runs this frame only if the pack isn't open. In play, TAB
+    (KEY_CYCLE) cycles the hand (inventory.cycle)."""
     pressed = inputs & ~pack.held
     pressed_keys = keys & ~pack.held_keys
-    pack = replace(pack, held=inputs, held_keys=keys, draw=False, moved=False, closed=False)
+    cell = keys & KEY_CELL if keys & KEY_CELL != pack.held_keys & KEY_CELL else 0     # a cell's key, newly
+    pack = replace(pack, held=inputs, held_keys=keys, draw=False, moved=False, changed=False, closed=False)
     if not pack.open:
         if pressed & INPUT_PACK:
-            return replace(pack, open=True, draw=True, kinds=tuple(shown(counts, hand))), hand
+            return replace(pack, open=True, draw=True, kinds=tuple(shown(counts, hand))), counts, hand
         if pressed_keys & KEY_CYCLE:
-            return pack, cycle(counts, hand)
-        return pack, hand
+            return pack, counts, cycle(counts, hand)
+        return pack, counts, hand
     if pressed & INPUT_PACK:
-        return replace(pack, open=False, closed=True), hand
+        counts, grid = crafting.clear(counts, pack.grid)
+        return replace(pack, open=False, closed=True, grid=grid), counts, hand
     kinds = pack.kinds
     index = kinds.index(hand)
     moved = index
@@ -90,7 +131,28 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         moved -= PACK_COLUMNS
     if pressed & INPUT_DOWN and moved + PACK_COLUMNS < len(kinds):
         moved += PACK_COLUMNS
-    return replace(pack, moved=moved != index), kinds[moved]
+    hand = kinds[moved]
+    pack = replace(pack, moved=moved != index)
+    before = counts, pack.grid
+    grid, book, copied, repeat = pack.grid, pack.book, pack.copied, pack.repeat
+    if cell and crafting.in_grid(cell - 1, pack.station):
+        counts, grid = crafting.put(counts, grid, cell - 1, hand)
+    if pressed_keys & KEY_CLEAR:
+        counts, grid = crafting.clear(counts, grid)
+    if keys & KEY_MAKE:
+        if pressed_keys & KEY_MAKE:
+            repeat = MAKE_DELAY
+        else:
+            repeat = (repeat - 1) & 0xFF
+        if repeat == 0 or pressed_keys & KEY_MAKE:
+            counts, grid, book = crafting.make(counts, grid, book, pack.station)
+            repeat = repeat or MAKE_REPEAT
+    if pressed_keys & KEY_BOOK:
+        counts, grid, copied = crafting.copy(counts, grid, book, copied, pack.station)
+    now = tuple(shown(counts, hand, kinds))
+    pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now,
+                   changed=(counts, grid) != before, draw=now != kinds)
+    return pack, counts, hand
 
 
 # The icons: each kind's picture, a tile's 64 bytes (screen.encode_tile):
@@ -205,16 +267,33 @@ def mark(side: str) -> bytes:
     return bytes(mode2_byte(*row) for row in pixels)
 
 
-def panel_rows(kinds: int) -> int:
+def socket() -> bytes:
+    """An empty cell of the grid: an outline, an icon's size."""
+    pixels = [[SOCKET_COLOUR if x in (0, 7) or y in (0, 15) else PANEL_COLOUR for x in range(8)] for y in range(16)]
+    return encode_tile(pixels)
+
+
+def kind_rows(kinds: int) -> int:
     return 1 + ROWS_PER_SLOT_ROW * ((kinds + PACK_COLUMNS - 1) // PACK_COLUMNS)
 
 
-def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int] | None = None) -> dict[int, int]:
+def panel_rows(kinds: int, station: int = STATION_HAND) -> int:
+    return kind_rows(kinds) + ROWS_PER_GRID_ROW * GRID_SIZES[station]
+
+
+def result(grid: tuple[int, ...], station: int = STATION_HAND) -> tuple[int, int] | None:
+    """What the grid makes, and how many, if anything."""
+    index = crafting.match(grid, station)
+    return None if index is None else (RECIPES[index].makes, RECIPES[index].count)
+
+
+def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int] | None = None,
+          grid: tuple[int, ...] = EMPTY_GRID, station: int = STATION_HAND) -> dict[int, int]:
     """The screen bytes the panel draws, by address: of `kinds`, or, by
-    default, those shown on opening with `hand`."""
+    default, those shown on opening with `hand`, and of the grid."""
     kinds = shown(counts, hand) if kinds is None else kinds
     image = {}
-    for row in range(PANEL_TOP, PANEL_TOP + panel_rows(len(kinds))):
+    for row in range(PANEL_TOP, PANEL_TOP + panel_rows(len(kinds), station)):
         for column in range(PANEL_LEFT, PANEL_LEFT + PANEL_COLUMNS):
             address = cell_address(screen_start, column, row)
             for line in range(CELL_BYTES):
@@ -225,13 +304,12 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
         for line in range(CELL_BYTES):
             image[address + line] = data[line]
 
-    for i, kind in enumerate(kinds):
-        left = PANEL_LEFT + i % PACK_COLUMNS * SLOT_CELLS + 1
-        top = PANEL_TOP + 1 + i // PACK_COLUMNS * ROWS_PER_SLOT_ROW
+    def slot(left: int, top: int, kind: int, count: int, right: str, left_mark: str) -> None:
+        """An icon from column left + 1, row top, its count below, and the
+        arrowheads either side of the count."""
         picture = icon(kind)
         for cell in range(8):
             put(left + 1 + cell % 4, top + cell // 4, picture[cell * 8:cell * 8 + 8])
-        count = counts[kind]
         if count >= 10:
             tens = digit(count // 10)
             put(left + 1, top + 2, tens[:8])
@@ -239,7 +317,26 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
         units = digit(count % 10)
         put(left + 3, top + 2, units[:8])
         put(left + 4, top + 2, units[8:])
-        if kind == hand:
-            put(left, top + 2, mark("right"))
-            put(left + 5, top + 2, mark("left"))
+        put(left, top + 2, mark(right))
+        put(left + 5, top + 2, mark(left_mark))
+
+    for i, kind in enumerate(kinds):
+        left = PANEL_LEFT + i % PACK_COLUMNS * SLOT_CELLS + 1
+        top = PANEL_TOP + 1 + i // PACK_COLUMNS * ROWS_PER_SLOT_ROW
+        marks = ("right", "left") if kind == hand else ("blank", "blank")
+        slot(left, top, kind, counts[kind], *marks)
+
+    size = GRID_SIZES[station]
+    grid_top = PANEL_TOP + kind_rows(len(kinds))
+    left = grid_left(size)
+    for row in range(size):
+        for column in range(size):
+            kind = grid[row * GRID_MAX + column]
+            picture = socket() if kind == EMPTY else icon(kind)
+            for cell in range(8):
+                put(left + column * GRID_PITCH + cell % 4, grid_top + row * ROWS_PER_GRID_ROW + cell // 4,
+                    picture[cell * 8:cell * 8 + 8])
+    made = result(grid, station)
+    if made is not None:
+        slot(left + size * GRID_PITCH, grid_top, made[0], made[1], "right", "blank")
     return image

@@ -229,6 +229,56 @@ Costs, measured:
   299 bytes in PLIGHT, 14 bytes of variables and 5 in PGAME, which now has
   28 bytes before its next page.
 
+### Crafting
+
+Below the kinds the pack shows the crafting grid (`crafting.py`,
+`asm/crafting.asm`; `docs/inventory-and-crafting.md`, Making), the hand's
+2 x 2 for now, and what it makes. The hand is the brush: a cell's key
+(T Y / G H, as they lie on the keyboard) puts one of the hand's kind in
+the cell, from its count, or takes it back, or swaps it; DELETE empties
+the grid; RETURN makes what it lays out, and lays the shape out again
+from the counts, as far as they go (held, again every 8 frames, after 20);
+COPY lays out the next recipe in the book, each recipe made once. Closing
+the pack empties the grid back into the counts. The recipes so far:
+planks (4) from wood, torches (2) from ore over wood, the workbench from
+four planks (`docs/manual.md` shows them as the player sees them).
+
+- **Keys:** in the pack, the host reads DELETE, RETURN and COPY into the
+  second byte of input (`KEY_CLEAR`, `KEY_MAKE`, `KEY_BOOK`), and the
+  first cell key held as a number in its low four bits (`scan_cell`, 1 on,
+  0 none), so nine cells fit beside them; the parasite takes a change of
+  that number as a press.
+- **Matching:** the grid is trimmed to its rows and columns with anything
+  in them, and compared, cell for cell, with each recipe of that size the
+  station allows (`craft_match`), from generated tables of each recipe's
+  size, result, count, station and cells.
+- **What's shown:** a kind once shown stays shown while the pack is open
+  (`pack_seen`), so slots don't move as counts run out; a kind gained, by
+  making it, joins them, and the panel is drawn again (`PACKET_PACK_DRAW`).
+  Otherwise a change of the counts or the grid sends `PACKET_PACK_CHANGED`,
+  and the host redraws only the counts, grid cells and result that differ
+  from what it drew (`render_pack_changed`). The packet adds the grid's
+  size, its nine cells and what it makes and how many.
+- **The panel:** the grid's cells are drawn as icons, or, empty, as a
+  socket (a blue outline), five cells apart; the result as a slot, with an
+  arrowhead pointing at its count.
+
+Costs, measured:
+
+- On the host: a key press's redraw, 5,808 cycles on average, 8,301 at
+  worst (a count and a cell, and the result); the panel drawn whole, on
+  opening or when a kind joins, now 89,929 to 106,263 (three more rows of
+  clearing for the grid), so it may show over two or three frames, then
+  stays put. The arrowheads, 2,412 to 4,804.
+- On the parasite, paused: a pack frame takes 2,058 cycles on average,
+  2,871 at worst. `craft_match` is 548 on average (738 worst), `craft_make`
+  777 (1,248).
+- Memory: on the host, 68 bytes of graphics (the socket and the grid's
+  columns; 143 left), 399 bytes of code in the render region (1,646 left),
+  111 bytes in MAIN and 30 in low RAM; on the parasite, 833 bytes in PLIGHT
+  and 52 bytes of variables. The kinds' icons for soil, stone, ore and gems
+  are their tiles in the material pages, which saved 256 bytes.
+
 ### In front and behind
 
 Each tree stands in front of the miner or behind him, as the hash says for

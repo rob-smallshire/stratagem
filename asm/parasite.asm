@@ -33,6 +33,7 @@ INCLUDE "build/generated/light.asm"
 INCLUDE "asm/zeropage.asm"
 INCLUDE "build/generated/inventory.asm"
 INCLUDE "build/generated/pack.asm"
+INCLUDE "build/generated/crafting.asm"
 INCLUDE "asm/variables.asm"
 INCLUDE "build/generated/tiles.asm"
 INCLUDE "build/generated/world.asm"
@@ -171,6 +172,7 @@ INCLUDE "asm/support.asm"
 INCLUDE "asm/items.asm"
 INCLUDE "asm/inventory.asm"
 INCLUDE "asm/pack.asm"
+INCLUDE "asm/crafting.asm"
 .plight_end
 
 \ Variables that need no starting value: after the game's
