@@ -7,8 +7,9 @@ frame's packet is a short one, the pack's. It shows the kinds held (a count
 above 0), in kind order, eight across: each as its icon, a tile's 8 x 16
 pixels, with its count below, and the hand marked by arrowheads either
 side of its count; if the hand isn't among them, it moves to the first.
-A kind once shown stays shown while the pack is open, even at 0, so the
-kinds don't move about as counts run out; a kind gained (by making it)
+A kind once shown stays shown while the pack is open, even at 0 (drawn as
+an empty socket, with no count), so the kinds don't move about as counts
+run out; a kind gained (by making it)
 joins them, in kind order. Z and X move the hand back and forth across
 the kinds shown, in order, from the end of one row to the start of the
 next, and K and M up and down a row, a key press each step, as the miner
@@ -374,17 +375,21 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
 
     def slot(left: int, top: int, kind: int, count: int, right: str, left_mark: str) -> None:
         """An icon from column left + 1, row top, its count below, and the
-        arrowheads either side of the count."""
-        picture = icon(kind)
+        arrowheads either side of the count; a socket and no count if there
+        are none."""
+        picture = icon(kind) if count else socket()
         for cell in range(8):
             put(left + 1 + cell % 4, top + cell // 4, picture[cell * 8:cell * 8 + 8])
-        if count >= 10:
+        if count == 0:
+            pass
+        elif count >= 10:
             tens = digit(count // 10)
             put(left + 1, top + 2, tens[:8])
             put(left + 2, top + 2, tens[8:])
-        units = digit(count % 10)
-        put(left + 3, top + 2, units[:8])
-        put(left + 4, top + 2, units[8:])
+        if count:
+            units = digit(count % 10)
+            put(left + 3, top + 2, units[:8])
+            put(left + 4, top + 2, units[8:])
         put(left, top + 2, mark(right))
         put(left + 5, top + 2, mark(left_mark))
 

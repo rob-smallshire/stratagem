@@ -262,7 +262,9 @@ four planks (`docs/manual.md` shows them as the player sees them).
   station allows (`craft_match`), from generated tables of each recipe's
   size, result, count, station and cells.
 - **What's shown:** a kind once shown stays shown while the pack is open
-  (`pack_seen`), so slots don't move as counts run out; a kind gained, by
+  (`pack_seen`), so slots don't move as counts run out, drawn as an empty
+  socket with no count once there are none, so the pack doesn't seem to
+  hold what it doesn't; a kind gained, by
   making it, joins them, and the panel is drawn again (`PACKET_PACK_DRAW`).
   Otherwise a change of the counts or the grid sends `PACKET_PACK_CHANGED`,
   and the host redraws only the counts, grid cells and result that differ

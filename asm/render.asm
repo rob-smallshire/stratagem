@@ -787,9 +787,7 @@ ASSERT PACK_COLUMNS = 8 AND SLOT_CELLS = 8 AND ROWS_PER_SLOT_ROW = 4
     CMP host_pack_count
     BEQ grid
     JSR pack_place
-    LDX pack_slot               \ The icon, its cells four across, two
-    LDY host_pack_kinds,X       \ down
-    JSR pack_kind_icon
+    JSR pack_slot_icon          \ The icon, its cells four across, two down
     LDX pack_slot
     LDA host_pack_counts,X
     STA pack_drawn_counts,X
@@ -831,8 +829,19 @@ ASSERT ROWS_PER_GRID_ROW = 3
     LDA host_pack_counts,X
     CMP pack_drawn_counts,X
     BEQ next
+    LDA pack_drawn_counts,X     \ (As it was)
+    STA pack_units
+    LDA host_pack_counts,X
     STA pack_drawn_counts,X
     JSR pack_place
+    LDA pack_units              \ Now none, or none before: the icon too
+    BEQ icon
+    LDX pack_slot
+    LDA host_pack_counts,X
+    BNE count
+.icon
+    JSR pack_slot_icon
+.count
     LDX pack_slot
     LDA host_pack_counts,X
     JSR pack_count
@@ -1119,10 +1128,48 @@ ASSERT GRID_PITCH = 5
     RTS
 }
 
+\ Draw slot pack_slot's icon (pack_place having placed it), or a socket if
+\ there are none of its kind.
+.pack_slot_icon
+{
+    LDX pack_slot
+    LDA host_pack_counts,X
+    BEQ none
+    LDY host_pack_kinds,X
+    JMP pack_kind_icon
+.none
+    LDA #LO(pack_socket)
+    STA zp_tile
+    LDA #HI(pack_socket)
+    STA zp_tile + 1
+    JMP pack_icon
+}
+
 \ Draw count A in the slot at pack_left: its tens, or blank cells if
-\ none, and its units.
+\ none, and its units; or, if 0, blank cells.
 .pack_count
 {
+    CMP #0
+    BNE some
+    JSR pack_blank_tile
+    LDA pack_left
+    CLC
+    ADC #1
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #2
+    JSR pack_put_count
+    JSR pack_blank_tile
+    LDA pack_left
+    CLC
+    ADC #3
+    JSR pack_put_count
+    LDA pack_left
+    CLC
+    ADC #4
+    JMP pack_put_count
+.some
     LDX #0
 .tens
     CMP #10

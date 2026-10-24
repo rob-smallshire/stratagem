@@ -381,3 +381,7 @@ A running log of design decisions. Add to it whenever one is made.
 - **0 shows the tool in use, with its slot's number:** any tool shown above
   the miner now has its belt slot's number beside it, as a second item
   picture; 0 shows it on demand without choosing anything.
+- **A kind run out, in the open pack, is an empty socket:** its icon and a
+  0 gave the impression, at a glance, that it was held. It keeps its place,
+  so nothing shuffles, but is drawn as the blue outline that means empty
+  elsewhere, with no count.

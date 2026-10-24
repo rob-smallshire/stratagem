@@ -234,7 +234,7 @@ def test_panel_matches_model(game_build):
         counts = tuple(rng.choice([0, 1, 9, 10, rng.randrange(100), 99]) for _ in range(KIND_COUNT))
         if trial == 1:
             counts = (0,) * KIND_COUNT          # nothing held: no kinds shown
-        kinds = pack.shown(counts)
+        kinds = pack.shown(counts, tuple(rng.sample(range(KIND_COUNT), 2)))    # some at 0, as if run out
         hand = rng.choice(kinds) if kinds else 0
         station = rng.choice([crafting.STATION_HAND, crafting.STATION_BENCH])
         grid = random_hand_grid(rng, station)
@@ -245,8 +245,7 @@ def test_panel_matches_model(game_build):
         memory[labels["zp_screen_start"] + 1] = screen_start >> 8
         show(counts, hand, kinds, grid, station, belt, slot)
         machine.call(labels["render_pack"])
-        check(pack.panel(screen_start, counts, hand, grid=grid, station=station, belt=belt, tool_slot=slot), before,
-              trial, "drawn")
+        check(pack.panel(screen_start, counts, hand, kinds, grid, station, belt, slot), before, trial, "drawn")
         # The hand moves: only the arrowheads are redrawn.
         hand = rng.choice(kinds) if kinds else hand
         show(counts, hand, kinds, grid, station, belt, slot)
