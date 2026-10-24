@@ -101,7 +101,8 @@ class PacketCheck:
 
     def __init__(self, game):
         self.hand = items.HandShown(game.byte("hand_last"), game.byte("hand_timer"), game.byte("tool_last"),
-                                    game.byte("hand_kind"))
+                                    game.byte("hand_kind"), bool(game.byte("zp_hand_tool")))
+        self.numbers = 0            # frames with a tool's number shown
         self.hand_frames = 0
         self.last = (word(game.memory, game.labels["item_miner_x"]) >> 5,   # the miner's sprite
                      word(game.memory, game.labels["item_miner_y"]) >> 4)   # last frame
@@ -132,9 +133,11 @@ class PacketCheck:
         self.hand = items.show_hand(self.hand, game.byte("hand"), tool, chosen)
         assert game.byte("hand_timer") == self.hand.timer
         hero = Player(x=word(memory, game.labels["zp_player_x"]), y=word(memory, game.labels["zp_player_y"]))
-        for column, line, kind in items.hand_shown(self.hand, hero, camera_x, camera_y):
+        hand = items.hand_shown(self.hand, hero, camera_x, camera_y, game.byte("belt_slot"))
+        for column, line, kind in hand:
             expected.append((column, line, first + kind | ITEM_BY_MINER))
-            self.hand_frames += 1
+        self.hand_frames += bool(hand)
+        self.numbers += len(hand) == 2
         self.last = miner
         assert sent == expected
         return len(sent)
@@ -210,6 +213,26 @@ def test_a_tool_chosen_is_shown_above_the_miner():
         check_packet(game)
     assert game.byte("belt_slot") == 0
     assert check_packet.hand_frames == 3 * items.HAND_FRAMES
+    assert check_packet.numbers == 3 * items.HAND_FRAMES      # each a tool, with its number
+
+
+def test_0_shows_the_tool_in_use_again():
+    """0 shows the tool in use, with its slot's number, and chooses
+    nothing."""
+    from stratagem.build import build
+    from stratagem.inventory import KIND_STONE_PICK
+    from test_daylight import MAILBOX_TOOLS
+    game = ParasiteGame(build())
+    labels = game.labels
+    game.memory[labels["belt"] + 4] = KIND_STONE_PICK
+    game.memory[labels["inventory"] + KIND_STONE_PICK] = 1
+    check_packet = PacketCheck(game)
+    for frame in range(2 * items.HAND_FRAMES + 20):
+        game.memory[MAILBOX_TOOLS] = 5 if frame == 2 else 10 if frame == items.HAND_FRAMES + 10 else 0
+        game.frame(0)
+        check_packet(game)
+    assert game.byte("belt_slot") == 4
+    assert check_packet.numbers == 2 * items.HAND_FRAMES
 
 
 @pytest.mark.parametrize("spare", [0, 1])

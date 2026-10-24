@@ -113,7 +113,7 @@ def test_parasite_pack_matches_model(game_build):
     seen = {"opened": 0, "moved": 0, "closed": 0, "paused": 0, "cycled": 0, "changed": 0, "joined": 0, "made": 0,
             "loaded": 0, "chosen": 0}
     keys = tools = 0
-    for frame in range(3000):
+    for frame in range(4000):
         if not state.open and rng.random() < 0.1:
             for kind in range(KIND_COUNT):
                 memory[labels["inventory"] + kind] = rng.choice([0, 0, 1, 2, rng.randrange(100), 99])
@@ -125,7 +125,7 @@ def test_parasite_pack_matches_model(game_build):
         if rng.random() < 0.6:
             keys = rng.choice(KEYS)
         if rng.random() < 0.3:
-            tools = rng.choice([0, 0, rng.randrange(1, pack.BELT_SLOTS + 1)])
+            tools = rng.choice([0, 0, rng.randrange(1, pack.BELT_SLOTS + 1), pack.SHOW_TOOL])
         counts = tuple(memory[labels["inventory"] + kind] for kind in range(KIND_COUNT))
         hand = memory[labels["hand"]]
         player = memory[labels["zp_player_x"]:labels["zp_player_x"] + 4]

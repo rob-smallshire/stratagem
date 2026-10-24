@@ -81,7 +81,8 @@ BELT_PITCH = 6                      # cells across from one slot of the belt to 
 BELT_LEFT = PANEL_LEFT + (PANEL_COLUMNS - BELT_SLOTS * BELT_PITCH) // 2
 ROWS_PER_BELT = 4
 EMPTY_BELT = (EMPTY,) * BELT_SLOTS
-BELT_KEYS = "123456789"             # by slot
+BELT_KEYS = "1234567890"            # by slot; 0 shows the tool in use again (items.py)
+SHOW_TOOL = BELT_SLOTS + 1          # the 0 key, as the belt key held
 
 
 def grid_left(size: int) -> int:
@@ -144,7 +145,7 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
     pressed = inputs & ~pack.held
     pressed_keys = keys & ~pack.held_keys
     cell = keys & KEY_CELL if keys & KEY_CELL != pack.held_keys & KEY_CELL else 0     # a cell's key, newly
-    slot = tools - 1 if tools and tools != pack.held_tools else None                # a belt key, newly
+    slot = tools - 1 if tools and tools != pack.held_tools and tools != SHOW_TOOL else None    # a belt key, newly
     pack = replace(pack, held=inputs, held_keys=keys, held_tools=tools, draw=False, moved=False, changed=False,
                    closed=False)
     if not pack.open:

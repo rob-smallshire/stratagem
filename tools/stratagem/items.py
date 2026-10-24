@@ -62,7 +62,9 @@ GATHER_MAX = 4              # pixels and lines a frame
 FLYING, RESTING, GATHERING = 0, 1, 2
 WOOD = KIND_WOOD             # the kinds of item are the inventory's (inventory.py)
 NO_TOOL = 0xFF               # bare hands (crafting.EMPTY)
-EMPTY_PICTURE = KIND_COUNT   # the picture shown for bare hands, after the kinds' (sprites.py)
+EMPTY_PICTURE = KIND_COUNT   # the picture shown for bare hands, after the kinds' (sprites.py)...
+NUMBER_FIRST = KIND_COUNT + 1    # ... then the belt's slots' numbers, 1 to 9
+NUMBERS = 9
 DROPS = {ROOT: WOOD, TRUNK: WOOD, TRUNK_KNOT: WOOD, BENCH: KIND_BENCH}     # what each material drops
 assert CANOPY_LEFT not in DROPS
 VIEW_LINES = VIEW_ROWS * 8
@@ -205,11 +207,13 @@ class HandShown:
     by a belt key (pack.py), even if it chose the tool already in hand, or
     by wearing out (actions.py): bare hands as EMPTY_PICTURE, a blue
     outline, like an empty cell in the pack. If both change in a frame, the
-    hand is shown."""
+    hand is shown. A tool is shown with its belt slot's number beside it;
+    the 0 key shows the tool in use again."""
     last: int = KIND_SOIL       # the hand as last seen
     timer: int = 0              # frames left to show it
     tool: int = NO_TOOL         # the tool as last seen
-    kind: int = KIND_SOIL       # what's shown
+    kind: int = KIND_SOIL       # what's shown...
+    is_tool: bool = False       # ... and whether it's the tool
 
 
 def show_hand(state: HandShown, hand: int, tool: int = NO_TOOL, chosen: bool = False) -> HandShown:
@@ -218,21 +222,27 @@ def show_hand(state: HandShown, hand: int, tool: int = NO_TOOL, chosen: bool = F
     broke."""
     changed = False
     if tool != state.tool or chosen:
-        state = replace(state, tool=tool, kind=tool, timer=HAND_FRAMES)
+        state = replace(state, tool=tool, kind=tool, timer=HAND_FRAMES, is_tool=True)
         changed = True
     if hand != state.last:
-        state = replace(state, last=hand, kind=hand, timer=HAND_FRAMES)
+        state = replace(state, last=hand, kind=hand, timer=HAND_FRAMES, is_tool=False)
         changed = True
     return state if changed else replace(state, timer=max(state.timer - 1, 0))
 
 
-def hand_shown(state: HandShown, player: Player, camera_x: int, camera_y: int) -> list[tuple[int, int, int]]:
-    """The hand, if shown and in view, as `shown` gives items."""
+def hand_shown(state: HandShown, player: Player, camera_x: int, camera_y: int, slot: int = 0
+               ) -> list[tuple[int, int, int]]:
+    """The hand, if shown and in view, as `shown` gives items (a picture's
+    number, not a kind); a tool with its belt slot's number beside it, if
+    that is in view too."""
     column = (player.px >> 1) - camera_x
     line = player.py - ITEM_HEIGHT - HAND_GAP - camera_y * 8
-    if state.timer and _in_view(column, line):
-        return [(column, line, EMPTY_PICTURE if state.kind == NO_TOOL else state.kind)]
-    return []
+    if not state.timer or not _in_view(column, line):
+        return []
+    shown = [(column, line, EMPTY_PICTURE if state.kind == NO_TOOL else state.kind)]
+    if state.is_tool and _in_view(column + ITEM_WIDTH // 2, line):
+        shown.append((column + ITEM_WIDTH // 2, line, NUMBER_FIRST + slot))
+    return shown
 
 
 def _in_view(column: int, line: int) -> bool:

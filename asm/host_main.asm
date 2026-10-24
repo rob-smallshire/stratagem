@@ -744,9 +744,9 @@ ASSERT play_keys = play_keys_second + 3
 .cell_keys                      \ By cell, by rows (pack.CELL_KEYS)
     EQUB KEY_R, KEY_T, KEY_Y, KEY_F, KEY_G, KEY_H, KEY_V, KEY_B, KEY_N, &FF
 ASSERT GRID_CELLS = 9
-.belt_keys                      \ 1 to 9, the belt's slots (pack.BELT_KEYS)
-    EQUB 48, 49, 17, 18, 19, 52, 36, 21, 38, &FF
-ASSERT BELT_SLOTS = 9
+.belt_keys                      \ 1 to 9, the belt's slots, then 0, to show the
+    EQUB 48, 49, 17, 18, 19, 52, 36, 21, 38, 39, &FF  \ tool in use (pack.BELT_KEYS)
+ASSERT BELT_SLOTS = 9 AND SHOW_TOOL = 10
 
 INCLUDE "asm/pixels.asm"
 INCLUDE "asm/scroll.asm"

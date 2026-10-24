@@ -11,7 +11,8 @@
 \ (items_emit).
 
 ASSERT ITEM_MAX_FALL <= 4 * 16  \ A quarter-cell a frame, at most
-ASSERT WOOD = KIND_WOOD AND ITEM_FRAME_COUNT = KIND_COUNT + 1  \ Item kinds are the inventory's, then bare hands
+ASSERT WOOD = KIND_WOOD AND ITEM_FRAME_COUNT = NUMBER_FIRST + 9  \ Item kinds are the inventory's, then bare
+ASSERT EMPTY_PICTURE = KIND_COUNT AND NUMBER_FIRST = KIND_COUNT + 1   \ hands, then the numbers 1 to 9
 ASSERT ITEM_OFFSET_X * 16 < 128
 
 \ Material A broke at tile (X, Y): throw out what it drops, if anything.
@@ -1022,8 +1023,9 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 
 \ After the items, the hand, or the tool in the tool hand, shown above the
 \ miner as its kind's item for HAND_FRAMES frames once it changes
-\ or a belt key chooses it again, or it breaks (items.show_hand: the hand if
-\ both do; bare hands as a blue outline), marked as by
+\ or a belt key (or 0) chooses it again, or it breaks (items.show_hand: the
+\ hand if both do; bare hands as a blue outline; a tool with its belt
+\ slot's number beside it), marked as by
 \ the miner, so that it is drawn each frame as he moves. Y is where it goes
 \ in the packet, and is moved on past it.
 .hand_emit
@@ -1053,6 +1055,7 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
     STA tool_last
     STA hand_kind
     DEX
+    STX zp_hand_tool            \ (Non-zero: the tool is shown)
     LDA #HAND_FRAMES
     STA hand_timer
 .tool_same
@@ -1061,20 +1064,23 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
     BEQ hand_same
     STA hand_last
     STA hand_kind
+    LDA #0
+    STA zp_hand_tool
     LDA #HAND_FRAMES
     STA hand_timer
     BNE show                    \ Always branches
 .hand_same
     TXA
     BEQ same
-    LDA hand_timer              \ The tool changed: shown unless bare hands
+    LDA hand_timer              \ The tool changed: shown
     BNE show
+.exit
     RTS
 .same
     LDA hand_timer
-    BEQ done
+    BEQ exit
     DEC hand_timer
-    BEQ done
+    BEQ exit
 .show
     LDA zp_player_x + 1         \ Column: (x >> 5) - camera_x
     STA zp_temp + 1
@@ -1134,6 +1140,29 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 .picture
     CLC
     ADC #ITEM_FRAME_FIRST
+    ORA #ITEM_BY_MINER
+    STA (para_write),Y
+    INY
+    INC item_sent
+    LDA zp_hand_tool            \ A tool: its belt slot's number beside it,
+    BEQ done                    \ if that is in view too
+    LDA zp_temp
+    CLC
+    ADC #ITEM_WIDTH DIV 2
+    STA zp_temp
+    SEC
+    SBC #MAX_STEP_X
+    CMP #VIEW_COLUMNS - 2 * MAX_STEP_X - ITEM_WIDTH DIV 2 + 1
+    BCS done
+    LDA zp_temp
+    STA (para_write),Y
+    INY
+    LDA zp_temp2
+    STA (para_write),Y
+    INY
+    LDA belt_slot
+    CLC
+    ADC #ITEM_FRAME_FIRST + NUMBER_FIRST
     ORA #ITEM_BY_MINER
     STA (para_write),Y
     INY

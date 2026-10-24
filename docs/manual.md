@@ -21,6 +21,7 @@ In the world:
 | SPACE | place what's in your hand ahead (a block, or a torch); with K or M, above or below you. A torch with nowhere else to go goes where you stand |
 | TAB | the next thing in your hand |
 | 1 to 9 | take a tool from your belt into your tool hand; an empty slot is your bare hands |
+| 0 | show the tool in your hand, and its number on your belt |
 | P | open your pack |
 
 In the pack, the world waits:
@@ -120,7 +121,8 @@ You have two hands. One holds what SPACE places; the other holds a tool,
 which L digs with. Your tools hang on a belt of nine slots, one for each
 of the number keys 1 to 9. In your pack, choose a tool, then press a number
 to hang it there; out in the world, press that number to take it in hand.
-The tool shows above you for a moment whenever you press its number. The belt is shown along the bottom of your pack.
+The tool shows above you for a moment, with its number beside it, whenever
+you press its number; 0 shows the tool you're holding. The belt is shown along the bottom of your pack.
 
 Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.

@@ -36,6 +36,7 @@
     STA belt_slot
     STA tools_held
     STA zp_place_wait
+    STA zp_hand_tool
     JSR tool_update             \ Bare hands
     LDA #0
     STA craft_book
@@ -104,6 +105,8 @@
     JMP sent
 .game
     LDX tool_pressed            \ A belt key: its slot in the tool hand
+    BEQ no_tool
+    CPX #SHOW_TOOL              \ (0 only shows it again: items.asm)
     BEQ no_tool
     DEX
     STX belt_slot
@@ -234,7 +237,9 @@
     BPL each_slot
     LDX tool_pressed            \ A belt key: with a tool as the hand, it
     BEQ no_tool                 \ into the slot, or out if there already;
-    DEX                         \ the slot into the tool hand
+    CPX #SHOW_TOOL              \ the slot into the tool hand (0 nothing)
+    BEQ no_tool
+    DEX
     STX belt_slot
     LDA hand
     CMP #TOOL_FIRST

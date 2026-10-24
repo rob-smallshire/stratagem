@@ -378,3 +378,6 @@ A running log of design decisions. Add to it whenever one is made.
   Choosing an empty slot shows it, and so does a tool breaking with none of
   its kind left, which otherwise went unnoticed; a break with a spare shows
   the spare.
+- **0 shows the tool in use, with its slot's number:** any tool shown above
+  the miner now has its belt slot's number beside it, as a second item
+  picture; 0 shows it on demand without choosing anything.

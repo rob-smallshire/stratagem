@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
                                  KIND_STONE_PICK, KIND_TORCH, KIND_WOOD_PICK)
-from stratagem.items import EMPTY_PICTURE, ITEM_HEIGHT, ITEM_WIDTH, WOOD
+from stratagem.items import EMPTY_PICTURE, ITEM_HEIGHT, ITEM_WIDTH, NUMBER_FIRST, NUMBERS, WOOD
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, Player
 from stratagem.screen import mode2_byte
 
@@ -185,8 +185,27 @@ BBBBBB
 """
 
 
+# The belt's slots' numbers, 1 to 9, shown beside a tool: three pixels of
+# white on the left of a picture, the rest clear.
+_NUMBERS = """
+.W. WW. WW. W.W WWW WWW WWW WWW WWW
+WW. ..W ..W W.W W.. W.. ..W W.W W.W
+.W. .W. WW. WWW WW. WWW .W. WWW WWW
+.W. W.. ..W ..W ..W W.W .W. W.W ..W
+WWW WWW WW. ..W WW. WWW .W. WWW WWW
+"""
+
+
+def _number(number: int) -> str:
+    rows = [line.split()[number - 1] + "..." for line in _NUMBERS.strip().split("\n")]
+    return "\n".join(rows)
+
+
 def item_pixels(kind: int) -> list[list[int]]:
-    art = _EMPTY_HANDS if kind == EMPTY_PICTURE else _ITEMS[kind]
+    if NUMBER_FIRST <= kind < NUMBER_FIRST + NUMBERS:
+        art = _number(kind - NUMBER_FIRST + 1)
+    else:
+        art = _EMPTY_HANDS if kind == EMPTY_PICTURE else _ITEMS[kind]
     rows = [[_COLOURS[c] for c in line] for line in art.split()]
     assert len(rows) == ITEM_HEIGHT and all(len(row) == ITEM_WIDTH for row in rows), kind
     return rows
@@ -222,8 +241,10 @@ def sprite_frames() -> list[bytes]:
 
 def item_frames() -> list[bytes]:
     """Each kind of item's frame, its mask and data, by kind, then bare
-    hands' (items.EMPTY_PICTURE)."""
-    return [encode_frame(item_pixels(kind)) for kind in [*sorted(_ITEMS), EMPTY_PICTURE]]
+    hands' (items.EMPTY_PICTURE), then the numbers 1 to 9
+    (items.NUMBER_FIRST)."""
+    pictures = [*sorted(_ITEMS), EMPTY_PICTURE, *range(NUMBER_FIRST, NUMBER_FIRST + NUMBERS)]
+    return [encode_frame(item_pixels(kind)) for kind in pictures]
 
 
 def frame_for(player: Player) -> int:

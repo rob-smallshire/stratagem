@@ -93,4 +93,5 @@ GUARD MAILBOX_FETCHED
 .zp_store_count     SKIP 2      \ store_emit: where the packet's count of changes goes
 .zp_place_wait      SKIP 1      \ Non-zero: the hand moved on; SPACE must be pressed again
 .zp_tool_broke      SKIP 1      \ Non-zero: a tool broke this frame (inventory.asm)
+.zp_hand_tool       SKIP 1      \ Non-zero: the tool is shown above the miner (items.asm)
 
