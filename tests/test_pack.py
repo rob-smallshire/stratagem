@@ -27,15 +27,17 @@ INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT
 
 def test_the_hand_moves_across_the_kinds_shown():
     counts = (3, 0, 12, 0, 99, 0, 0, 0)
-    assert pack.shown(counts, inventory.KIND_SOIL) == [0, 1, 2, 4]
-    opened, counts, hand = pack.step(Pack(), counts, 1, INPUT_PACK)
-    assert opened.open and opened.draw and hand == 1
+    assert pack.shown(counts) == [0, 2, 4]                  # no soil: not shown
+    opened, counts, hand = pack.step(Pack(), counts, inventory.KIND_SOIL, INPUT_PACK)
+    assert opened.open and opened.draw and hand == 0        # the hand moves to the first shown
     moved, counts, hand = pack.step(opened, counts, hand, INPUT_RIGHT)
     assert moved.moved and not moved.draw and hand == 2
     held, counts, hand = pack.step(moved, counts, hand, INPUT_RIGHT)      # held, not pressed again
     assert not held.moved and hand == 2
     closed, counts, hand = pack.step(held, counts, hand, INPUT_PACK)
     assert not closed.open and closed.closed and hand == 2
+    empty, counts, hand = pack.step(Pack(), (0,) * KIND_COUNT, inventory.KIND_SOIL, INPUT_PACK)
+    assert empty.kinds == () and hand == inventory.KIND_SOIL  # nothing held: the hand stays
 
 
 def test_planks_made_in_the_pack():
@@ -133,7 +135,7 @@ def test_parasite_pack_matches_model(game_build):
             assert packet[0] == PACKET_PACK | (PACKET_PACK_DRAW if state.draw else 0) | \
                 (PACKET_PACK_MOVED if state.moved else 0) | (PACKET_PACK_CHANGED if state.changed else 0), \
                 f"frame {frame}"
-            assert packet[1:3] == [len(kinds), kinds.index(hand_after)]
+            assert packet[1:3] == [len(kinds), kinds.index(hand_after) if kinds else 0]
             pairs = 3 + 2 * len(kinds)
             assert packet[3:pairs] == [b for kind in kinds for b in (kind, counts_after[kind])]
             result = pack.result(state.grid)
@@ -168,7 +170,7 @@ def test_panel_matches_model(game_build):
 
     def show(counts, hand, kinds, grid) -> None:
         memory[labels["host_pack_count"]] = len(kinds)
-        memory[labels["host_pack_index"]] = kinds.index(hand)
+        memory[labels["host_pack_index"]] = kinds.index(hand) if kinds else 0
         for i, kind in enumerate(kinds):
             memory[labels["host_pack_kinds"] + i] = kind
             memory[labels["host_pack_counts"] + i] = counts[kind]
@@ -187,8 +189,10 @@ def test_panel_matches_model(game_build):
         if trial == 0:
             screen_start = SCREEN_END - 8       # the panel's rows wrap at once
         counts = tuple(rng.choice([0, 1, 9, 10, rng.randrange(100), 99]) for _ in range(KIND_COUNT))
-        hand = rng.randrange(KIND_COUNT)
-        kinds = pack.shown(counts, hand)
+        if trial == 1:
+            counts = (0,) * KIND_COUNT          # nothing held: no kinds shown
+        kinds = pack.shown(counts)
+        hand = rng.choice(kinds) if kinds else 0
         grid = random_hand_grid(rng)
         before = bytes(rng.randrange(256) for _ in range(SCREEN_END - SCREEN_START))
         memory[SCREEN_START:SCREEN_END] = before
@@ -198,7 +202,7 @@ def test_panel_matches_model(game_build):
         machine.call(labels["render_pack"])
         check(pack.panel(screen_start, counts, hand, grid=grid), before, trial, "drawn")
         # The hand moves: only the arrowheads are redrawn.
-        hand = rng.choice(kinds)
+        hand = rng.choice(kinds) if kinds else hand
         show(counts, hand, kinds, grid)
         machine.call(labels["render_pack_marks"])
         check(pack.panel(screen_start, counts, hand, kinds, grid), before, trial, "moved")
@@ -281,7 +285,7 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     assert all(shown[a - SCREEN_START] == b for a, b in panel.items()), "the panel wasn't redrawn"
 
     # Planks: the wood into the grid's first cell (R), then made (RETURN).
-    state = Pack(open=True, kinds=tuple(pack.shown(counts, hand)))
+    state = Pack(open=True, kinds=tuple(pack.shown(counts)))
     state, counts, hand = pack.step(state, counts, inventory.KIND_WOOD, 0, 1)
     tap(bbc, labels, R_KEY)
     panel = pack.panel(screen_start, counts, hand, list(state.kinds), state.grid)

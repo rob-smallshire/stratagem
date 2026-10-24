@@ -201,9 +201,10 @@ P opens the pack (`pack.py`, `asm/pack.asm`; `render_pack` in
 `render.asm`), and the game pauses. The parasite runs no game frame while
 it is open: each frame it takes the input and sends the pack's packet
 instead (`PACKET_PACK`): the kinds shown, their counts and the hand's
-place among them. The kinds shown are those held, and the hand whatever
-its count, in kind order, fixed on opening (nothing can change them while
-paused). The host draws the panel across the top of the view: a blank
+place among them. The kinds shown are those held (a count above 0), in
+kind order; if the hand isn't among them, opening moves it to the first.
+A kind shown stays shown while the pack is open, even at 0 (see
+Crafting). The host draws the panel across the top of the view: a blank
 row, then, for each row of eight kinds, their icons (a tile's 8 x 16
 pixels), their counts below in a 3 x 7 font, right-aligned, and
 arrowheads either side of the hand's count. The rest of the view is left

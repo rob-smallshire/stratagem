@@ -4,16 +4,16 @@ does it.
 
 PACK (P) opens the pack, and the game pauses: nothing moves, and each
 frame's packet is a short one, the pack's. It shows the kinds held (a count
-above 0) and the kind in hand, whatever its count, in kind order, eight
-across: each as its icon, a tile's 8 x 16 pixels, with its count below,
-and the hand marked by arrowheads either side of its count. A kind once
-shown stays shown while the pack is open, so the kinds don't move about as
-counts run out; a kind gained (by making it) joins them, in kind order.
-Z and X move the hand back and forth across the kinds shown, in order,
-from the end of one row to the start of the next, and K and M up and down
-a row, a key press each step, as the miner moves in play; and only the
-arrowheads are redrawn (redrawing the panel would show it half
-drawn, for a frame).
+above 0), in kind order, eight across: each as its icon, a tile's 8 x 16
+pixels, with its count below, and the hand marked by arrowheads either
+side of its count; if the hand isn't among them, it moves to the first.
+A kind once shown stays shown while the pack is open, even at 0, so the
+kinds don't move about as counts run out; a kind gained (by making it)
+joins them, in kind order. Z and X move the hand back and forth across
+the kinds shown, in order, from the end of one row to the start of the
+next, and K and M up and down a row, a key press each step, as the miner
+moves in play; and only the arrowheads are redrawn (redrawing the panel
+would show it half drawn, for a frame).
 
 Below the kinds is the crafting grid (crafting.py), the hand's 2 x 2, and
 what it makes. The hand is the brush: a cell's key (R T / F G) puts a kind
@@ -97,10 +97,16 @@ class Pack:
     station: int = STATION_HAND
 
 
-def shown(counts: tuple[int, ...], hand: int, kinds: tuple[int, ...] = ()) -> list[int]:
-    """The kinds the pack shows, in order: those held, the hand and those
-    shown already."""
-    return [kind for kind in range(KIND_COUNT) if counts[kind] or kind == hand or kind in kinds]
+def shown(counts: tuple[int, ...], kinds: tuple[int, ...] = ()) -> list[int]:
+    """The kinds the pack shows, in order: those held and those shown
+    already."""
+    return [kind for kind in range(KIND_COUNT) if counts[kind] or kind in kinds]
+
+
+def hand_shown(kinds: tuple[int, ...] | list[int], hand: int) -> int:
+    """The hand, if it is among the kinds shown, otherwise the first of
+    them; the hand if none are shown."""
+    return hand if hand in kinds or not kinds else kinds[0]
 
 
 def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0
@@ -115,7 +121,8 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
     pack = replace(pack, held=inputs, held_keys=keys, draw=False, moved=False, changed=False, closed=False)
     if not pack.open:
         if pressed & INPUT_PACK:
-            return replace(pack, open=True, draw=True, kinds=tuple(shown(counts, hand))), counts, hand
+            kinds = tuple(shown(counts))
+            return replace(pack, open=True, draw=True, kinds=kinds), counts, hand_shown(kinds, hand)
         if pressed_keys & KEY_CYCLE:
             return pack, counts, cycle(counts, hand)
         return pack, counts, hand
@@ -123,7 +130,7 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         counts, grid = crafting.clear(counts, pack.grid)
         return replace(pack, open=False, closed=True, grid=grid), counts, hand
     kinds = pack.kinds
-    index = kinds.index(hand)
+    index = kinds.index(hand) if kinds else 0
     moved = index
     if pressed & INPUT_LEFT and moved > 0:
         moved -= 1
@@ -133,7 +140,7 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         moved -= PACK_COLUMNS
     if pressed & INPUT_DOWN and moved + PACK_COLUMNS < len(kinds):
         moved += PACK_COLUMNS
-    hand = kinds[moved]
+    hand = kinds[moved] if kinds else hand
     pack = replace(pack, moved=moved != index)
     before = counts, pack.grid
     grid, book, copied, repeat = pack.grid, pack.book, pack.copied, pack.repeat
@@ -151,7 +158,8 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
             repeat = repeat or MAKE_REPEAT
     if pressed_keys & KEY_BOOK:
         counts, grid, copied = crafting.copy(counts, grid, book, copied, pack.station)
-    now = tuple(shown(counts, hand, kinds))
+    now = tuple(shown(counts, kinds))
+    hand = hand_shown(now, hand)
     pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now,
                    changed=(counts, grid) != before, draw=now != kinds)
     return pack, counts, hand
@@ -293,7 +301,7 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
           grid: tuple[int, ...] = EMPTY_GRID, station: int = STATION_HAND) -> dict[int, int]:
     """The screen bytes the panel draws, by address: of `kinds`, or, by
     default, those shown on opening with `hand`, and of the grid."""
-    kinds = shown(counts, hand) if kinds is None else kinds
+    kinds = shown(counts) if kinds is None else kinds
     image = {}
     for row in range(PANEL_TOP, PANEL_TOP + panel_rows(len(kinds), station)):
         for column in range(PANEL_LEFT, PANEL_LEFT + PANEL_COLUMNS):

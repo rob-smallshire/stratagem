@@ -246,18 +246,19 @@
     RTS
 }
 
-\ Set pack_kinds to the kinds shown (those held, the hand, and those shown
-\ since opening: pack_seen), pack_count to how many, and pack_index to the
-\ hand's place among them.
+\ Set pack_kinds to the kinds shown (those held, and those shown since
+\ opening: pack_seen), pack_count to how many, and pack_index to the
+\ hand's place among them; if the hand isn't among them, it moves to the
+\ first (pack_index 0, whether or not any are shown).
 .pack_shown
 {
     LDY #0
+    STY pack_index
+    STY pack_i
     LDX #0
 .loop
     LDA inventory,X
     BNE show
-    CPX hand
-    BEQ show
     LDA pack_seen,X
     BEQ next
 .show
@@ -266,6 +267,7 @@
     CPX hand
     BNE not_hand
     STY pack_index
+    STA pack_i                  \ (Non-zero: the hand is shown)
 .not_hand
     TXA
     STA pack_kinds,Y
@@ -275,6 +277,13 @@
     CPX #KIND_COUNT
     BNE loop
     STY pack_count
+    LDA pack_i
+    BNE done
+    TYA
+    BEQ done                    \ Nothing shown: the hand stays
+    LDA pack_kinds
+    STA hand
+.done
     RTS
 }
 

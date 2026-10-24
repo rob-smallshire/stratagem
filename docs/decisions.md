@@ -302,3 +302,9 @@ A running log of design decisions. Add to it whenever one is made.
 - **The grid's keys move a key left, to R T Y / F G H / V B N:** that
   keeps them clear of Z X and of K M, so all four of play's movement keys
   move the hand in the pack, up and down a row included.
+- **The pack shows only kinds held:** at first it also showed the hand
+  whatever its count, so a new game opened on "soil 0". Now opening moves
+  the hand to the first kind held if its own isn't; with nothing held, the
+  pack shows only the grid and the hand stays. A kind that runs out while
+  the pack is open still stays, at 0, until it closes, so slots don't move
+  while crafting.
