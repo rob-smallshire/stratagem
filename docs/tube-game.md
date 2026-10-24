@@ -320,7 +320,8 @@ is bare hands); in the pack, with a tool as the hand, it first hangs the
 tool in the slot, or takes it off if it is there already. A slot holds a
 kind, so when
 the last of a kind breaks, its slot stands empty-handed until another is
-made. The tool chosen is shown above the miner for a second, as the hand is
+made. The tool chosen is shown above the miner for a second, as the hand is,
+and again whenever its belt key is pressed, even if it is already in hand
 (`items.show_hand`: the hand if both change at once; nothing for bare
 hands). The pack shows the belt below the grid: each slot's icon or a
 socket, its key's number below it, and arrowheads either side of the tool

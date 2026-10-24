@@ -1022,7 +1022,8 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
 
 \ After the items, the hand, or the tool in the tool hand, shown above the
 \ miner as its kind's item for HAND_FRAMES frames once it changes
-\ (items.show_hand: the hand if both do; bare hands, nothing), marked as by
+\ or a belt key chooses it again (items.show_hand: the hand if both do; bare
+\ hands, nothing), marked as by
 \ the miner, so that it is drawn each frame as he moves. Y is where it goes
 \ in the packet, and is moved on past it.
 .hand_emit
@@ -1031,7 +1032,11 @@ ASSERT FLYING = 0 AND RESTING = 1 AND GATHERING = 2
     LDA belt,X
     LDX #0                      \ (X: non-zero if anything changed)
     CMP tool_last
+    BNE tool_changed
+    LDX tool_pressed            \ Or chosen again, by a belt key
     BEQ tool_same
+    LDX #0
+.tool_changed
     STA tool_last
     STA hand_kind
     DEX

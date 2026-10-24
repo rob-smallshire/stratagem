@@ -201,18 +201,20 @@ class HandShown:
     """The hand, or the tool in the tool hand, shown above the miner, as an
     item's picture (sprites.py), after the items, for HAND_FRAMES frames
     once it changes: the hand by TAB, placing with none left, or the pack;
-    the tool by a function key (pack.py), unless bare hands. If both change
-    in a frame, the hand is shown."""
+    the tool by a belt key (pack.py), even if it chose the tool already in
+    hand, unless bare hands. If both change in a frame, the hand is
+    shown."""
     last: int = KIND_SOIL       # the hand as last seen
     timer: int = 0              # frames left to show it
     tool: int = NO_TOOL         # the tool as last seen
     kind: int = KIND_SOIL       # what's shown
 
 
-def show_hand(state: HandShown, hand: int, tool: int = NO_TOOL) -> HandShown:
-    """A game frame's change to what is shown, given the hand and the tool."""
+def show_hand(state: HandShown, hand: int, tool: int = NO_TOOL, chosen: bool = False) -> HandShown:
+    """A game frame's change to what is shown, given the hand, the tool, and
+    whether a belt key was pressed."""
     changed = False
-    if tool != state.tool:
+    if tool != state.tool or chosen:
         state = replace(state, tool=tool, kind=tool, timer=0 if tool == NO_TOOL else HAND_FRAMES)
         changed = True
     if hand != state.last:

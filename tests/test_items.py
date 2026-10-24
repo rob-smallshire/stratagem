@@ -126,7 +126,7 @@ class PacketCheck:
                   and top < item.py + items.ITEM_HEIGHT and item.py < bottom)
             expected.append((column, line, first + kind | (ITEM_BY_MINER if by else 0)))
         tool = memory[game.labels["belt"] + game.byte("belt_slot")]
-        self.hand = items.show_hand(self.hand, game.byte("hand"), tool)
+        self.hand = items.show_hand(self.hand, game.byte("hand"), tool, bool(game.byte("tool_pressed")))
         assert game.byte("hand_timer") == self.hand.timer
         hero = Player(x=word(memory, game.labels["zp_player_x"]), y=word(memory, game.labels["zp_player_y"]))
         for column, line, kind in items.hand_shown(self.hand, hero, camera_x, camera_y):
@@ -190,8 +190,8 @@ def test_the_hand_is_shown_above_the_miner_when_it_changes():
 
 def test_a_tool_chosen_is_shown_above_the_miner():
     """3 takes the belt's third slot, a wooden pickaxe, into the tool hand:
-    it is shown for HAND_FRAMES frames; 1, an empty slot, bare hands, shows
-    nothing."""
+    it is shown for HAND_FRAMES frames; 3 again shows it again; 1, an empty
+    slot, bare hands, shows nothing."""
     from stratagem.build import build
     from stratagem.inventory import KIND_WOOD_PICK
     from test_daylight import MAILBOX_TOOLS
@@ -199,12 +199,13 @@ def test_a_tool_chosen_is_shown_above_the_miner():
     labels = game.labels
     game.memory[labels["belt"] + 2] = KIND_WOOD_PICK
     check_packet = PacketCheck(game)
-    for frame in range(items.HAND_FRAMES + 40):
-        game.memory[MAILBOX_TOOLS] = 3 if frame == 5 else 1 if frame == items.HAND_FRAMES + 20 else 0
+    again = items.HAND_FRAMES + 10                  # 3 again, the pickaxe in hand: shown again
+    for frame in range(2 * items.HAND_FRAMES + 40):
+        game.memory[MAILBOX_TOOLS] = 3 if frame in (5, again) else 1 if frame == again + items.HAND_FRAMES + 5 else 0
         game.frame(0)
         check_packet(game)
     assert game.byte("belt_slot") == 0
-    assert check_packet.hand_frames == items.HAND_FRAMES
+    assert check_packet.hand_frames == 2 * items.HAND_FRAMES
 
 
 @pytest.mark.parametrize("seed", [1988, 1, 2, 3])

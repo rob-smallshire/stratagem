@@ -368,3 +368,9 @@ A running log of design decisions. Add to it whenever one is made.
   and nearer to hand. Nine slots, not ten. A belt key in the pack also
   takes its slot into the tool hand, so the belt's arrowheads move there,
   and hanging a tool also chooses it.
+- **A belt key always shows its tool:** pressing the number of the tool
+  already in hand showed nothing, which looked like the key had failed.
+  Now any press shows the slot's tool above the miner for a second.
+  Showing both hands all the time, beside the miner, was considered and
+  set aside for now: about twice the host's cost every frame, and the
+  pictures would lie over a tunnel's walls.

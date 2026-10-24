@@ -119,7 +119,8 @@ At a workbench:
 You have two hands. One holds what SPACE places; the other holds a tool,
 which L digs with. Your tools hang on a belt of nine slots, one for each
 of the number keys 1 to 9. In your pack, choose a tool, then press a number
-to hang it there; out in the world, press that number to take it in hand. The belt is shown along the bottom of your pack.
+to hang it there; out in the world, press that number to take it in hand.
+The tool shows above you for a moment whenever you press its number. The belt is shown along the bottom of your pack.
 
 Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.
