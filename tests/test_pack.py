@@ -26,7 +26,7 @@ INPUTS = [0, 0, INPUT_PACK, INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN, INPUT
 
 
 def test_the_hand_moves_across_the_kinds_shown():
-    counts = (3, 0, 12, 0, 99, 0, 0, 0)
+    counts = (3, 0, 12, 0, 99) + (0,) * (KIND_COUNT - 5)
     assert pack.shown(counts) == [0, 2, 4]                  # no soil: not shown
     opened, counts, hand = pack.step(Pack(), counts, inventory.KIND_SOIL, INPUT_PACK)
     assert opened.open and opened.draw and hand == 0        # the hand moves to the first shown
@@ -75,7 +75,7 @@ def test_planks_made_in_the_pack():
 
 
 def test_tab_cycles_the_hand_through_kinds_placed():
-    counts = (7, 3, 0, 2, 0, 0, 0, 0)       # wood, soil, no stone, ore, nothing else
+    counts = (7, 3, 0, 2) + (0,) * (KIND_COUNT - 4)     # wood, soil, no stone, ore, nothing else
     assert inventory.cycle(counts, inventory.KIND_SOIL) == inventory.KIND_ORE
     assert inventory.cycle(counts, inventory.KIND_ORE) == inventory.KIND_SOIL      # round again, past the wood
     assert inventory.cycle(counts, inventory.KIND_WOOD) == inventory.KIND_SOIL
@@ -175,15 +175,15 @@ def test_panel_matches_model(game_build):
     memory = machine.mpu.memory
     rng = random.Random(1066)
 
-    def show(counts, hand, kinds, grid) -> None:
+    def show(counts, hand, kinds, grid, station) -> None:
         memory[labels["host_pack_count"]] = len(kinds)
         memory[labels["host_pack_index"]] = kinds.index(hand) if kinds else 0
         for i, kind in enumerate(kinds):
             memory[labels["host_pack_kinds"] + i] = kind
             memory[labels["host_pack_counts"] + i] = counts[kind]
-        memory[labels["host_pack_size"]] = 2
+        memory[labels["host_pack_size"]] = crafting.GRID_SIZES[station]
         memory[labels["host_pack_grid"]:labels["host_pack_grid"] + GRID_CELLS] = grid
-        made = pack.result(grid) or (pack.EMPTY, 0)
+        made = pack.result(grid, station) or (pack.EMPTY, 0)
         memory[labels["host_pack_made"]], memory[labels["host_pack_made_count"]] = made
 
     def check(expected, before, trial, what) -> None:
@@ -200,34 +200,35 @@ def test_panel_matches_model(game_build):
             counts = (0,) * KIND_COUNT          # nothing held: no kinds shown
         kinds = pack.shown(counts)
         hand = rng.choice(kinds) if kinds else 0
-        grid = random_hand_grid(rng)
+        station = rng.choice([crafting.STATION_HAND, crafting.STATION_BENCH])
+        grid = random_hand_grid(rng, station)
         before = bytes(rng.randrange(256) for _ in range(SCREEN_END - SCREEN_START))
         memory[SCREEN_START:SCREEN_END] = before
         memory[labels["zp_screen_start"]] = screen_start & 0xFF
         memory[labels["zp_screen_start"] + 1] = screen_start >> 8
-        show(counts, hand, kinds, grid)
+        show(counts, hand, kinds, grid, station)
         machine.call(labels["render_pack"])
-        check(pack.panel(screen_start, counts, hand, grid=grid), before, trial, "drawn")
+        check(pack.panel(screen_start, counts, hand, grid=grid, station=station), before, trial, "drawn")
         # The hand moves: only the arrowheads are redrawn.
         hand = rng.choice(kinds) if kinds else hand
-        show(counts, hand, kinds, grid)
+        show(counts, hand, kinds, grid, station)
         machine.call(labels["render_pack_marks"])
-        check(pack.panel(screen_start, counts, hand, kinds, grid), before, trial, "moved")
+        check(pack.panel(screen_start, counts, hand, kinds, grid, station), before, trial, "moved")
         # The counts and the grid change: they are redrawn.
         counts = tuple(count if rng.random() < 0.5 else rng.choice([0, 1, 9, 10, rng.randrange(100), 99])
                        for count in counts)
-        grid = random_hand_grid(rng)
-        show(counts, hand, kinds, grid)
+        grid = random_hand_grid(rng, station)
+        show(counts, hand, kinds, grid, station)
         machine.call(labels["render_pack_changed"])
-        check(pack.panel(screen_start, counts, hand, kinds, grid), before, trial, "changed")
+        check(pack.panel(screen_start, counts, hand, kinds, grid, station), before, trial, "changed")
 
 
-def random_hand_grid(rng: random.Random) -> tuple[int, ...]:
-    """A grid laid out in the hand's 2 x 2, often a recipe."""
+def random_hand_grid(rng: random.Random, station: int = crafting.STATION_HAND) -> tuple[int, ...]:
+    """A grid laid out in the station's, often a recipe."""
     from test_crafting import random_grid
     while True:
         grid = random_grid(rng)
-        if all(kind == pack.EMPTY or crafting.in_grid(cell, crafting.STATION_HAND) for cell, kind in enumerate(grid)):
+        if all(kind == pack.EMPTY or crafting.in_grid(cell, station) for cell, kind in enumerate(grid)):
             return grid
 
 

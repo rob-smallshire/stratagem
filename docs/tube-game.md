@@ -298,6 +298,12 @@ looks for one within 3 tiles across and 2 up or down of the miner's tile
 (`craft_station`, `crafting.station_near`): if there is one, the grid is
 3 x 3 (R T Y / F G H / V B N), and the bench's recipes can be made.
 
+At the bench: a wooden pickaxe from a T of planks (PPP / .P. / .P.) and a
+stone pickaxe from stone and planks (SSS / .P. / .P.), kinds in the pack
+(`inventory.TOOLS`). The pack's graphics (icons, digits, arrowheads, the
+socket) are now in the render region's code area, leaving its graphics
+area room for more item pictures.
+
 - Memory: the bench's piece graphics are 128 bytes in MAIN, which now
   ends at `&3F80`, 128 bytes short of the screen. `place` moved from
   PGAME to PLIGHT (`asm/place.asm`) to make room for the material tables'

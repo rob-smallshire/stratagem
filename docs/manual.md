@@ -99,5 +99,17 @@ Wood comes from trees. Dig a tree's root, and down it comes.
   [plnk][plnk]
 ```
 
+At a workbench:
+
+**A wooden pickaxe**, a T of planks:
+
+```
+  [plnk][plnk][plnk]
+  [    ][plnk][    ]
+  [    ][plnk][    ]
+```
+
+**A stone pickaxe**, the same with a head of stone.
+
 There is more to make than this. The old miners are said to have made
 much better tools than these, and left word of them in the deep places.

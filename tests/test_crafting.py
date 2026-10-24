@@ -5,8 +5,9 @@ import random
 
 from conftest import parasite_machine
 from stratagem import crafting
-from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, RECIPES, STATION_HAND
-from stratagem.inventory import COUNT_MAX, KIND_BENCH, KIND_COUNT, KIND_ORE, KIND_PLANKS, KIND_TORCH, KIND_WOOD
+from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, RECIPES, STATION_BENCH, STATION_HAND
+from stratagem.inventory import (COUNT_MAX, KIND_BENCH, KIND_COUNT, KIND_ORE, KIND_PLANKS, KIND_STONE_PICK, KIND_TORCH,
+                                 KIND_WOOD, KIND_WOOD_PICK)
 
 W, O, P, _ = KIND_WOOD, KIND_ORE, KIND_PLANKS, EMPTY
 
@@ -31,6 +32,16 @@ def test_shapes_match_anywhere_in_the_grid_but_not_mirrored():
     assert crafting.match(grid_of(P, P, _, P), STATION_HAND) is None
     assert crafting.match(grid_of(W, W), STATION_HAND) is None
     assert crafting.match(EMPTY_GRID, STATION_HAND) is None
+
+
+def test_pickaxes_are_made_at_the_bench():
+    planks, stone = KIND_PLANKS, crafting.LETTERS["S"]
+    wooden = (P, P, P, _, P, _, _, P, _)
+    assert crafting.match(wooden, STATION_HAND) is None                 # a T needs the bench
+    assert RECIPES[crafting.match(wooden, STATION_BENCH)].makes == KIND_WOOD_PICK
+    stone_pick = (stone, stone, stone, _, planks, _, _, planks, _)
+    assert RECIPES[crafting.match(stone_pick, STATION_BENCH)].makes == KIND_STONE_PICK
+    assert crafting.match(grid_of(W), STATION_BENCH) == 0               # the hand's recipes too
 
 
 def test_a_cells_key_puts_takes_back_and_swaps():
@@ -103,11 +114,12 @@ def test_parasite_crafting_matches_model(game_build):
         memory[grid_address:grid_address + GRID_CELLS] = grid
         memory[labels["craft_book"]] = book
         memory[labels["craft_copied"]] = copied
-        memory[labels["pack_station"]] = STATION_HAND
+        station = rng.choice([STATION_HAND, STATION_BENCH])
+        memory[labels["pack_station"]] = station
         what = rng.choice(["match", "put", "clear", "make", "copy"])
         if what == "match":
             machine.call(labels["craft_match"])
-            index = crafting.match(grid, STATION_HAND)
+            index = crafting.match(grid, station)
             assert (not machine.mpu.p & 2) == (index is not None), f"trial {trial}"
             if index is not None:
                 assert machine.mpu.x == index, f"trial {trial}"
@@ -126,11 +138,11 @@ def test_parasite_crafting_matches_model(game_build):
         elif what == "make":
             machine.call(labels["craft_make"])
             before = counts
-            counts, grid, book = crafting.make(counts, grid, book, STATION_HAND)
+            counts, grid, book = crafting.make(counts, grid, book, station)
             seen["made"] += counts != before
         else:
             machine.call(labels["craft_copy"])
-            counts, grid, copied = crafting.copy(counts, grid, book, copied, STATION_HAND)
+            counts, grid, copied = crafting.copy(counts, grid, book, copied, station)
             seen["copied"] += 1
         assert tuple(memory[inventory:inventory + KIND_COUNT]) == counts, f"trial {trial}: {what}"
         assert tuple(memory[grid_address:grid_address + GRID_CELLS]) == grid, f"trial {trial}: {what}"

@@ -94,25 +94,6 @@ ASSERT ITEM_FRAME_FIRST = SPRITE_FRAME_COUNT
         EQUB HI(item_saves + item * ITEM_BYTES)
     NEXT
 
-\ The pack's panel (render_pack): the icons of kinds that aren't materials
-\ (a tile's 64 bytes each; a material's is its whole tile in
-\ material_pages), each kind's icon's address, the digits (two cells each)
-\ and the arrowheads (pointing right, then left, then two blank cells).
-.pack_icons
-    PACK_ICONS
-.pack_icon_low
-    PACK_ICON_LOW
-.pack_icon_high
-    PACK_ICON_HIGH
-.pack_digits
-    PACK_DIGITS
-.pack_marks
-    PACK_MARKS
-.pack_socket                    \ An empty cell of the grid
-    PACK_SOCKET
-.grid_lefts                     \ The grid's first column, by its size
-    GRID_LEFTS
-
 CLEAR RENDER_CODE, RENDER_END
 ORG RENDER_CODE
 GUARD RENDER_END
@@ -1265,5 +1246,25 @@ ASSERT GRID_PITCH = 5
     BNE loop
     RTS
 }
+
+\ The pack's panel's graphics (render_pack), here in the code's room: the
+\ icons of kinds that aren't materials (a tile's 64 bytes each; a
+\ material's is its whole tile in material_pages), each kind's icon's
+\ address, the digits (two cells each) and the arrowheads (pointing right,
+\ then left, then two blank cells).
+.pack_icons
+    PACK_ICONS
+.pack_icon_low
+    PACK_ICON_LOW
+.pack_icon_high
+    PACK_ICON_HIGH
+.pack_digits
+    PACK_DIGITS
+.pack_marks
+    PACK_MARKS
+.pack_socket                    \ An empty cell of the grid
+    PACK_SOCKET
+.grid_lefts                     \ The grid's first column, by its size
+    GRID_LEFTS
 
 .render_end

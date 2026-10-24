@@ -13,7 +13,8 @@ those drawn after.
 
 from __future__ import annotations
 
-from stratagem.inventory import KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE, KIND_TORCH
+from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
+                                 KIND_STONE_PICK, KIND_TORCH, KIND_WOOD_PICK)
 from stratagem.items import ITEM_HEIGHT, ITEM_WIDTH, WOOD
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, Player
 from stratagem.screen import mode2_byte
@@ -83,7 +84,8 @@ RR..RR
 # Each kind of item (items.py, the inventory's kinds), lying on the ground
 # or shown above the miner as the hand: a log, its cut end showing its
 # rings; a clod of soil; a chunk of stone (white, black being clear); one
-# of ore; a gem; planks, red as the wood; a torch; a workbench.
+# of ore; a gem; planks, red as the wood; a torch; a workbench; pickaxes,
+# of wood and of stone.
 _ITEMS = {
     WOOD: """
 RRRRY.
@@ -140,6 +142,20 @@ RRRRRR
 R....R
 RRRRRR
 R....R
+""",
+    KIND_WOOD_PICK: """
+.RRRR.
+RRRRRR
+R.RR.R
+..RR..
+..RR..
+""",
+    KIND_STONE_PICK: """
+.WWWW.
+WWBWWW
+W.RR.W
+..RR..
+..RR..
 """,
 }
 assert sorted(_ITEMS) == list(range(KIND_COUNT))

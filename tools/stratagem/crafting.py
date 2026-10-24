@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from stratagem.tiles import BENCH
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
-                                 KIND_TORCH, KIND_WOOD, gain, spend)
+                                 KIND_STONE_PICK, KIND_TORCH, KIND_WOOD, KIND_WOOD_PICK, gain, spend)
 
 GRID_MAX = 3
 GRID_CELLS = GRID_MAX * GRID_MAX
@@ -55,6 +55,8 @@ RECIPES = [
     Recipe("W", KIND_PLANKS, 4),
     Recipe("O/W", KIND_TORCH, 2),
     Recipe("PP/PP", KIND_BENCH, 1),
+    Recipe("PPP/.P./.P.", KIND_WOOD_PICK, 1, STATION_BENCH),
+    Recipe("SSS/.P./.P.", KIND_STONE_PICK, 1, STATION_BENCH),
 ]
 assert len(RECIPES) <= 8                # the book is a byte of bits
 for _recipe in RECIPES:
