@@ -501,7 +501,7 @@ the start to the boots (`STARTING_ABILITIES = 0`).
    rather than popping out as items when the pack closes.
 4. Done, in part: the workbench as a piece and the 3 x 3 grid near it;
    wooden and stone pickaxes; two hands (L digs with the tool hand, chosen
-   from a belt on f0 to f9; SPACE places the hand); digging by tool, slow
+   from a belt on the keys 1 to 9; SPACE places the hand); digging by tool, slow
    by hand and no stone, and tools that wear out. Still to come: ladders,
    platforms and doors.
 5. The furnace and anvil, bars, the iron pickaxe, finds in the world, and

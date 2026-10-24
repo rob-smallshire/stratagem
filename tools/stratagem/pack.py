@@ -34,6 +34,13 @@ it), an arrowhead's cell and a blank cell. The grid's cells are
 GRID_PITCH cells apart, an empty cell drawn as a socket, and the result is
 drawn as a slot, after them, with an arrowhead pointing at its count, in
 the grid's first row of icons.
+
+Below the grid is the tool belt: BELT_SLOTS slots on the keys 1 to 9, each
+a kind of tool or empty. A belt key takes its slot into the tool hand, in
+play or in the pack; in the pack, with a tool as the hand, it first hangs
+the tool there, or takes it off if it is there already. The belt is drawn
+as icons (sockets where empty), BELT_PITCH cells apart, each with its key's
+number below and arrowheads either side of the tool hand's.
 """
 
 from __future__ import annotations
@@ -69,12 +76,12 @@ ROWS_PER_SLOT_ROW = 4
 assert PANEL_LEFT >= 0
 GRID_PITCH = 5                      # cells across from one grid cell to the next
 ROWS_PER_GRID_ROW = 3
-BELT_SLOTS = 10                     # f0 to f9
+BELT_SLOTS = 9                      # on the keys 1 to 9
 BELT_PITCH = 6                      # cells across from one slot of the belt to the next
 BELT_LEFT = PANEL_LEFT + (PANEL_COLUMNS - BELT_SLOTS * BELT_PITCH) // 2
 ROWS_PER_BELT = 4
 EMPTY_BELT = (EMPTY,) * BELT_SLOTS
-FN_KEYS = ["f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9"]
+BELT_KEYS = "123456789"             # by slot
 
 
 def grid_left(size: int) -> int:
@@ -102,9 +109,9 @@ class Pack:
     copied: int = len(RECIPES) - 1  # the recipe COPY laid out last
     repeat: int = 0                 # frames until L, held, makes again
     station: int = STATION_HAND
-    belt: tuple[int, ...] = EMPTY_BELT  # a tool's kind (inventory.TOOLS) or EMPTY, by function key
+    belt: tuple[int, ...] = EMPTY_BELT  # a tool's kind (inventory.TOOLS) or EMPTY, by belt key
     slot: int = 0                   # the belt's slot in the tool hand
-    held_tools: int = 0             # the function key held last frame (1 on), or 0
+    held_tools: int = 0             # the belt key held last frame (1 on), or 0
 
 
 def tool(pack: Pack) -> int:
@@ -130,14 +137,14 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
     second byte, `keys`, and the station the miner is at, if the pack opens
     (crafting.station_near). Returns the pack, the counts and the hand; the
     game runs this frame only if the pack isn't open. In play, TAB
-    (KEY_CYCLE) cycles the hand (inventory.cycle). `tools` is the function
-    key held (1 on, f0 first), or 0: in play, a press takes the belt's slot
-    into the tool hand; in the pack, with a tool in hand, it loads the slot
-    with it, or empties it if it holds it already."""
+    (KEY_CYCLE) cycles the hand (inventory.cycle). `tools` is the belt key
+    held (1 on, key 1 first), or 0: a press takes the belt's slot into the
+    tool hand; in the pack, with a tool as the hand, it first hangs it in
+    the slot, or takes it off if it is there already."""
     pressed = inputs & ~pack.held
     pressed_keys = keys & ~pack.held_keys
     cell = keys & KEY_CELL if keys & KEY_CELL != pack.held_keys & KEY_CELL else 0     # a cell's key, newly
-    slot = tools - 1 if tools and tools != pack.held_tools else None                # a function key, newly
+    slot = tools - 1 if tools and tools != pack.held_tools else None                # a belt key, newly
     pack = replace(pack, held=inputs, held_keys=keys, held_tools=tools, draw=False, moved=False, changed=False,
                    closed=False)
     if not pack.open:
@@ -168,10 +175,12 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         moved = (moved + 1) % len(kinds)
     hand = kinds[moved] if kinds else hand
     pack = replace(pack, moved=moved != index)
-    before = counts, pack.grid, pack.belt
-    grid, book, copied, repeat, belt = pack.grid, pack.book, pack.copied, pack.repeat, pack.belt
-    if slot is not None and hand in TOOLS:
-        belt = belt[:slot] + (EMPTY if belt[slot] == hand else hand,) + belt[slot + 1:]
+    before = counts, pack.grid, pack.belt, pack.slot
+    grid, book, copied, repeat, belt, tool_slot = pack.grid, pack.book, pack.copied, pack.repeat, pack.belt, pack.slot
+    if slot is not None:
+        if hand in TOOLS:
+            belt = belt[:slot] + (EMPTY if belt[slot] == hand else hand,) + belt[slot + 1:]
+        tool_slot = slot
     if cell and crafting.in_grid(cell - 1, pack.station):
         counts, grid = crafting.put(counts, grid, cell - 1, hand)
     if pressed_keys & KEY_CLEAR:
@@ -188,8 +197,8 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
         counts, grid, copied = crafting.copy(counts, grid, book, copied, pack.station)
     now = tuple(shown(counts, kinds))
     hand = hand_shown(now, hand)
-    pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now, belt=belt,
-                   changed=(counts, grid, belt) != before, draw=now != kinds)
+    pack = replace(pack, grid=grid, book=book, copied=copied, repeat=repeat, kinds=now, belt=belt, slot=tool_slot,
+                   changed=(counts, grid, belt, tool_slot) != before, draw=now != kinds)
     return pack, counts, hand
 
 
@@ -404,7 +413,7 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
         picture = socket() if kind == EMPTY else icon(kind)
         for cell in range(8):
             put(left + 1 + cell % 4, belt_top + cell // 4, picture[cell * 8:cell * 8 + 8])
-        number = digit(index)
+        number = digit(index + 1)
         put(left + 2, belt_top + 2, number[:8])
         put(left + 3, belt_top + 2, number[8:])
         if index == tool_slot:

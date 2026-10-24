@@ -256,7 +256,7 @@ def test_panel_matches_model(game_build):
         counts = tuple(count if rng.random() < 0.5 else rng.choice([0, 1, 9, 10, rng.randrange(100), 99])
                        for count in counts)
         grid = random_hand_grid(rng, station)
-        belt = random_belt()
+        belt, slot = random_belt(), rng.randrange(pack.BELT_SLOTS)
         show(counts, hand, kinds, grid, station, belt, slot)
         machine.call(labels["render_pack_changed"])
         check(pack.panel(screen_start, counts, hand, kinds, grid, station, belt, slot), before, trial, "changed")
@@ -274,7 +274,7 @@ def random_hand_grid(rng: random.Random, station: int = crafting.STATION_HAND) -
 ITEM_FRAME_FIRST = len(sprites.sprite_frames())
 PACK_KEY, LEFT_KEY, TAB_KEY = (3, 7), (6, 1), (6, 0)     # Beebium's keyboard matrix: P, Z (left), TAB,
 R_KEY, MAKE_KEY = (3, 3), (5, 6)                         # R (the first cell), L (make)
-F1_KEY = (7, 1)                                          # f1, the belt's second slot
+KEY_1, KEY_2 = (3, 0), (3, 1)                            # 1 and 2, the belt's first slots
 
 
 def frames(bbc, labels, count: int, keys=(), label: str = "host_frame_shown") -> None:
@@ -374,18 +374,19 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
         differences = [hex(a) for a, b in expected.items() if actual[a - SCREEN_START] != b]
         assert differences[:8] == [], f"{len(differences)} screen bytes differ with the hand shown"
 
-    # The belt: a wooden pickaxe, in hand in the pack, loaded into f1; then,
-    # in play, f1 takes it into the tool hand.
+    # The belt: a wooden pickaxe, in hand in the pack, hung on 2, which takes
+    # it into the tool hand; then, in play, 1 and 2 choose bare hands and it.
     bus = bbc.connect_coprocessor().memory.address.bus
     bus[plabels["inventory"] + inventory.KIND_WOOD_PICK] = 1
     bus[plabels["hand"]] = inventory.KIND_WOOD_PICK
     tap(bbc, labels, PACK_KEY)
-    tap(bbc, labels, F1_KEY)
+    tap(bbc, labels, KEY_2)
     belt = (pack.EMPTY, inventory.KIND_WOOD_PICK) + (pack.EMPTY,) * (pack.BELT_SLOTS - 2)
-    assert tuple(parasite[plabels["belt"] + i] for i in range(pack.BELT_SLOTS)) == belt, "f1 didn't load the belt"
+    assert tuple(parasite[plabels["belt"] + i] for i in range(pack.BELT_SLOTS)) == belt, "2 didn't load the belt"
+    assert parasite[plabels["belt_slot"]] == 1, "2 didn't take the pickaxe into the tool hand"
     counts = tuple(parasite[plabels["inventory"] + kind] for kind in range(KIND_COUNT))
     screen_start = peek[labels["zp_screen_start"]] | peek[labels["zp_screen_start"] + 1] << 8
-    panel = pack.panel(screen_start, counts, inventory.KIND_WOOD_PICK, belt=belt)
+    panel = pack.panel(screen_start, counts, inventory.KIND_WOOD_PICK, belt=belt, tool_slot=1)
     shown = screen[SCREEN_START:SCREEN_END]
     differences = [hex(a) for a, b in panel.items() if shown[a - SCREEN_START] != b]
     assert differences[:8] == [], f"{len(differences)} screen bytes differ with the belt loaded"
@@ -393,7 +394,9 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     frames(bbc, labels, 1)
     bbc.keyboard.matrix_up(*PACK_KEY)
     frames(bbc, labels, 2)
-    bbc.keyboard.matrix_down(*F1_KEY)
-    frames(bbc, labels, 6)                  # the function keys are read every fourth frame
-    bbc.keyboard.matrix_up(*F1_KEY)
-    assert parasite[plabels["belt_slot"]] == 1, "f1 didn't take the pickaxe into the tool hand"
+    for key, slot in ((KEY_1, 0), (KEY_2, 1)):
+        bbc.keyboard.matrix_down(*key)
+        frames(bbc, labels, 6)              # the belt's keys are read every fourth frame
+        bbc.keyboard.matrix_up(*key)
+        frames(bbc, labels, 2)
+        assert parasite[plabels["belt_slot"]] == slot, f"the key didn't choose slot {slot}"

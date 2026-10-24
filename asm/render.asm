@@ -969,8 +969,9 @@ ASSERT GRID_PITCH = 5
 
 \ Draw the belt, below the grid: BELT_SLOTS slots BELT_PITCH cells apart,
 \ each a tool's icon or a socket, those that differ from pack_drawn_belt;
-\ and, if pack_belt_whole, each slot's function key's number below it, and
-\ arrowheads either side of the tool hand's.
+\ and, if pack_belt_whole, each slot's key's number below it (from 1); and
+\ arrowheads either side of the tool hand's, if whole or if it moved
+\ (pack_drawn_slot).
 .pack_belt
 {
     LDA pack_grid_top
@@ -1005,8 +1006,10 @@ ASSERT GRID_PITCH = 5
     JSR pack_kind_icon
 .numbers
     LDA pack_belt_whole
-    BEQ next
-    LDA pack_grid_cell          \ Its key's number
+    BEQ marks
+    LDX pack_grid_cell          \ Its key's number, from 1
+    INX
+    TXA
     JSR pack_digit
     LDA pack_left
     CLC
@@ -1016,13 +1019,22 @@ ASSERT GRID_PITCH = 5
     CLC
     ADC #3
     JSR pack_put_count
+    JMP draw_marks
+.marks
+    LDA host_pack_slot          \ The arrowheads, if the slot in the tool
+    CMP pack_drawn_slot         \ hand moved
+    BEQ next
+.draw_marks
+    LDX #LO(pack_marks)         \ The tool hand's: arrowheads; the others
+    LDY #HI(pack_marks)         \ blank cells
     LDA pack_grid_cell
     CMP host_pack_slot
-    BNE next
-    LDA #LO(pack_marks)         \ The tool hand's: arrowheads
-    STA zp_tile
-    LDA #HI(pack_marks)
-    STA zp_tile + 1
+    BEQ hand
+    LDX #LO(pack_marks + 2 * CELL_BYTES)
+    LDY #HI(pack_marks + 2 * CELL_BYTES)
+.hand
+    STX zp_tile
+    STY zp_tile + 1
     LDA pack_left
     JSR pack_put_count
     LDA pack_left
@@ -1037,7 +1049,11 @@ ASSERT GRID_PITCH = 5
     INC pack_grid_cell
     LDA pack_grid_cell
     CMP #BELT_SLOTS
-    BNE slot
+    BEQ done
+    JMP slot
+.done
+    LDA host_pack_slot
+    STA pack_drawn_slot
     RTS
 }
 
@@ -1316,6 +1332,7 @@ ASSERT GRID_PITCH = 5
 .pack_drawn_made_count SKIP 1
 .pack_drawn_belt    SKIP BELT_SLOTS \ The belt as drawn
 .pack_belt_whole    SKIP 1      \ Non-zero: draw the belt's numbers and arrowheads
+.pack_drawn_slot    SKIP 1      \ The tool hand's slot as drawn
 
 \ Clear the whole screen to colour 0.
 .render_clear

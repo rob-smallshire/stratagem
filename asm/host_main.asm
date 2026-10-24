@@ -204,7 +204,7 @@ GUARD USER_END
     RTS
 }
 
-\ Read the input and write it to the parasite's mailbox: the function key,
+\ Read the input and write it to the parasite's mailbox: the belt key,
 \ the second byte of input, the input, and the count of packets read.
 .host_send_input
 {
@@ -630,10 +630,10 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     STA SYSTEM_VIA_DDRA         \ (bit 7)
     BIT host_flags
     BVS pack
-    LDA host_frames             \ In play: the function keys, every fourth
+    LDA host_frames             \ In play: the belt's keys, every fourth
     AND #3                      \ frame
     BNE no_tools
-    LDY #fn_keys - key_table
+    LDY #belt_keys - key_table
     JSR scan_first
     STA zp_tools
 .no_tools
@@ -643,7 +643,7 @@ SLOT_GRAPHICS = HOST_MATERIAL_PAGES + SLOT_MATERIAL * &200
     JSR scan_keys               \ (play_keys follows)
     JMP read
 .pack
-    LDY #fn_keys - key_table    \ In the pack: the function keys, every frame,
+    LDY #belt_keys - key_table  \ In the pack: the belt's keys, every frame,
     JSR scan_first
     STA zp_tools
     LDY #pack_keys_second - key_table  \ the grid's keys in the second byte,
@@ -744,9 +744,9 @@ ASSERT play_keys = play_keys_second + 3
 .cell_keys                      \ By cell, by rows (pack.CELL_KEYS)
     EQUB KEY_R, KEY_T, KEY_Y, KEY_F, KEY_G, KEY_H, KEY_V, KEY_B, KEY_N, &FF
 ASSERT GRID_CELLS = 9
-.fn_keys                        \ f0 to f9, the belt's slots (pack.FN_KEYS)
-    EQUB 32, 113, 114, 115, 20, 116, 117, 22, 118, 119, &FF
-ASSERT BELT_SLOTS = 10
+.belt_keys                      \ 1 to 9, the belt's slots (pack.BELT_KEYS)
+    EQUB 48, 49, 17, 18, 19, 52, 36, 21, 38, &FF
+ASSERT BELT_SLOTS = 9
 
 INCLUDE "asm/pixels.asm"
 INCLUDE "asm/scroll.asm"

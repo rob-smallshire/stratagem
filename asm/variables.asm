@@ -41,10 +41,11 @@ GUARD &0800
 .hand_kind       SKIP 1      \ ... and the kind shown
 
 \ The tool belt (pack.py)
-.belt            SKIP BELT_SLOTS \ A tool's kind or CELL_EMPTY, by function key
-.belt_slot       SKIP 1      \ The slot in the tool hand
-.tools_held      SKIP 1      \ The function key held last frame (1 on), or 0
-.tool_pressed    SKIP 1      \ A function key pressed this frame (1 on), or 0
+.belt            SKIP BELT_SLOTS \ A tool's kind or CELL_EMPTY, by belt key
+.belt_slot       SKIP 1      \ The slot in the tool hand (follows belt)
+ASSERT belt_slot = belt + BELT_SLOTS
+.tools_held      SKIP 1      \ The belt key held last frame (1 on), or 0
+.tool_pressed    SKIP 1      \ A belt key pressed this frame (1 on), or 0
 .tool_digs       SKIP KIND_COUNT - TOOL_FIRST \ Digs on the one in use, by kind of tool
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place

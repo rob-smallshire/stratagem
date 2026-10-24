@@ -281,8 +281,8 @@ GUARD &0800
 \ and the pack's and crafting's workspace
 ORG plight_end
 GUARD &F800
-.pack_before        SKIP KIND_COUNT + GRID_CELLS + BELT_SLOTS \ The counts, grid and
-                                \ belt before the pack's keys (pack.asm)
+.pack_before        SKIP KIND_COUNT + GRID_CELLS + BELT_SLOTS + 1 \ The counts, grid,
+                                \ belt and its slot before the pack's keys
 .craft_cell         SKIP 1      \ Crafting's workspace (crafting.asm)
 .craft_k            SKIP 1
 .craft_row          SKIP 1

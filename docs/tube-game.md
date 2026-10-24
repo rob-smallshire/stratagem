@@ -192,9 +192,9 @@ latch bit 3, `3` to port B), sets port A's direction to `&7F`, and for
 each key in a table writes its internal key number (an INKEY number's
 `-n - 1`) to port A and reads its state in bit 7; then lets the scanning
 start again (`&0B`). A key costs about 31 cycles. Play's eight keys take
-353 cycles a frame, and the pack's twenty-eight 911 (P, Z X K M, TAB,
-DELETE, L, COPY, the nine cell keys and the ten function keys; the cells' scan stops at the first
-held), with interrupts held off for as long. Which keys are read, and the
+353 cycles a frame (and the belt's nine keys every fourth frame), and the
+pack's twenty-seven 885 (P, Z X K M, TAB, DELETE, L, COPY, the nine cell
+keys and the nine belt keys; the cells' scan stops at the first held), with interrupts held off for as long. Which keys are read, and the
 bits they set, is a table (`key_table`): play's, and the pack's. (The game
 first read its keys with OSBYTE `&81`, at about 270 cycles a key; see
 `decisions.md`, 2026-10-24.)
@@ -312,25 +312,28 @@ area room for more item pictures.
 ### The tool belt
 
 The miner has two hands: the hand, which SPACE places, and the tool hand,
-which L digs with. The tool hand holds one of the belt's ten slots, f0 to
-f9, each empty or holding a kind of tool (`pack.py`: `Pack.belt`,
-`Pack.slot`; `belt`, `belt_slot` on the parasite). In play, a function key
-takes its slot into the tool hand (an empty slot is bare hands); in the
-pack, with a tool as the hand, a function key loads its slot with that
-kind, or empties it if it holds it already. A slot holds a kind, so when
+which L digs with. The tool hand holds one of the belt's nine slots, on
+the keys 1 to 9, each empty or holding a kind of tool (`pack.py`:
+`Pack.belt`, `Pack.slot`; `belt`, `belt_slot` on the parasite). A belt key
+takes its slot into the tool hand, in play or in the pack (an empty slot
+is bare hands); in the pack, with a tool as the hand, it first hangs the
+tool in the slot, or takes it off if it is there already. A slot holds a
+kind, so when
 the last of a kind breaks, its slot stands empty-handed until another is
 made. The tool chosen is shown above the miner for a second, as the hand is
 (`items.show_hand`: the hand if both change at once; nothing for bare
 hands). The pack shows the belt below the grid: each slot's icon or a
 socket, its key's number below it, and arrowheads either side of the tool
-hand's.
+hand's, redrawn when it moves.
 
-- Keys: the host reads the function keys every fourth frame in play, every
-  frame in the pack, as the number of the first held (1 on, f0 first), into
+- Keys: the digit keys, not the function keys, which under emulation can
+  need a modifier, and whose f0 is often the host's F10. The host reads
+  them every fourth frame in play, every frame in the pack, as the number
+  of the first held (1 on, key 1 first), into
   a fourth byte of the mailbox (`MAILBOX_TOOLS`, `&8C`; `MAILBOX_FETCHED`
   moved to `&8B`).
 - Costs, measured: the host's key scan in play is 353 cycles on three
-  frames in four and 641 on the fourth (425 on average); in the pack, 911.
+  frames in four and 615 on the fourth (419 on average); in the pack, 885.
   Drawing the panel whole at a bench (ten kinds, the 3 x 3 grid and the
   belt) takes 173,631 to 216,093 cycles, about five frames, on opening; a
   key's redraw 2,576 to 9,195 (5,690 on average).
@@ -361,7 +364,7 @@ Nothing shows the wear.
 
 - On the parasite, PGAME's `material_quarters` is the tool in use's row,
   copied from PLIGHT's `tool_quarters` by `tool_update` at the start, when a
-  function key chooses a slot, when the pack closes and when a tool breaks,
+  belt key chooses a slot, when the pack closes and when a tool breaks,
   so the digging code is as it was; `tool_wear` is one call in the dig.
 - Costs, measured: `tool_wear` 49 cycles a dig, 450 when the tool breaks;
   `tool_update` 382 to 422, only on those events. Nothing per frame.

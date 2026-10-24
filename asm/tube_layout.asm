@@ -18,7 +18,7 @@ LIST_BYTES = &500
 
 \ The parasite's mailbox, written by the host: the input, then a count of
 \ frames read (so the parasite knows the input has come)
-MAILBOX_TOOLS = &8C             \ The function key held (1 on, f0 first), or 0
+MAILBOX_TOOLS = &8C             \ The belt key held (1 on, key 1 first), or 0
 MAILBOX_KEYS = &8D              \ The second byte of input (KEY_CYCLE)
 MAILBOX_INPUT = &8E
 MAILBOX_FRAME = &8F

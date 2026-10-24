@@ -72,7 +72,7 @@
     LDA #0
     STA pack_cell
 .cell
-    LDA MAILBOX_TOOLS           \ A function key, if not held last frame
+    LDA MAILBOX_TOOLS           \ A belt key, if not held last frame
     CMP tools_held
     STA tools_held
     BNE tool
@@ -102,7 +102,7 @@
     JSR pack_shown
     JMP sent
 .game
-    LDX tool_pressed            \ A function key: its slot in the tool hand
+    LDX tool_pressed            \ A belt key: its slot in the tool hand
     BEQ no_tool
     DEX
     STX belt_slot
@@ -225,18 +225,19 @@
     STA pack_before + KIND_COUNT,X
     DEX
     BPL grid
-    LDX #BELT_SLOTS - 1
+    LDX #BELT_SLOTS             \ (And the slot in the tool hand)
 .each_slot
     LDA belt,X
     STA pack_before + KIND_COUNT + GRID_CELLS,X
     DEX
     BPL each_slot
-    LDX tool_pressed            \ A function key, with a tool in hand: into
-    BEQ no_tool                 \ its slot, or out if there already
+    LDX tool_pressed            \ A belt key: with a tool as the hand, it
+    BEQ no_tool                 \ into the slot, or out if there already;
+    DEX                         \ the slot into the tool hand
+    STX belt_slot
     LDA hand
     CMP #TOOL_FIRST
     BCC no_tool
-    DEX
     CMP belt,X
     BNE load
     LDA #CELL_EMPTY
@@ -295,7 +296,7 @@
     BNE changed
     DEX
     BPL grid_changed
-    LDX #BELT_SLOTS - 1
+    LDX #BELT_SLOTS             \ (And the slot in the tool hand)
 .belt_changed
     LDA belt,X
     CMP pack_before + KIND_COUNT + GRID_CELLS,X

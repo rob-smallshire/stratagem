@@ -362,3 +362,9 @@ A running log of design decisions. Add to it whenever one is made.
   and placed one on it six frames later: now when the hand moves on by
   itself, the new kind is shown above the miner but not placed until SPACE
   is released and pressed again (`zp_place_wait`).
+- **The belt is on the keys 1 to 9, not f0 to f9:** the function keys can
+  need a modifier on an emulator's host keyboard, and most map f0 to the
+  host's F10, breaking the order; the digits are always where expected,
+  and nearer to hand. Nine slots, not ten. A belt key in the pack also
+  takes its slot into the tool hand, so the belt's arrowheads move there,
+  and hanging a tool also chooses it.

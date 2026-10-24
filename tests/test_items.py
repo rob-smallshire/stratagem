@@ -189,9 +189,9 @@ def test_the_hand_is_shown_above_the_miner_when_it_changes():
 
 
 def test_a_tool_chosen_is_shown_above_the_miner():
-    """f2 takes the belt's third slot, a wooden pickaxe, into the tool hand:
-    it is shown for HAND_FRAMES frames; f0, an empty slot, bare hands,
-    shows nothing."""
+    """3 takes the belt's third slot, a wooden pickaxe, into the tool hand:
+    it is shown for HAND_FRAMES frames; 1, an empty slot, bare hands, shows
+    nothing."""
     from stratagem.build import build
     from stratagem.inventory import KIND_WOOD_PICK
     from test_daylight import MAILBOX_TOOLS

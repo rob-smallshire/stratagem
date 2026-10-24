@@ -120,7 +120,7 @@ ENDMACRO
 .zp_redraw          EQUB 0
 .zp_input           EQUB 0
 .zp_keys            EQUB 0      \ The second byte of input (KEY_CYCLE)
-.zp_tools           EQUB 0      \ The function key held (1 on), or 0
+.zp_tools           EQUB 0      \ The belt key held (1 on), or 0
 .redraw_tile        EQUB 0      \ A changed tile to redraw at the flip...
 .redraw_tile_x      EQUB 0
 .redraw_tile_y      EQUB 0
