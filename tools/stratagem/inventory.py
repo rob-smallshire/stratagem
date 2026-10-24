@@ -12,19 +12,21 @@ that places something, in kind order. A kind in hand that places nothing
 the hand to the next kind held that places something (cycle).
 
 Planks, torches and the workbench are made (crafting.py). Torches are
-dropped by T (asm/torches.asm), each spending one, and the miner starts with
-STARTING_TORCHES; planks and the workbench place nothing yet.
+placed as blocks are, at most TORCH_MAX in the world (asm/torches.asm), and
+the miner starts with STARTING_TORCHES; planks and the workbench place
+nothing yet.
 """
 
-from stratagem.tiles import GEM, GRASS, ORE, SOIL, STONE
+from stratagem.tiles import GEM, GRASS, ORE, SOIL, STONE, TORCH
 
 KIND_WOOD, KIND_SOIL, KIND_STONE, KIND_ORE, KIND_GEM, KIND_PLANKS, KIND_TORCH, KIND_BENCH = range(8)
 KIND_COUNT = 8
 COUNT_MAX = 99
 STARTING_TORCHES = 8
+TORCH_MAX = 24                      # torches in the world at once
 
 YIELDS = {GRASS: KIND_SOIL, SOIL: KIND_SOIL, STONE: KIND_STONE, ORE: KIND_ORE, GEM: KIND_GEM}
-PLACES = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM}
+PLACES = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM, KIND_TORCH: TORCH}
 assert set(YIELDS.values()) <= set(PLACES)
 assert KIND_COUNT < 0x80 and max(PLACES.values()) < 0x80     # &FF means none in the tables
 

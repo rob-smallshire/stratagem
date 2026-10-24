@@ -32,7 +32,8 @@ the miner to gather in; what it held falls (support.py). Only straight digs brea
 passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
 falls. Each dig starts a cooldown. Placing puts a whole block of the kind
-in hand (inventory.py) in an empty tile (AIR or SKY). If the world has no
+in hand (inventory.py) in an empty tile (AIR or SKY); a torch is placed
+the same way, unless there are TORCH_MAX in the world. If the world has no
 room for a change, nothing happens.
 """
 
@@ -45,7 +46,7 @@ from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, 
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
                              QUARTER_LINES, QUARTER_PIXELS, QUARTERS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE,
-                             TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
+                             TORCH, TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
 QUARTERS_PER_DIG = {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1}
@@ -63,6 +64,7 @@ class Hands:
     counts: tuple[int, ...] = inventory.STARTING    # of each kind (inventory.py)
     cooldown: int = 0
     hand: int = inventory.KIND_SOIL             # the kind placing puts down
+    torches: int = 0                            # placed in the world (asm/torches.asm)
 
 
 def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
@@ -261,11 +263,14 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
         if hand is None:
             return hands, NONE, None
         hands = replace(hands, hand=hand)
+        torch = inventory.PLACES[hand] == TORCH
+        if torch and hands.torches >= inventory.TORCH_MAX:
+            return hands, NONE, None
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
                      and not overlaps_player(player, x, y))
         if target is not None and world.set_tile(*target, (inventory.PLACES[hand],
                                                            SHAPE_FULL | background_bits(*target))):
-            return Hands(inventory.spend(hands.counts, hand), PLACE_FRAMES, hand), PLACE, target
+            return Hands(inventory.spend(hands.counts, hand), PLACE_FRAMES, hand, hands.torches + torch), PLACE, target
     return hands, NONE, None
 
 
@@ -275,4 +280,4 @@ def _dug(hands: Hands, material: int, left: int | None) -> Hands:
     if left is not None:
         return replace(hands, cooldown=DIG_FRAMES)
     kind = inventory.YIELDS[material]
-    return Hands(inventory.gain(hands.counts, kind), DIG_FRAMES, kind)
+    return Hands(inventory.gain(hands.counts, kind), DIG_FRAMES, kind, hands.torches)

@@ -8,6 +8,7 @@ import pytest
 
 from conftest import RUN_TIMEOUT_EMULATED_SECONDS
 from stratagem import camera, inventory, items, lighting, player, sprites
+from stratagem.inventory import KIND_TORCH
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
 from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, SHAPE_FULL, SLOT_COUNT, TORCH,
@@ -17,12 +18,15 @@ TILE_CACHE_SIZE = 32       # asm/layout.asm
 FRAMES = sprites.sprite_frames()
 ITEM_FRAMES = sprites.item_frames()
 # Each digs deep first: near the surface, daylight outshines the miner's light.
+TORCHES = "torches"          # not a key: the torches put in hand (keys_down)
 DIG_DEEP = [(300, ["M", "L"])]
 SCRIPTS = {
     "tunnel-right-and-down": DIG_DEEP + [(80, ["X", "L"]), (60, ["X", "M", "L"]), (30, ["Z"]), (20, ["K"]),
                                          (20, [])],
     "tunnel-left-and-up": DIG_DEEP + [(80, ["Z", "L"]), (60, ["Z", "K", "L"]), (30, ["X"]), (20, [])],
-    "drop-torches": DIG_DEEP + [(60, ["X", "L"]), (3, ["T"]), (20, []), (80, ["X", "L"]), (3, ["T"]), (20, []),
+    # A torch placed behind the miner, turned round in the tunnel.
+    "place-torches": DIG_DEEP + [(60, ["X", "L"]), (2, ["Z"]), (3, [TORCHES, " "]), (20, []), (80, ["X", "L"]),
+                                 (20, []),
                                 (60, ["Z"]), (30, ["M", "L"]), (20, [])],
     # The tree beside the start (column 127): its root dug, it falls, and
     # the logs it throws out are gathered in to the miner.
@@ -114,8 +118,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
     frames = 0
     items_shown = 0
     for count, keys in script:
-        for key in keys:
-            bbc.keyboard.key_down(key)
+        keys_down(bbc, game_build, keys)
         for _ in range(count):
             bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
             expected = expected_screen(bbc, labels)
@@ -124,15 +127,14 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
             assert differences[:8] == [], f"frame {frames}: {len(differences)} screen bytes differ"
             items_shown = max(items_shown, peek[labels["host_items"]])
             frames += 1
-        for key in keys:
-            bbc.keyboard.key_up(key)
+        keys_up(bbc, keys)
     if script is SCRIPTS["fell-a-tree"]:
         assert items_shown >= 2, "the felled tree's logs weren't drawn"
         parasite = bbc.connect_coprocessor().memory.address
         plabels = game_build.labels["PARASITE"]
         assert parasite.peek[plabels["inventory"] + inventory.KIND_WOOD] >= 2, "the logs weren't gathered in"
-    if any("T" in keys for _, keys in script):
-        # Torches were dropped, and they light the tiles around them.
+    if any(TORCHES in keys for _, keys in script):
+        # Torches were placed, and they light the tiles around them.
         camera_x, camera_y = word(peek, labels["zp_camera_x"]), word(peek, labels["zp_camera_y"])
         tiles = host_tiles(bbc, labels)
         view = [(x, y) for y in range(camera_y >> 1, (camera_y + camera.VIEW_ROWS - 1 >> 1) + 1)
@@ -143,17 +145,32 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
 
 STORE_SLOT_BYTES = 128      # asm/tube_layout.asm
 CHUNK_SIZE, CHUNKS_ACROSS = 8, 32
-STORE_SCRIPT = [(150, ["M", "L"]), (60, ["X", "L"]), (2, ["T"]), (30, ["Z", "L"]), (10, [])]
+STORE_SCRIPT = [(150, ["M", "L"]), (60, ["X", "L"]), (2, ["Z"]), (3, [TORCHES, " "]), (30, ["Z", "L"]), (10, [])]
 
 
-def play(bbc, labels, script):
-    for count, keys in script:
-        for key in keys:
+def keys_down(bbc, game_build, keys) -> None:
+    """Press the keys; TORCHES, not a key, puts the torches in hand, as the
+    pack would."""
+    for key in keys:
+        if key == TORCHES:
+            bbc.connect_coprocessor().memory.address.bus[game_build.labels["PARASITE"]["hand"]] = KIND_TORCH
+        else:
             bbc.keyboard.key_down(key)
+
+
+def keys_up(bbc, keys) -> None:
+    for key in keys:
+        if key != TORCHES:
+            bbc.keyboard.key_up(key)
+
+
+def play(bbc, game_build, script):
+    labels = game_build.labels["HOST"]
+    for count, keys in script:
+        keys_down(bbc, game_build, keys)
         for _ in range(count):
             bbc.debugger.run_to(labels["host_frame_shown"], skip_current=True)
-        for key in keys:
-            bbc.keyboard.key_up(key)
+        keys_up(bbc, keys)
 
 
 def test_host_keeps_the_store(tube_bbc, tube_machine, game_build):
@@ -170,7 +187,7 @@ def test_host_keeps_the_store(tube_bbc, tube_machine, game_build):
     started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
     assert started, "the game did not start"
     parasite = bbc.connect_coprocessor().memory.address
-    play(bbc, labels, STORE_SCRIPT)
+    play(bbc, game_build, STORE_SCRIPT)
     assert parasite.peek[plabels["cache_misses"]] == 0, "a chunk was needed before it was fetched"
 
     # Drop the chunks around the miner from the cache, spoiling
@@ -191,7 +208,7 @@ def test_host_keeps_the_store(tube_bbc, tube_machine, game_build):
                 parasite.bus[base + i] = 0xEE
             dropped += 1
     assert dropped, "the miner's chunk isn't cached"
-    play(bbc, labels, [(8, ["M", "L"]), (10, [])])
+    play(bbc, game_build, [(8, ["M", "L"]), (10, [])])
     assert parasite.peek[plabels["cache_misses"]] >= 1, "the dropped chunk wasn't fetched at once"
 
     for _ in range(4):          # until the queue is sent

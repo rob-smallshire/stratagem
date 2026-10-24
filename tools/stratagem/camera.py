@@ -37,7 +37,6 @@ CENTRE_Y = 15
 
 INPUT_LEFT, INPUT_RIGHT, INPUT_UP, INPUT_DOWN = 1, 2, 4, 8
 INPUT_ACTION, INPUT_PLACE = 16, 32      # L (dig) and SPACE (place)
-INPUT_TORCH = 64                        # T (drop a torch: the Tube game)
 
 
 @dataclass(frozen=True)

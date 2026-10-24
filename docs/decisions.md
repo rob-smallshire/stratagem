@@ -308,3 +308,9 @@ A running log of design decisions. Add to it whenever one is made.
   pack shows only the grid and the hand stays. A kind that runs out while
   the pack is open still stays, at 0, until it closes, so slots don't move
   while crafting.
+- **Torches are placed with SPACE, like anything else; T is gone:** a torch
+  is a kind that places the torch material, aimed as a block is (not into
+  the miner's own tile, as T dropped it). TAB and the pack choose it. The
+  limit of 24 in the world stays (`TORCH_MAX`, now in `inventory.py`).
+- **Planks are red,** like the wood they come from: the first icon, yellow
+  with staggered joints, read as bricks. Boards with dark seams now.

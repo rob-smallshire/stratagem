@@ -3,7 +3,7 @@ does: up to COUNT_MAX of each kind."""
 
 from conftest import parasite_machine
 from stratagem import inventory
-from stratagem.camera import INPUT_TORCH
+from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, INPUT_RIGHT
 from stratagem.inventory import COUNT_MAX, KIND_COUNT, KIND_TORCH
 
 
@@ -21,19 +21,20 @@ def test_counts_go_up_to_the_cap(game_build):
         assert [memory[address + k] for k in range(KIND_COUNT) if k != kind] == others
 
 
-def test_the_miner_starts_with_torches_and_t_spends_them(game_build):
-    """The game starts with inventory.STARTING; T drops a torch for each one
-    carried, and none once they are gone."""
+def test_the_miner_starts_with_torches_and_places_them(game_build):
+    """The game starts with inventory.STARTING; SPACE, with the torches in
+    hand, places one, spending it: here behind the miner, turned round in
+    a tunnel dug down and along."""
     from test_daylight import ParasiteGame
     game = ParasiteGame(game_build)
     game.frame(0)
     address = game.labels["inventory"]
     assert tuple(game.memory[address + k] for k in range(KIND_COUNT)) == inventory.STARTING
-    game.memory[address + KIND_TORCH] = 0
-    game.call("torch_drop")         # none carried: nothing, though the tile is empty
-    assert game.byte("torch_count") == 0
-    game.memory[address + KIND_TORCH] = 2
-    for frame in range(40):         # T pressed every other frame, the miner standing
-        game.frame(INPUT_TORCH if frame % 2 == 0 else 0)
-    assert game.byte("torch_count") == 1        # only one tile to drop it in
-    assert game.memory[address + KIND_TORCH] == 1
+    for count, inputs in [(150, INPUT_DOWN | INPUT_ACTION), (60, INPUT_RIGHT | INPUT_ACTION), (2, INPUT_LEFT)]:
+        for _ in range(count):
+            game.frame(inputs)
+    game.memory[game.labels["hand"]] = KIND_TORCH
+    for frame in range(3):
+        game.frame(INPUT_PLACE)
+    assert game.byte("torch_count") == 1
+    assert game.memory[address + KIND_TORCH] == inventory.STARTING_TORCHES - 1

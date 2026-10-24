@@ -1,6 +1,6 @@
-\ Torches, on the parasite (docs/tube-game.md). T drops one into the tile
-\ the miner stands in, if it is empty (air or sky). A torch lights the tiles
-\ around it as the miner's light does (the same flood, from the torch's
+\ Torches, on the parasite (docs/tube-game.md). One is placed as a block is
+\ (actions.asm), torches being a kind (inventory.py), at most TORCH_MAX in
+\ the world. A torch lights the tiles around it as the miner's light does (the same flood, from the torch's
 \ tile), but its light is fixed, a level per tile, kept with daylight in the
 \ tile cache's light plane: the host draws it with the tiles, and the
 \ miner's light shows only where brighter. Each torch's pool is kept, so that
@@ -13,74 +13,11 @@
 \ a tile is sent, so that the miner's light always compares against what the
 \ host shows.
 
-\ Drop a torch on a fresh press of T.
-.torch_input
+\ Put a torch in the tile aimed at (actions.asm's place, zp_world_new_shape
+\ set) and add it to the torches; return with carry set if the world is
+\ full. The tile's change floods it (torch_tile_changed).
+.torch_place
 {
-    LDA zp_input
-    AND #INPUT_TORCH
-    BEQ released
-    LDA torch_held
-    BNE done
-    LDA #&FF
-    STA torch_held
-    JMP torch_drop
-.released
-    LDA #0
-    STA torch_held
-.done
-    RTS
-}
-
-\ Drop a torch into the tile at the middle of the player's box, if one is
-\ carried, the tile is empty and there is room for another torch, spending
-\ it. The tile's change floods it (torch_tile_changed).
-.torch_drop
-{
-    LDA inventory + KIND_TORCH
-    BEQ done
-    LDA torch_count
-    CMP #TORCH_MAX
-    BCS done
-    JSR player_pixels
-    CLC                         \ The tile at the middle of the player's box
-    LDA zp_box_x
-    ADC #PLAYER_WIDTH DIV 2
-    STA zp_temp
-    LDA zp_box_x + 1
-    ADC #0
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LDA zp_temp
-    STA target_x
-    CLC
-    LDA zp_box_y
-    ADC #PLAYER_HEIGHT DIV 2
-    STA zp_temp
-    LDA zp_box_y + 1
-    ADC #0
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LSR A
-    ROR zp_temp
-    LDA zp_temp
-    STA target_y
-    JSR target_tile
-    CMP #TILE_AIR
-    BEQ empty
-    CMP #TILE_SKY
-    BNE done
-.empty
-    LDA target_shape            \ Whole, against the same background
-    AND #BACKGROUND_SKY
-    STA zp_world_new_shape
     LDA light_dirty             \ Light passes a torch as it passed the
     PHA                         \ empty tile: the miner's flood stands
     LDA #TILE_TORCH
@@ -94,7 +31,7 @@
     LDA target_y
     STA torch_y,X
     INC torch_count
-    DEC inventory + KIND_TORCH
+    CLC
 .done
     RTS
 }

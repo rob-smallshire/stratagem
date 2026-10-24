@@ -48,7 +48,6 @@ sun_reach_1 = &BE00             \ ... and the deepest within 1 to 4 columns
 sun_reach_2 = &BF00
 sun_reach_3 = &C000
 
-TORCH_MAX = 24                  \ Torches (torches.asm)
 TORCH_QUEUE = 128               \ Tiles awaiting redrawing (a power of 2)
 
 ORG &D1                         \ Daylight's zero page
@@ -113,7 +112,6 @@ ALIGN &100
 .para_changes       EQUB 0      \ Changed tiles in this packet
 .para_change_y      EQUB 0      \ ... and where the next goes
 .torch_count        EQUB 0      \ Torches (torches.asm)
-.torch_held         EQUB 0      \ T was down last frame
 .torch_index        EQUB 0
 .torch_change_x     EQUB 0
 .torch_change_y     EQUB 0

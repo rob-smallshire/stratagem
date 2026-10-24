@@ -90,10 +90,6 @@
     INC zp_frame
     JSR update_player
     JSR player_action
-    LDA redraw_tile             \ A torch, unless a tile has changed already
-    BNE no_torch
-    JSR torch_input
-.no_torch
     JSR items_step
 .*para_items_moved
     JSR pack_plan_camera

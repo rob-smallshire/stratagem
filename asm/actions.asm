@@ -195,7 +195,8 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 \ Place the kind in hand in the empty tile aimed at, if any. If none of
 \ that kind is left, the hand moves first to the first kind held that
 \ places something; if there is none, or the hand places nothing, nothing
-\ is placed.
+\ is placed. A torch is added to the torches (torches.asm), unless there
+\ are TORCH_MAX already.
 .place
 {
     LDX hand
@@ -218,6 +219,14 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 .found
     STX hand
 .in_hand
+    LDX hand
+    LDA kind_places,X
+    CMP #TILE_TORCH
+    BNE aim_empty
+    LDA torch_count             \ Room for another torch?
+    CMP #TORCH_MAX
+    BCS done
+.aim_empty
     LDA #&FF                    \ Aim for an empty tile
     STA want
     JSR aim
@@ -226,8 +235,11 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     STA zp_world_new_shape      \ SHAPE_FULL with the background
     LDX hand
     LDA kind_places,X
+    CMP #TILE_TORCH
+    BEQ torch
     JSR change_target
     BCS done
+.placed
     LDX hand
     DEC inventory,X
     LDA #PLACE_FRAMES
@@ -235,6 +247,10 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     LDA #ACTION_PLACE
     STA action
 .done
+    RTS
+.torch
+    JSR torch_place
+    BCC placed
     RTS
 }
 

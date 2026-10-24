@@ -20,11 +20,13 @@ frame, and the games below show it isn't needed (see
 - The pack (step 2, in part): P pauses the game and shows the kinds held
   with their counts across the top of the view; Z X K M move the
   hand (`tube-game.md`, The pack).
-- Torches: counted. The miner starts with 8 (`STARTING_TORCHES`), and T
-  drops one, spending it; at most 24 in the world, never picked up.
+- Torches: counted, and placed with SPACE like any block when in hand.
+  The miner starts with 8 (`STARTING_TORCHES`); at most 24 in the world
+  (`TORCH_MAX`), never picked up.
 - Dropped items exist as sprites that burst out and are gathered in. The
   same machinery can show anything small near the miner for a moment.
-- Keys: Z X K M (move), L (dig, act), SPACE (place), T (torch).
+- Keys: Z X K M (move), L (dig, act), SPACE (place), TAB (cycle the hand),
+  P (the pack).
 
 - Crafting (step 3): the pack's 2 x 2 grid makes planks, torches and the
   workbench (`tube-game.md`, Crafting; `docs/manual.md`).
@@ -294,8 +296,8 @@ recognised, so its result shows.
 - When the hand changes, or the last of something is placed, its icon is
   shown above the miner for about a second. It's drawn as an item sprite,
   so it costs what an item costs, and only while it's shown.
-- The torch key stays as a shortcut, and torches become counted and
-  craftable (wood and something that burns).
+- Torches are counted and craftable (ore over wood), and placed like
+  anything else, with SPACE (decided 2026-10-24: the T key went).
 
 ### Making: a grid on the keys
 
@@ -334,7 +336,7 @@ play, and the cell keys place it:
   staggered, so the grid leans to the right, but it still reads as a grid
   under the fingers.
 - The crafting screen is a mode of its own, paused, so its keys don't clash
-  with play (T is the torch there).
+  with play.
 
 What's recognised:
 

@@ -83,7 +83,7 @@ RR..RR
 # Each kind of item (items.py, the inventory's kinds), lying on the ground
 # or shown above the miner as the hand: a log, its cut end showing its
 # rings; a clod of soil; a chunk of stone (white, black being clear); one
-# of ore; a gem; planks; a torch; a workbench.
+# of ore; a gem; planks, red as the wood; a torch; a workbench.
 _ITEMS = {
     WOOD: """
 RRRRY.
@@ -121,11 +121,11 @@ CMMMMC
 ..CC..
 """,
     KIND_PLANKS: """
-YYYRYY
 RRRRRR
-YRYYYY
+......
 RRRRRR
-YYYYRY
+......
+RRRRRR
 """,
     KIND_TORCH: """
 ..Y...

@@ -11,7 +11,7 @@ from stratagem import actions, inventory, player
 from stratagem.actions import Hands
 from stratagem.camera import INPUT_ACTION, INPUT_PLACE
 from stratagem.camera import INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.tiles import AIR, SHAPE_BITS, SHAPE_FULL
+from stratagem.tiles import AIR, SHAPE_BITS, SHAPE_FULL, TORCH
 from stratagem.world import CHUNK_SIZE, HEIGHTS, RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World
 from test_player import TILE_CACHE_SIZE, PlayerHarness, _random_start
 
@@ -31,11 +31,12 @@ def write_hands(memory, labels, hands: Hands) -> None:
         memory[labels["inventory"] + kind] = count
     memory[labels["hand"]] = hands.hand
     memory[labels["cooldown"]] = hands.cooldown
+    memory[labels["torch_count"]] = hands.torches
 
 
 def read_hands(memory, labels) -> Hands:
     counts = tuple(memory[labels["inventory"] + kind] for kind in range(inventory.KIND_COUNT))
-    return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]])
+    return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]], memory[labels["torch_count"]])
 
 
 def random_hands(rng: random.Random, kinds=sorted(inventory.PLACES)) -> Hands:
@@ -45,7 +46,10 @@ def random_hands(rng: random.Random, kinds=sorted(inventory.PLACES)) -> Hands:
     hand = rng.choice(kinds)
     if rng.random() < 0.5:
         counts[hand] = 0
-    return Hands(tuple(counts), 0, hand)
+    if rng.random() < 0.05:                     # nothing to place at all
+        for kind in inventory.PLACES:
+            counts[kind] = 0
+    return Hands(tuple(counts), 0, hand, rng.choice([0, 0, inventory.TORCH_MAX - 1, inventory.TORCH_MAX]))
 
 
 def assert_tile_matches(machine, labels, world, target) -> None:
@@ -127,7 +131,8 @@ def test_actions_match_model(machine, game_build):
 def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
     """Placing puts down the kind in hand; with none of it left, the first
     kind held that places something, which the hand moves to; with nothing
-    to place, or a hand that places nothing (wood), nothing. The 6502 does
+    to place, or a hand that places nothing (wood), nothing; a torch,
+    unless there are TORCH_MAX in the world. The 6502 does
     as the model, from random places and hands."""
     labels = game_build.labels["PARASITE"]
     harness = PlayerHarness(machine, labels)
@@ -135,10 +140,11 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
     rng = random.Random(1066)
     world = World()
     seen = collections.Counter()
-    for trial in range(800):
+    torches = collections.Counter()
+    for trial in range(1600):
         state = _random_start(rng, world)
         inputs = INPUT_PLACE | rng.choice([0, INPUT_UP, INPUT_DOWN])
-        hands = random_hands(rng, range(inventory.KIND_COUNT))
+        hands = random_hands(rng, [*range(inventory.KIND_COUNT), *[inventory.KIND_TORCH] * 4])    # torches often
         harness.fill_cache(world, state.px // 8, state.py // 16)
         harness.write(state, inputs)
         write_hands(memory, labels, hands)
@@ -152,7 +158,11 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
             assert_tile_matches(machine, labels, world, target)
         seen["moved" if hands.hand != before.hand else "places nothing" if before.hand not in inventory.PLACES
              else "nothing held" if not any(before.counts[k] for k in inventory.PLACES) else "kept"] += 1
+        if inventory.PLACES.get(hands.hand) == TORCH:
+            torches["placed" if action == actions.PLACE else "full" if before.torches == inventory.TORCH_MAX
+                    else "not placed"] += 1
     assert min(seen.values()) >= 5 and len(seen) == 4, seen
+    assert min(torches.values()) >= 5 and len(torches) == 3, torches
 
 
 @pytest.mark.parametrize("keys", [pytest.param(INPUT_LEFT | INPUT_DOWN, marks=pytest.mark.slow),

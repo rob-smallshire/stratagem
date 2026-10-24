@@ -24,8 +24,7 @@ The keys are those of `implementation-record.md`, and T:
 | Z, X | Walk left, right |
 | K | Jump; in the air, a fresh press jumps again |
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
-| SPACE | Place a block of the kind in hand: the kind last dug, or, with none of it left, the first kind carried (soil, stone, ore, gems) |
-| T | Drop a torch where the miner stands (in air: up to 24) |
+| SPACE | Place the kind in hand: the kind last dug, or chosen, or, with none of it left, the first kind carried that places something (soil, stone, ore, gems, torches: up to 24 in the world) |
 | TAB | Cycle the hand to the next kind held that places something |
 | P | Open the pack, pausing the game; P again closes it |
 | Z X K M | In the pack: move the hand across the kinds shown |
@@ -82,8 +81,10 @@ Tube host's code and variables have `&00`-`&56`).
 
 ### Torches
 
-A torch is a material (`tiles.TORCH`), passable, dropped into the empty
-tile the miner stands in (`asm/torches.asm`). Its light is the miner's flood
+A torch is a material (`tiles.TORCH`), passable, and a kind: with the
+torches in hand, SPACE places one as it places a block, in the empty tile
+aimed at (`place` in `asm/actions.asm`, then `torch_place` in
+`asm/torches.asm`). Its light is the miner's flood
 from its tile, but fixed and per tile, kept with daylight in the tile
 cache's light plane: the host draws it with the tiles, and the miner's
 light shows only where brighter. Each torch's pool is kept (24 at most), so
@@ -188,12 +189,13 @@ interrupts held off: it stops the keyboard's own scanning (System VIA
 latch bit 3, `3` to port B), sets port A's direction to `&7F`, and for
 each key in a table writes its internal key number (an INKEY number's
 `-n - 1`) to port A and reads its state in bit 7; then lets the scanning
-start again (`&0B`). A key costs about 31 cycles, against about 270 by
-OSBYTE `&81`: the nine keys of play take 370 cycles a frame (2,429
-before), the pack's seventeen 575 (P, Z X K M, DELETE, RETURN, COPY and
-the nine cell keys; the cells' scan stops at the first held), with
-interrupts held off for as long. Which keys are read, and the bits they
-set, is a table (`key_table`): play's, and the pack's.
+start again (`&0B`). A key costs about 31 cycles. Play's eight keys take
+342 cycles a frame, and the pack's seventeen 575 (P, Z X K M, DELETE,
+RETURN, COPY and the nine cell keys; the cells' scan stops at the first
+held), with interrupts held off for as long. Which keys are read, and the
+bits they set, is a table (`key_table`): play's, and the pack's. (The game
+first read its keys with OSBYTE `&81`, at about 270 cycles a key; see
+`decisions.md`, 2026-10-24.)
 
 ### The pack
 
