@@ -3,6 +3,52 @@
 \ whose contents have been taken from the counts; the recipes, each a shape
 \ (build/generated/crafting.asm); and the recipe book, a bit for each recipe made.
 
+\ Set pack_station to the station the miner crafts at: the workbench if
+\ one is within NEAR_ACROSS tiles across and NEAR_UP_DOWN up or down of
+\ the miner's tile, otherwise the hand; and pack_size to its grid's size.
+.craft_station
+{
+    JSR miner_tile
+    LDA target_x
+    STA craft_left              \ (As workspace: the miner's tile)
+    LDA target_y
+    STA craft_top
+    LDX #STATION_HAND
+    LDA #LO(-NEAR_UP_DOWN)
+    STA craft_row
+.row
+    LDA #LO(-NEAR_ACROSS)
+    STA craft_column
+.cell
+    CLC
+    LDA craft_left
+    ADC craft_column
+    STA target_x
+    CLC
+    LDA craft_top
+    ADC craft_row
+    STA target_y
+    JSR target_tile
+    CMP #TILE_BENCH
+    BEQ bench
+    INC craft_column
+    LDA craft_column
+    CMP #NEAR_ACROSS + 1
+    BNE cell
+    INC craft_row
+    LDA craft_row
+    CMP #NEAR_UP_DOWN + 1
+    BNE row
+    BEQ found                   \ Always branches
+.bench
+    LDX #STATION_BENCH
+.found
+    STX pack_station
+    LDA grid_sizes,X
+    STA pack_size
+    RTS
+}
+
 \ A cell's key, cell X: the hand's kind into it, from its count; the same
 \ kind back out; or another kind back out and the hand's in, if there is
 \ one to put.

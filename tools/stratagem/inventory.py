@@ -13,11 +13,12 @@ the hand to the next kind held that places something (cycle).
 
 Planks, torches and the workbench are made (crafting.py). Torches are
 placed as blocks are, at most TORCH_MAX in the world (asm/torches.asm), and
-the miner starts with STARTING_TORCHES; planks and the workbench place
-nothing yet.
+the miner starts with STARTING_TORCHES. The workbench is placed as a
+piece, and dug it breaks whole, thrown out as an item (items.py); planks
+place nothing yet.
 """
 
-from stratagem.tiles import GEM, GRASS, ORE, SOIL, STONE, TORCH
+from stratagem.tiles import BENCH, GEM, GRASS, ORE, SOIL, STONE, TORCH
 
 KIND_WOOD, KIND_SOIL, KIND_STONE, KIND_ORE, KIND_GEM, KIND_PLANKS, KIND_TORCH, KIND_BENCH = range(8)
 KIND_COUNT = 8
@@ -26,7 +27,7 @@ STARTING_TORCHES = 8
 TORCH_MAX = 24                      # torches in the world at once
 
 YIELDS = {GRASS: KIND_SOIL, SOIL: KIND_SOIL, STONE: KIND_STONE, ORE: KIND_ORE, GEM: KIND_GEM}
-PLACES = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM, KIND_TORCH: TORCH}
+PLACES = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM, KIND_TORCH: TORCH, KIND_BENCH: BENCH}
 assert set(YIELDS.values()) <= set(PLACES)
 assert KIND_COUNT < 0x80 and max(PLACES.values()) < 0x80     # &FF means none in the tables
 

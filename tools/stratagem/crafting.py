@@ -4,7 +4,7 @@
 
 The grid is GRID_MAX cells square, by rows; each cell holds a kind or
 EMPTY. A station gives the grid's size: in the hand, 2 x 2, its top left
-cells (R T / F G). Putting a kind in a cell takes one from its count, and
+cells (R T / F G); near a workbench (station_near), 3 x 3. Putting a kind in a cell takes one from its count, and
 taking it out gives it back, so the grid's contents are always the
 ingredients of what's made.
 
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from stratagem.tiles import BENCH
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
                                  KIND_TORCH, KIND_WOOD, gain, spend)
 
@@ -30,8 +31,9 @@ EMPTY = 0xFF
 EMPTY_GRID = (EMPTY,) * GRID_CELLS
 assert KIND_COUNT < EMPTY
 
-STATION_HAND = 0
-GRID_SIZES = {STATION_HAND: 2}
+STATION_HAND, STATION_BENCH = 0, 1
+GRID_SIZES = {STATION_HAND: 2, STATION_BENCH: 3}
+NEAR_ACROSS, NEAR_UP_DOWN = 3, 2        # a bench this many tiles from the miner's is near
 
 LETTERS = {"W": KIND_WOOD, "D": KIND_SOIL, "S": KIND_STONE, "O": KIND_ORE, "G": KIND_GEM, "P": KIND_PLANKS,
            ".": EMPTY}
@@ -61,6 +63,17 @@ for _recipe in RECIPES:
     assert any(c != EMPTY for c in _rows[0]) and any(c != EMPTY for c in _rows[-1])       # trimmed
     assert any(row[0] != EMPTY for row in _rows) and any(row[-1] != EMPTY for row in _rows)
     assert len(_rows) <= GRID_SIZES[_recipe.station] and len(_rows[0]) <= GRID_SIZES[_recipe.station]
+
+
+def station_near(tile_at, tx: int, ty: int) -> int:
+    """The station the miner, in tile (tx, ty), crafts at: the workbench if
+    one is within NEAR_ACROSS tiles across and NEAR_UP_DOWN up or down
+    (tile numbers wrapping as bytes), otherwise the hand."""
+    for dy in range(-NEAR_UP_DOWN, NEAR_UP_DOWN + 1):
+        for dx in range(-NEAR_ACROSS, NEAR_ACROSS + 1):
+            if tile_at((tx + dx) & 0xFF, (ty + dy) & 0xFF)[0] == BENCH:
+                return STATION_BENCH
+    return STATION_HAND
 
 
 def in_grid(cell: int, station: int) -> bool:

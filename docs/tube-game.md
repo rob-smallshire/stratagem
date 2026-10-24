@@ -288,6 +288,21 @@ Costs, measured:
   and 52 bytes of variables. The kinds' icons for soil, stone, ore and gems
   are their tiles in the material pages, which saved 256 bytes.
 
+### The workbench
+
+The workbench is a piece (`tiles.BENCH`, its picture in `piece_art.py`),
+passable, held from below (`support.py`, "bench"): with one in hand, SPACE
+places it as a block, and a dig breaks it whole, thrown out as an item
+(`items.DROPS`) to be gathered in again. Opening the pack, the parasite
+looks for one within 3 tiles across and 2 up or down of the miner's tile
+(`craft_station`, `crafting.station_near`): if there is one, the grid is
+3 x 3 (R T Y / F G H / V B N), and the bench's recipes can be made.
+
+- Memory: the bench's piece graphics are 128 bytes in MAIN, which now
+  ends at `&3F80`, 128 bytes short of the screen. `place` moved from
+  PGAME to PLIGHT (`asm/place.asm`) to make room for the material tables'
+  new entries.
+
 ### In front and behind
 
 Each tree stands in front of the miner or behind him, as the hash says for

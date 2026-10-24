@@ -335,3 +335,8 @@ A running log of design decisions. Add to it whenever one is made.
   out. Pickaxes are kinds in the pack, the best held used, and wear out
   after a number of digs (about 60 for wood, 130 for stone, as in
   Minecraft), breaking with no warning shown, a count spent.
+- **The workbench is one tile, a passable piece held from below:**
+  `tile-set.md` planned it as two tiles; one is enough to start, and its
+  picture is the pack's icon. Dug, it breaks whole and comes back as an
+  item, as a tree's part gives wood. "Near" is within 3 tiles across and 2
+  up or down of the miner's tile, found once, on opening the pack.

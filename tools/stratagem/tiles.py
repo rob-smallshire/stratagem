@@ -49,9 +49,10 @@ AIR, GRASS, SOIL, STONE, ORE, GEM, BEDROCK, WATER, SKY, TORCH = range(10)
 # Trees' parts, pieces the generator places (world.py)
 (ROOT, TRUNK, TRUNK_KNOT, CANOPY_LEFT, CANOPY_OVER_TRUNK, CANOPY_RIGHT,
  CANOPY_TOP_LEFT, CANOPY_TOP, CANOPY_TOP_RIGHT) = range(10, 19)
+BENCH = 19                  # the workbench, placed by the player (crafting.py)
 MATERIAL_NAMES = ["air", "grass", "soil", "stone", "ore", "gem", "bedrock", "water", "sky", "torch",
                   "root", "trunk", "trunk, knot", "canopy left", "canopy over trunk", "canopy right",
-                  "canopy top left", "canopy top", "canopy top right"]
+                  "canopy top left", "canopy top", "canopy top right", "bench"]
 MATERIAL_COUNT = len(MATERIAL_NAMES)
 DRAWN_COUNT = SKY + 1       # materials the renderer draws, with pages of graphics;
                             # pieces are drawn through slots (below)
@@ -59,7 +60,7 @@ TREE_PARTS = list(range(ROOT, CANOPY_TOP_RIGHT + 1))
 
 # Materials a body can pass through, whatever their shape; the rest are
 # solid in their shape's solid quarter-cells.
-PASSABLE = frozenset({AIR, WATER, SKY, TORCH, *TREE_PARTS})
+PASSABLE = frozenset({AIR, WATER, SKY, TORCH, *TREE_PARTS, BENCH})
 # Materials that can be dug, and so take shapes other than SHAPE_FULL.
 DIGGABLE = [GRASS, SOIL, STONE, ORE, GEM]
 
@@ -313,7 +314,7 @@ def material_pages(material: int) -> bytes:
 # keeps them in its program RAM, and composes each pair of piece and
 # backdrop that is in the tile cache once, into a slot in the render region,
 # which the renderer draws as an ordinary material (below).
-PIECES = [TORCH, *TREE_PARTS]
+PIECES = [TORCH, *TREE_PARTS, BENCH]
 FIRST_PIECE = TORCH
 PIECE_COUNT = len(PIECES)
 assert PIECES == list(range(FIRST_PIECE, FIRST_PIECE + PIECE_COUNT))
@@ -329,7 +330,8 @@ def piece_pixels(material: int) -> list[list[int | None]]:
     picture = {ROOT: piece_art.ROOT, TRUNK: piece_art.TRUNK, TRUNK_KNOT: piece_art.TRUNK_KNOT,
                CANOPY_LEFT: piece_art.CANOPY[1][0], CANOPY_OVER_TRUNK: piece_art.CANOPY[1][1],
                CANOPY_RIGHT: piece_art.CANOPY[1][2], CANOPY_TOP_LEFT: piece_art.CANOPY[0][0],
-               CANOPY_TOP: piece_art.CANOPY[0][1], CANOPY_TOP_RIGHT: piece_art.CANOPY[0][2]}[material]
+               CANOPY_TOP: piece_art.CANOPY[0][1], CANOPY_TOP_RIGHT: piece_art.CANOPY[0][2],
+               BENCH: piece_art.BENCH}[material]
     return [[None if c == piece_art.CLEAR else int(c) for c in row] for row in picture]
 
 

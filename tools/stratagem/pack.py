@@ -46,7 +46,7 @@ from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, GRID_MAX, GRID_SIZ
 from stratagem.inventory import (KIND_BENCH, KIND_COUNT, KIND_GEM, KIND_ORE, KIND_PLANKS, KIND_SOIL, KIND_STONE,
                                  KIND_TORCH, KIND_WOOD, cycle)
 from stratagem.screen import CELL_BYTES, VIEW_COLUMNS, cell_address, encode_tile, mode2_byte
-from stratagem.tiles import (AIR, BLACK, GEM, ORE, RED, SHAPE_FULL, SOIL, STONE, TILE_COLOUR_BASE, TORCH, TRUNK, WHITE,
+from stratagem.tiles import (AIR, BENCH, BLACK, GEM, ORE, RED, SHAPE_FULL, SOIL, STONE, TILE_COLOUR_BASE, TORCH, TRUNK, WHITE,
                              YELLOW, tile_bytes)
 
 INPUT_PACK = 128                    # P: open or close the pack
@@ -110,10 +110,11 @@ def hand_shown(kinds: tuple[int, ...] | list[int], hand: int) -> int:
     return hand if hand in kinds or not kinds else kinds[0]
 
 
-def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0
+def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int = 0, station: int = STATION_HAND
          ) -> tuple[Pack, tuple[int, ...], int]:
     """One frame's input to the pack, before the game's: `inputs` and the
-    second byte, `keys`. Returns the pack, the counts and the hand; the
+    second byte, `keys`, and the station the miner is at, if the pack opens
+    (crafting.station_near). Returns the pack, the counts and the hand; the
     game runs this frame only if the pack isn't open. In play, TAB
     (KEY_CYCLE) cycles the hand (inventory.cycle)."""
     pressed = inputs & ~pack.held
@@ -123,7 +124,8 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
     if not pack.open:
         if pressed & INPUT_PACK:
             kinds = tuple(shown(counts))
-            return replace(pack, open=True, draw=True, kinds=kinds), counts, hand_shown(kinds, hand)
+            return (replace(pack, open=True, draw=True, kinds=kinds, station=station), counts,
+                    hand_shown(kinds, hand))
         if pressed_keys & KEY_CYCLE:
             return pack, counts, cycle(counts, hand)
         return pack, counts, hand
@@ -172,7 +174,7 @@ def step(pack: Pack, counts: tuple[int, ...], hand: int, inputs: int, keys: int 
 # a material's whole tile, which the render region's material pages hold
 # already (ICON_MATERIALS), a piece's over the cave, or a picture of its own.
 ICON_MATERIALS = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM}
-ICON_PIECES = {KIND_WOOD: TRUNK, KIND_TORCH: TORCH}
+ICON_PIECES = {KIND_WOOD: TRUNK, KIND_TORCH: TORCH, KIND_BENCH: BENCH}
 ICON_ART = {
     KIND_PLANKS: """
 RRRRRRRR
@@ -190,24 +192,6 @@ RRRRRRRR
 RRRRRRRR
 RRRR..RR
 RRRRRRRR
-........
-""",
-    KIND_BENCH: """
-........
-...WWW..
-....R...
-....R...
-YYYYYYYY
-YYYYYYYY
-RRRRRRRR
-.R....R.
-.R....R.
-.R....R.
-.RRRRRR.
-.R....R.
-.R....R.
-.R....R.
-.R....R.
 ........
 """,
 }

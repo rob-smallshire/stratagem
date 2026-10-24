@@ -18,10 +18,6 @@
     BPL empty
     LDA #RECIPE_COUNT - 1
     STA craft_copied
-    LDX #STATION_HAND
-    STX pack_station
-    LDA grid_sizes,X
-    STA pack_size
     LDA #0
     STA craft_book
     STA craft_repeat
@@ -70,6 +66,7 @@
     LDA #&FF
     STA pack_open
     STA pack_draw
+    JSR craft_station           \ At a workbench?
     LDA #0                      \ The kinds shown, from those held now
     LDX #KIND_COUNT - 1
 .unseen

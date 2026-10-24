@@ -42,10 +42,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from stratagem.camera import MAX_STEP_X
-from stratagem.inventory import KIND_SOIL, KIND_WOOD
+from stratagem.inventory import KIND_BENCH, KIND_SOIL, KIND_WOOD
 from stratagem.player import GRAVITY, PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.screen import VIEW_COLUMNS, VIEW_ROWS
-from stratagem.tiles import CANOPY_LEFT, QUARTER_LINES, QUARTER_PIXELS, QUARTERS, ROOT, TRUNK, TRUNK_KNOT, solid_quarter_cells
+from stratagem.tiles import BENCH, CANOPY_LEFT, QUARTER_LINES, QUARTER_PIXELS, QUARTERS, ROOT, TRUNK, TRUNK_KNOT, solid_quarter_cells
 
 ITEM_MAX = 8
 ITEM_WIDTH = 6              # pixels: three bytes of MODE 2
@@ -61,7 +61,7 @@ REST_FRAMES = 25            # half a second
 GATHER_MAX = 4              # pixels and lines a frame
 FLYING, RESTING, GATHERING = 0, 1, 2
 WOOD = KIND_WOOD             # the kinds of item are the inventory's (inventory.py)
-DROPS = {ROOT: WOOD, TRUNK: WOOD, TRUNK_KNOT: WOOD}     # what each material drops
+DROPS = {ROOT: WOOD, TRUNK: WOOD, TRUNK_KNOT: WOOD, BENCH: KIND_BENCH}     # what each material drops
 assert CANOPY_LEFT not in DROPS
 VIEW_LINES = VIEW_ROWS * 8
 

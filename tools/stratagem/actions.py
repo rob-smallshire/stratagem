@@ -47,7 +47,7 @@ from dataclasses import dataclass, replace
 from stratagem import inventory
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, INPUT_RIGHT, INPUT_UP
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
-from stratagem.tiles import (AIR, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
+from stratagem.tiles import (AIR, BENCH, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
                              QUARTER_LINES, QUARTER_PIXELS, QUARTERS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE,
                              TORCH, TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
@@ -57,7 +57,7 @@ assert set(QUARTERS_PER_DIG) == set(DIGGABLE) == set(inventory.YIELDS)
 DIG_FRAMES = 8
 PLACE_FRAMES = 6
 EMPTY = frozenset({AIR, SKY})
-CHOPPABLE = frozenset(TREE_PARTS)       # broken whole by a dig, for wood
+CHOPPABLE = frozenset({*TREE_PARTS, BENCH})     # broken whole by a dig, for what they drop (items.py)
 
 NONE, DIG, PLACE = 0, 1, 2
 

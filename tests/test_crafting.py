@@ -137,3 +137,34 @@ def test_parasite_crafting_matches_model(game_build):
         assert memory[labels["craft_book"]] == book, f"trial {trial}: {what}"
         assert memory[labels["craft_copied"]] == copied, f"trial {trial}: {what}"
     assert min(seen.values()) >= 50, seen
+
+
+def test_a_bench_near_gives_the_3x3_grid(game_build):
+    """The tree beside the start felled, a bench placed where it stood:
+    opening the pack, the parasite finds it near, as crafting.station_near
+    says, and the grid is 3 x 3."""
+    from stratagem import pack
+    from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_PLACE
+    from stratagem.crafting import STATION_BENCH, station_near
+    from stratagem.inventory import KIND_BENCH
+    from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH
+    from stratagem.tiles import BENCH
+    from test_daylight import ParasiteGame
+    game = ParasiteGame(game_build)
+    memory, labels = game.memory, game.labels
+    for frame in range(104):
+        game.frame(INPUT_LEFT | INPUT_ACTION if frame < 4 else 0)
+    memory[labels["inventory"] + KIND_BENCH] = 1
+    memory[labels["hand"]] = KIND_BENCH
+    for frame in range(10):
+        game.frame(INPUT_PLACE if frame < 2 else 0)
+    assert memory[labels["inventory"] + KIND_BENCH] == 0, "the bench wasn't placed"
+    px = (memory[labels["zp_player_x"]] | memory[labels["zp_player_x"] + 1] << 8) >> 4
+    py = (memory[labels["zp_player_y"]] | memory[labels["zp_player_y"] + 1] << 8) >> 4
+    tx, ty = (px + PLAYER_WIDTH // 2) // TILE_WIDTH, (py + PLAYER_HEIGHT // 2) // TILE_HEIGHT
+    assert any(game.tile_at(tx + dx, ty + dy)[0] == BENCH for dx in range(-3, 4) for dy in range(-2, 3))
+    assert station_near(game.tile_at, tx, ty) == STATION_BENCH
+    from test_pack import send
+    send(game, pack.INPUT_PACK)
+    assert memory[labels["pack_open"]] and game.byte("pack_station") == STATION_BENCH
+    assert game.byte("pack_size") == 3

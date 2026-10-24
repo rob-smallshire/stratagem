@@ -51,15 +51,10 @@
     RTS
 }
 
-\ If the hand is the torches, set target_x/y to the tile at the middle of
-\ the player's box, where a torch goes with nowhere else to go, and return
-\ carry clear if it is empty (air or sky); otherwise carry set.
-.torch_own_tile
+\ Set target_x/y to the miner's tile: the one holding the middle of the
+\ player's box.
+.miner_tile
 {
-    LDX hand
-    LDA kind_places,X
-    CMP #TILE_TORCH
-    BNE none
     JSR player_pixels
     JSR middle_column
     CLC
@@ -78,6 +73,19 @@
     ROR zp_temp
     LDA zp_temp
     STA target_y
+    RTS
+}
+
+\ If the hand is the torches, set target_x/y to the tile at the middle of
+\ the player's box, where a torch goes with nowhere else to go, and return
+\ carry clear if it is empty (air or sky); otherwise carry set.
+.torch_own_tile
+{
+    LDX hand
+    LDA kind_places,X
+    CMP #TILE_TORCH
+    BNE none
+    JSR miner_tile
     JSR target_tile
     CMP #TILE_AIR
     BEQ empty

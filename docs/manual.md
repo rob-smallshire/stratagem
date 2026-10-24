@@ -59,6 +59,18 @@ The grid fills again from your pack, ready to make another.
 
 A shape can sit anywhere in the grid, but it can't be turned round.
 
+Near a workbench, the grid is three cells by three, the keys
+R T Y / F G H / V B N:
+
+```
+   R  T  Y
+    F  G  H
+     V  B  N
+```
+
+A workbench is placed like a block, with SPACE. Dig it and it comes back to
+you.
+
 What you've made once, your pack remembers. COPY lays out each of those
 shapes in turn, from what you carry; a cell left empty shows what you're
 short of.

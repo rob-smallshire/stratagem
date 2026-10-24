@@ -63,6 +63,7 @@ def _kinds() -> dict[str, Kind]:
         "grass tuft": Kind(BELOW, NOTHING),
         "mushroom": Kind(BELOW, NOTHING),
         "chest": Kind(BELOW, NOTHING),
+        "bench": Kind(BELOW, NOTHING),
         "door bottom": Kind(BELOW, FAMILY, "door"),
         "door top": Kind(BELOW, FAMILY, "door"),
         "door open bottom": Kind(BELOW, FAMILY, "door"),

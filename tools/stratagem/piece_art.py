@@ -35,6 +35,27 @@ def split(big: np.ndarray, columns: int, rows: int) -> list[list[np.ndarray]]:
     return [[big[j * H:(j + 1) * H, i * W:(i + 1) * W] for i in range(columns)] for j in range(rows)]
 
 
+# The workbench: a thick top on legs, a hammer on it.
+BENCH = art("""
+........
+...WWW..
+....R...
+....R...
+YYYYYYYY
+YYYYYYYY
+RRRRRRRR
+.R....R.
+.R....R.
+.R....R.
+.RRRRRR.
+.R....R.
+.R....R.
+.R....R.
+.R....R.
+........
+""")
+
+
 # Trees: a canopy three tiles wide and two high (dithered leaves, as in
 # Stryker's Run, so that backdrop shows through), over a trunk.
 
