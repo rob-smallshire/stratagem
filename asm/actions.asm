@@ -10,6 +10,11 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
 {
     LDA #ACTION_NONE
     STA action
+    LDA zp_input                \ SPACE up: placing may go on
+    AND #INPUT_PLACE
+    BNE placing
+    STA zp_place_wait
+.placing
     LDA cooldown
     BEQ ready
     DEC cooldown
@@ -1102,6 +1107,8 @@ SCAN_HIGHEST = 2                \ The highest in the way
 .want_empty
     LDA material_empty,X
     BEQ no
+    BIT want                    \ Something passable may overlap the player
+    BVC yes
     \ Clear of the player: not (px - x * 8 in -5..7 and py - y * 16 in
     \ -23..15), working with OVERLAP_OFFSET added.
     LDA target_x

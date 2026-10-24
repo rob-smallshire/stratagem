@@ -35,6 +35,7 @@
     LDA #0
     STA belt_slot
     STA tools_held
+    STA zp_place_wait
     JSR tool_update             \ Bare hands
     LDA #0
     STA craft_book

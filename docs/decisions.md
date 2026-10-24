@@ -354,3 +354,11 @@ A running log of design decisions. Add to it whenever one is made.
   tool in use can change, rather than looking it up on every dig, which
   would have meant changing the digging code in full PGAME. Tools wear by
   digs of the ground, not chops, and break silently (60 and 130 digs).
+- **Placing: passable things may overlap the miner, and a hand that moves
+  on waits for a new press.** A workbench was hard to place on flat ground,
+  since the tile ahead usually overlaps the miner, which is right for a
+  solid block but not for a bench or a torch, which can be walked through.
+  And with SPACE held, placing the last bench moved the hand to the torches
+  and placed one on it six frames later: now when the hand moves on by
+  itself, the new kind is shown above the miner but not placed until SPACE
+  is released and pressed again (`zp_place_wait`).

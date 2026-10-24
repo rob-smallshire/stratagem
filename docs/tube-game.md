@@ -24,7 +24,7 @@ The keys are those of `implementation-record.md`, and T:
 | Z, X | Walk left, right |
 | K | Jump; in the air, a fresh press jumps again |
 | L | Dig, ahead; with M, down; with K, up; with both, diagonally. Digging ahead or up and down breaks a tree's part whole, for wood: beside a tree, its root goes first, and the tree falls |
-| SPACE | Place the kind in hand: the kind chosen (TAB, the pack), or, with none of it left, the first kind carried that places something (soil, stone, ore, gems, torches: up to 24 in the world) |
+| SPACE | Place the kind in hand, chosen with TAB or the pack, ahead (a block clear of the miner; a torch or a workbench may overlap him). With none of it left, the hand moves on to the first kind carried that places something, shown, and SPACE places it when pressed again |
 | TAB | Cycle the hand to the next kind held that places something |
 | P | Open the pack, pausing the game; P again closes it |
 | Z X K M | In the pack: move the hand across the kinds shown |

@@ -3,6 +3,8 @@ says, and on the parasite (asm/crafting.asm, py65) exactly as the model."""
 
 import random
 
+import pytest
+
 from conftest import parasite_machine
 from stratagem import crafting
 from stratagem.crafting import EMPTY, EMPTY_GRID, GRID_CELLS, RECIPES, STATION_BENCH, STATION_HAND
@@ -180,3 +182,30 @@ def test_a_bench_near_gives_the_3x3_grid(game_build):
     send(game, pack.INPUT_PACK)
     assert memory[labels["pack_open"]] and game.byte("pack_station") == STATION_BENCH
     assert game.byte("pack_size") == 3
+
+
+@pytest.mark.parametrize("steps", [0, 1, 2, 3])
+def test_a_bench_held_down_is_placed_and_then_nothing(game_build, steps):
+    """Where the tree beside the start stood, the miner a few frames' walk
+    along: SPACE held with the last bench in hand places it, whatever the
+    miner's place within the tiles, and then the hand moves on to the
+    torches, shown, but no torch is placed until SPACE is pressed again."""
+    from stratagem.camera import INPUT_ACTION, INPUT_LEFT, INPUT_PLACE
+    from stratagem.inventory import KIND_BENCH, KIND_TORCH, STARTING_TORCHES
+    from test_daylight import ParasiteGame
+    game = ParasiteGame(game_build)
+    memory, labels = game.memory, game.labels
+    for frame in range(104):
+        game.frame(INPUT_LEFT | INPUT_ACTION if frame < 4 else 0)
+    for frame in range(steps):
+        game.frame(INPUT_LEFT)
+    memory[labels["inventory"] + KIND_BENCH] = 1
+    memory[labels["hand"]] = KIND_BENCH
+    for frame in range(20):
+        game.frame(INPUT_PLACE)
+    assert memory[labels["inventory"] + KIND_BENCH] == 0, "the bench wasn't placed"
+    assert game.byte("hand") == KIND_TORCH
+    assert game.byte("torch_count") == 0 and memory[labels["inventory"] + KIND_TORCH] == STARTING_TORCHES
+    for frame in range(3):
+        game.frame(INPUT_PLACE if frame == 2 else 0)
+    assert game.byte("torch_count") == 1, "pressed again, the torch wasn't placed"

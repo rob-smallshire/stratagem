@@ -38,6 +38,7 @@ def write_hands(machine, labels, hands: Hands) -> None:
     memory[labels["belt_slot"]] = 0
     for index, wear in enumerate(hands.wear):
         memory[labels["tool_digs"] + index] = wear
+    memory[labels["zp_place_wait"]] = 0xFF if hands.wait else 0
     machine.call(labels["tool_update"])
 
 
@@ -45,7 +46,8 @@ def read_hands(memory, labels) -> Hands:
     counts = tuple(memory[labels["inventory"] + kind] for kind in range(inventory.KIND_COUNT))
     tool = memory[labels["belt"] + memory[labels["belt_slot"]]]
     wear = tuple(memory[labels["tool_digs"] + i] for i in range(len(inventory.TOOLS)))
-    return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]], memory[labels["torch_count"]], tool, wear)
+    return Hands(counts, memory[labels["cooldown"]], memory[labels["hand"]], memory[labels["torch_count"]], tool, wear,
+                 bool(memory[labels["zp_place_wait"]]))
 
 
 def random_hands(rng: random.Random, kinds=sorted(inventory.PLACES)) -> Hands:
@@ -59,7 +61,8 @@ def random_hands(rng: random.Random, kinds=sorted(inventory.PLACES)) -> Hands:
         for kind in inventory.PLACES:
             counts[kind] = 0
     tool, wear = random_tool(rng, counts)
-    return Hands(tuple(counts), 0, hand, rng.choice([0, 0, inventory.TORCH_MAX - 1, inventory.TORCH_MAX]), tool, wear)
+    return Hands(tuple(counts), 0, hand, rng.choice([0, 0, inventory.TORCH_MAX - 1, inventory.TORCH_MAX]), tool, wear,
+                 rng.random() < 0.2)
 
 
 def random_tool(rng: random.Random, counts: list[int]) -> tuple[int, tuple[int, ...]]:
@@ -106,7 +109,7 @@ def test_actions_match_model(machine, game_build):
     broken = 0
     partial_seen = set()
     ramps = 0
-    for episode in range(60):
+    for episode in range(100):
         state = _random_start(rng, world)
         hands = random_hands(rng)
         inputs = 0
@@ -167,6 +170,7 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
     world = World()
     seen = collections.Counter()
     torches = collections.Counter()
+    waited = overlapping = 0
     for trial in range(1600):
         state = _random_start(rng, world)
         inputs = INPUT_PLACE | rng.choice([0, INPUT_UP, INPUT_DOWN])
@@ -184,6 +188,8 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
             assert_tile_matches(machine, labels, world, target)
         seen["moved" if hands.hand != before.hand else "places nothing" if before.hand not in inventory.PLACES
              else "nothing held" if not any(before.counts[k] for k in inventory.PLACES) else "kept"] += 1
+        waited += before.wait and action == actions.NONE
+        overlapping += action == actions.PLACE and actions.overlaps_player(state, *target)
         if inventory.PLACES.get(hands.hand) == TORCH:
             own = ((state.px + player.PLAYER_WIDTH // 2) // player.TILE_WIDTH,
                    (state.py + player.PLAYER_HEIGHT // 2) // player.TILE_HEIGHT)
@@ -192,6 +198,7 @@ def test_placing_takes_the_hand_or_the_first_kind_held(machine, game_build):
                     else "full" if before.torches == inventory.TORCH_MAX else "not placed"] += 1
     assert min(seen.values()) >= 5 and len(seen) == 4, seen
     assert min(torches.values()) >= 5 and len(torches) == 4, torches
+    assert waited >= 5 and overlapping >= 5, (waited, overlapping)
 
 
 @pytest.mark.parametrize("keys", [pytest.param(INPUT_LEFT | INPUT_DOWN, marks=pytest.mark.slow),

@@ -91,4 +91,5 @@ GUARD MAILBOX_FETCHED
 .zp_temp            SKIP 2
 .zp_temp2           SKIP 2
 .zp_store_count     SKIP 2      \ store_emit: where the packet's count of changes goes
+.zp_place_wait      SKIP 1      \ Non-zero: the hand moved on; SPACE must be pressed again
 

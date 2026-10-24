@@ -42,7 +42,8 @@ Your pack holds everything you carry: up to 99 of each kind. Dig past 99
 and the rest is left behind, so keep an eye on your counts.
 
 The arrowheads mark what's in your hand. SPACE puts it down; when it runs
-out, your hand moves to the next thing you can place.
+out, your hand moves to the next thing you can place, shown above you:
+press SPACE again to place that.
 
 ## Making things
 

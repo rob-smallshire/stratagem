@@ -1,14 +1,17 @@
 \ Placing, on the parasite (tools/stratagem/actions.py's act, with
 \ actions.asm): in PLIGHT, as PGAME has no room.
 
-\ Place the kind in hand in the empty tile aimed at, if any. If none of
-\ that kind is left, the hand moves first to the first kind held that
-\ places something; if there is none, or the hand places nothing, nothing
-\ is placed. A torch is added to the torches (torches.asm), unless there
+\ Place the kind in hand in the empty tile aimed at, if any: clear of the
+\ player, unless it can be walked through. If none of that kind is left,
+\ the hand moves to the first kind held that places something, and nothing
+\ is placed until SPACE is pressed again (zp_place_wait); if there is none,
+\ or the hand places nothing, nothing is placed. A torch is added to the torches (torches.asm), unless there
 \ are TORCH_MAX already; with no empty tile to aim at, it goes in the
 \ miner's own tile, if that is empty.
 .place
 {
+    LDA zp_place_wait
+    BNE none
     LDX hand
     LDA kind_places,X
     BMI none
@@ -27,11 +30,20 @@
 .none
     RTS
 .found
-    STX hand
+    STX hand                    \ Shown, not placed, until SPACE again
+    LDA #&FF
+    STA zp_place_wait
+    RTS
 .in_hand
     JSR torch_room              \ A torch, if there is room for another
     BCS done
-    LDA #&FF                    \ Aim for an empty tile
+    LDX hand                    \ Aim for an empty tile: clear of the
+    LDY kind_places,X           \ player (bit 6), unless passable
+    LDA #&FF
+    LDX material_passable,Y
+    BEQ solid
+    LDA #&80
+.solid
     STA want
     JSR aim
     BCC aimed

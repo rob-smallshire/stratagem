@@ -33,8 +33,11 @@ the miner to gather in; what it held falls (support.py). Only straight digs brea
 passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
 falls. Each dig starts a cooldown. Placing puts a whole block of the kind
-in hand (inventory.py) in an empty tile (AIR or SKY); a torch is placed
-the same way, or, with no such tile, in the miner's own tile (the one
+in hand (inventory.py) in an empty tile (AIR or SKY), clear of the player
+unless it can be walked through (a torch, a workbench); with none of the
+hand's kind left, the hand moves on to the first kind held that places
+something, and nothing is placed until SPACE is pressed again. A torch is
+placed the same way, or, with no such tile, in the miner's own tile (the one
 holding the middle of the player's box), if that is empty, unless there
 are TORCH_MAX in the world. If the world has no
 room for a change, nothing happens.
@@ -49,7 +52,7 @@ from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, 
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import (AIR, BENCH, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
                              QUARTER_LINES, QUARTER_PIXELS, QUARTERS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE,
-                             TORCH, TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
+                             PASSABLE, TORCH, TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
 # Quarters a dig removes, by the tool in the tool hand (pack.py's belt; NO_TOOL,
@@ -82,6 +85,7 @@ class Hands:
     torches: int = 0                            # placed in the world (asm/torches.asm)
     tool: int = NO_TOOL                         # the kind in the tool hand
     wear: tuple[int, ...] = (0,) * len(inventory.TOOLS)    # digs on the one in use, by kind of tool
+    wait: bool = False                          # the hand moved on: SPACE must be pressed again
 
 
 def tool_in_use(hands: Hands) -> int:
@@ -256,6 +260,8 @@ def diggable(tile: tuple[int, int], dug: dict[int, int] = TOOL_QUARTERS[inventor
 def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands, int, tuple[int, int] | None]:
     """One frame's digging or placing. Returns the new hands, what was done
     and where, changing the world."""
+    if not inputs & INPUT_PLACE:
+        hands = replace(hands, wait=False)
     if hands.cooldown:
         return replace(hands, cooldown=hands.cooldown - 1), NONE, None
 
@@ -288,15 +294,19 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             if world.set_tile(*target, tile):
                 return _dug(hands, material, left), DIG, target
     elif inputs & INPUT_PLACE:
+        if hands.wait:
+            return hands, NONE, None
         hand = inventory.in_hand(hands.counts, hands.hand)
         if hand is None:
             return hands, NONE, None
-        hands = replace(hands, hand=hand)
+        if hand != hands.hand:                  # moved on: shown, not placed, until SPACE again
+            return replace(hands, hand=hand, wait=True), NONE, None
         torch = inventory.PLACES[hand] == TORCH
         if torch and hands.torches >= inventory.TORCH_MAX:
             return hands, NONE, None
+        passable = inventory.PLACES[hand] in PASSABLE      # may overlap the player
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
-                     and not overlaps_player(player, x, y))
+                     and (passable or not overlaps_player(player, x, y)))
         if target is None and torch:            # the miner's own tile, if empty
             own = ((player.px + PLAYER_WIDTH // 2) // TILE_WIDTH, (player.py + PLAYER_HEIGHT // 2) // TILE_HEIGHT)
             target = own if world.tile_at(*own)[0] in EMPTY else None
