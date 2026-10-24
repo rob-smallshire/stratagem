@@ -265,3 +265,13 @@ def collect_marks(bbc: Beebium, hit_address: int, id_address: int, count: int) -
         marks[bbc.memory.address.peek[id_address]] = bbc.debugger.cycle_count
     assert list(marks) == list(range(1, count + 1))
     return marks
+
+
+def pickaxe_hands():
+    """Hands with wooden pickaxes in the tool hand, enough not to run out:
+    digging as fast as before tools (actions.TOOL_QUARTERS)."""
+    from stratagem import inventory
+    from stratagem.actions import Hands
+    counts = list(inventory.STARTING)
+    counts[inventory.KIND_WOOD_PICK] = inventory.COUNT_MAX
+    return Hands(counts=tuple(counts), tool=inventory.KIND_WOOD_PICK)

@@ -10,6 +10,12 @@
 \ A = 0.
 .pack_init
 {
+    LDA #0                      \ Each kind of tool unworn
+    LDX #KIND_COUNT - TOOL_FIRST - 1
+.unworn
+    STA tool_digs,X
+    DEX
+    BPL unworn
     LDA #CELL_EMPTY
     LDX #GRID_CELLS - 1
 .empty
@@ -29,6 +35,8 @@
     LDA #0
     STA belt_slot
     STA tools_held
+    JSR tool_update             \ Bare hands
+    LDA #0
     STA craft_book
     STA craft_repeat
     STA pack_open
@@ -97,6 +105,7 @@
     BEQ no_tool
     DEX
     STX belt_slot
+    JSR tool_update
 .no_tool
     LDA pack_keys_pressed       \ TAB: the hand to the next kind
     AND #KEY_CYCLE
@@ -109,6 +118,7 @@
     BIT pack_pressed
     BPL moves
     JSR craft_clear             \ Closed: the grid back into the counts,
+    JSR tool_update             \ the tool in use as it now is,
     LDA #0                      \ and the game's frame, with no input
     STA pack_open
     STA zp_input

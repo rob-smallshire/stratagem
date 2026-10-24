@@ -337,6 +337,37 @@ hand's.
 - Memory: the render region's code area has 799 bytes left, MAIN's code
   about 160 before its page.
 
+### Digging by tool
+
+What a dig does depends on the tool in use: the tool hand's, if any of
+that kind is left, otherwise bare hands (`actions.TOOL_QUARTERS`, quarters
+of a tile a dig removes):
+
+| | Grass | Soil | Stone | Ore | Gem |
+|---|---|---|---|---|---|
+| Bare hands | 1 | 1 | — | — | — |
+| Wooden pickaxe | 4 | 2 | 1 | 1 | 1 |
+| Stone pickaxe | 4 | 4 | 2 | 2 | 1 |
+
+So by hand soil takes four digs and stone can't be dug; a tree's part
+still breaks whole at one, by hand, which is the way to wood, planks, a
+workbench and a wooden pickaxe. The wooden pickaxe digs as the miner did
+before tools.
+
+Each dig of the ground (not a chop) wears the tool in use: its kind's dig
+count goes up, and at its durability (60 for wood, 130 for stone) it
+breaks, one fewer of that kind, the count starting again for the next.
+Nothing shows the wear.
+
+- On the parasite, PGAME's `material_quarters` is the tool in use's row,
+  copied from PLIGHT's `tool_quarters` by `tool_update` at the start, when a
+  function key chooses a slot, when the pack closes and when a tool breaks,
+  so the digging code is as it was; `tool_wear` is one call in the dig.
+- Costs, measured: `tool_wear` 49 cycles a dig, 450 when the tool breaks;
+  `tool_update` 382 to 422, only on those events. Nothing per frame.
+- Memory: the pack's and crafting's workspace moved out of `&0400`-`&07FF`,
+  which is full, to after PLIGHT.
+
 ### In front and behind
 
 Each tree stands in front of the miner or behind him, as the hash says for

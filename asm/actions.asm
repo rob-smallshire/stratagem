@@ -126,6 +126,7 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     STA cooldown
     LDA #ACTION_DIG
     STA action
+    JSR tool_wear               \ The tool in use wears
     LDA chopped                 \ A tree's part may drop wood
     BEQ not_chopped
     LDX target_x

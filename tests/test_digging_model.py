@@ -8,8 +8,9 @@ from collections import deque
 
 import pytest
 
+from conftest import pickaxe_hands
+
 from stratagem import actions, player
-from stratagem.actions import Hands
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.tiles import QUARTER_LINES, QUARTER_PIXELS, QUARTERS, SOIL, STONE, solid_quarter_cells
@@ -89,7 +90,7 @@ def test_every_dig_opens_space_next_to_the_player(direction):
     for where, world, hero in starts():
         for _ in range(30):
             hero = player.step(hero, 0, world.tile_at)
-        hands = Hands()
+        hands = pickaxe_hands()
         for frame in range(400):
             hero = player.step(hero, keys, world.tile_at)
             region = open_near_player(world, hero)
@@ -135,7 +136,7 @@ def tunnel(world, direction: str, x: int, floor: int, frames: int) -> tuple[int,
     hero = Player(x=(x * TILE_WIDTH + 1) * 16, y=(floor * TILE_HEIGHT - PLAYER_HEIGHT) * 16)
     for _ in range(30):
         hero = player.step(hero, 0, world.tile_at)
-    hands = Hands()
+    hands = pickaxe_hands()
     x0, y0, biggest = hero.px, hero.py, 0
     for _ in range(frames):
         before = hero

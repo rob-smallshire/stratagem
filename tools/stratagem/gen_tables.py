@@ -184,8 +184,8 @@ def shapes_source() -> str:
     lines += _bytes_lines([0xFF if m in tiles.PASSABLE else 0 for m in materials])
     lines.append(".material_empty")      # can be placed into
     lines += _bytes_lines([0xFF if m in actions.EMPTY else 0 for m in materials])
-    lines.append(".material_quarters")   # quarters a dig removes; 0 if not diggable
-    lines += _bytes_lines([actions.QUARTERS_PER_DIG.get(m, 0) for m in materials])
+    lines.append(".material_quarters")   # quarters a dig removes with the tool in use (tool_update); 0 if not
+    lines += _bytes_lines([actions.TOOL_QUARTERS[actions.NO_TOOL].get(m, 0) for m in materials])   # diggable
     lines.append(".material_chops")      # broken whole by a straight dig, for wood
     lines += _bytes_lines([0xFF if m in actions.CHOPPABLE else 0 for m in materials])
     # Solid quarter-cells of each shape, bit row * 4 + column.
@@ -557,6 +557,15 @@ def inventory_source() -> str:
     lines.append("")
     lines.append("MACRO COUNTS_AT_START")
     lines += _bytes_lines(inventory.STARTING)
+    lines.append("ENDMACRO")
+    lines.append("")
+    lines.append("MACRO TOOL_QUARTERS")    # by tool, bare hands first, then TOOLS: quarters by material
+    for tool in [actions.NO_TOOL, *inventory.TOOLS]:
+        lines += _bytes_lines([actions.TOOL_QUARTERS[tool].get(m, 0) for m in range(tiles.MATERIAL_COUNT)])
+    lines.append("ENDMACRO")
+    lines.append("")
+    lines.append("MACRO TOOL_DURABILITY")  # by tool, TOOLS
+    lines += _bytes_lines([actions.DURABILITY[tool] for tool in inventory.TOOLS])
     lines.append("ENDMACRO")
     return "\n".join(lines) + "\n"
 

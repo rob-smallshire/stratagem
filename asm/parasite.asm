@@ -277,9 +277,23 @@ GUARD &0800
 .item_camera_line   SKIP 2      \ items_emit: the view's top line
 .item_sent          SKIP 1
 
-\ And tables the light sets up afresh each pass, above daylight's window
+\ And tables the light sets up afresh each pass, above daylight's window,
+\ and the pack's and crafting's workspace
 ORG plight_end
 GUARD &F800
+.pack_before        SKIP KIND_COUNT + GRID_CELLS + BELT_SLOTS \ The counts, grid and
+                                \ belt before the pack's keys (pack.asm)
+.craft_cell         SKIP 1      \ Crafting's workspace (crafting.asm)
+.craft_k            SKIP 1
+.craft_row          SKIP 1
+.craft_column       SKIP 1
+.craft_width        SKIP 1
+.craft_height       SKIP 1
+.craft_top          SKIP 1
+.craft_left         SKIP 1
+.craft_bottom       SKIP 1
+.craft_right        SKIP 1
+.craft_recipe       SKIP 1
 .sl_pool            SKIP MINER_WINDOW
 .sl_pool_clear      SKIP MINER_WINDOW
 .sl_pool_outside    SKIP MINER_WINDOW     \ Non-zero outside the tile cache

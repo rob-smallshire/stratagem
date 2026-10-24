@@ -347,3 +347,10 @@ A running log of design decisions. Add to it whenever one is made.
   (a function key with a tool as the hand), chosen in play. Play reads the
   function keys only every fourth frame, which costs 72 cycles a frame on
   average rather than 288. A slot holds a kind, not one tool.
+- **Digging by the tool in hand:** bare hands dig soil and grass a quarter
+  at a time and can't dig stone, ore or gems; the wooden pickaxe digs as
+  the miner did before; the stone pickaxe twice as fast in stone and ore.
+  The parasite swaps PGAME's per-material table for the tool's row when the
+  tool in use can change, rather than looking it up on every dig, which
+  would have meant changing the digging code in full PGAME. Tools wear by
+  digs of the ground, not chops, and break silently (60 and 130 digs).

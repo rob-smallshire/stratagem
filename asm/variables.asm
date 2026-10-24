@@ -27,8 +27,6 @@ GUARD &0800
 .pack_changed    SKIP 1      \ Non-zero if the counts or the grid changed
 .pack_cell       SKIP 1      \ A cell's key pressed this frame (1 on), or 0
 .pack_seen       SKIP KIND_COUNT \ Non-zero for each kind shown since opening
-.pack_before     SKIP KIND_COUNT + GRID_CELLS + BELT_SLOTS \ The counts, grid and belt
-                             \ before keys
 .pack_station    SKIP 1      \ Where the miner crafts (crafting.py)
 .pack_size       SKIP 1      \ Its grid's size
 
@@ -37,17 +35,6 @@ GUARD &0800
 .craft_book      SKIP 1      \ A bit for each recipe made
 .craft_copied    SKIP 1      \ The recipe COPY laid out last
 .craft_repeat    SKIP 1      \ Frames until L, held, makes again
-.craft_cell      SKIP 1      \ Workspace
-.craft_k         SKIP 1
-.craft_row       SKIP 1
-.craft_column    SKIP 1
-.craft_width     SKIP 1
-.craft_height    SKIP 1
-.craft_top       SKIP 1
-.craft_left      SKIP 1
-.craft_bottom    SKIP 1
-.craft_right     SKIP 1
-.craft_recipe    SKIP 1
 .hand_last       SKIP 1      \ The hand as last seen (items.asm)...
 .hand_timer      SKIP 1      \ ... frames left to show it or the tool...
 .tool_last       SKIP 1      \ ... the tool as last seen...
@@ -58,6 +45,7 @@ GUARD &0800
 .belt_slot       SKIP 1      \ The slot in the tool hand
 .tools_held      SKIP 1      \ The function key held last frame (1 on), or 0
 .tool_pressed    SKIP 1      \ A function key pressed this frame (1 on), or 0
+.tool_digs       SKIP KIND_COUNT - TOOL_FIRST \ Digs on the one in use, by kind of tool
 .cooldown        SKIP 1      \ Frames until the next dig or place
 .action          SKIP 1      \ What was done this frame: 0, 1 dig, 2 place
 .target_x        SKIP 1      \ The tile aimed at

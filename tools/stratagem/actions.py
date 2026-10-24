@@ -52,8 +52,20 @@ from stratagem.tiles import (AIR, BENCH, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_
                              TORCH, TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
 from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
 
-QUARTERS_PER_DIG = {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1}
-assert set(QUARTERS_PER_DIG) == set(DIGGABLE) == set(inventory.YIELDS)
+# Quarters a dig removes, by the tool in the tool hand (pack.py's belt; NO_TOOL,
+# bare hands, also with none of that kind left) and the material; a material
+# missing can't be dug with it.
+NO_TOOL = 0xFF
+TOOL_QUARTERS = {
+    NO_TOOL: {GRASS: 1, SOIL: 1},
+    inventory.KIND_WOOD_PICK: {GRASS: 4, SOIL: 2, STONE: 1, ORE: 1, GEM: 1},
+    inventory.KIND_STONE_PICK: {GRASS: 4, SOIL: 4, STONE: 2, ORE: 2, GEM: 1},
+}
+DURABILITY = {inventory.KIND_WOOD_PICK: 60, inventory.KIND_STONE_PICK: 130}    # digs before it breaks
+assert set(TOOL_QUARTERS) == {NO_TOOL, *inventory.TOOLS} and set(DURABILITY) == set(inventory.TOOLS)
+assert all(set(q) <= set(DIGGABLE) for q in TOOL_QUARTERS.values())
+assert set(TOOL_QUARTERS[inventory.KIND_WOOD_PICK]) == set(DIGGABLE) == set(inventory.YIELDS)
+assert max(DURABILITY.values()) < 0x100
 DIG_FRAMES = 8
 PLACE_FRAMES = 6
 EMPTY = frozenset({AIR, SKY})
@@ -68,6 +80,18 @@ class Hands:
     cooldown: int = 0
     hand: int = inventory.KIND_SOIL             # the kind placing puts down
     torches: int = 0                            # placed in the world (asm/torches.asm)
+    tool: int = NO_TOOL                         # the kind in the tool hand
+    wear: tuple[int, ...] = (0,) * len(inventory.TOOLS)    # digs on the one in use, by kind of tool
+
+
+def tool_in_use(hands: Hands) -> int:
+    """The tool a dig uses: the tool hand's, if any of it is left."""
+    return hands.tool if hands.tool != NO_TOOL and hands.counts[hands.tool] else NO_TOOL
+
+
+def quarters(hands: Hands) -> dict[int, int]:
+    """Quarters a dig removes, by material, with the tool in use."""
+    return TOOL_QUARTERS[tool_in_use(hands)]
 
 
 def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
@@ -118,7 +142,8 @@ def _in_path(tile_at, tx: int, ty: int, rects: list[Rect]) -> bool:
     return False
 
 
-def diagonal(player: Player, dx: int, dy: int, tile_at) -> tuple[tuple[int, int] | None, int | None]:
+def diagonal(player: Player, dx: int, dy: int, tile_at, dug: dict[int, int] = TOOL_QUARTERS[inventory.KIND_WOOD_PICK]
+             ) -> tuple[tuple[int, int] | None, int | None]:
     """Where digging diagonally works next: (a step to shape, its ramp), or
     (a tile to clear, None), or (None, None).
 
@@ -169,7 +194,7 @@ def diagonal(player: Player, dx: int, dy: int, tile_at) -> tuple[tuple[int, int]
             if part == "ramp":
                 if tx == step[0] and _in_world(*step):
                     material, shape = tile_at(*step)
-                    if material in QUARTERS_PER_DIG and cut_to(shape & SHAPE_BITS, ramp) is not False:
+                    if material in dug and cut_to(shape & SHAPE_BITS, ramp) is not False:
                         return step, ramp
                 continue
             rect = rects[part]
@@ -181,7 +206,7 @@ def diagonal(player: Player, dx: int, dy: int, tile_at) -> tuple[tuple[int, int]
                 if (part == 1 and (tx, ty) in keep) or (dy < 0 and (tx, ty) == step) or not _in_world(tx, ty):
                     continue
                 material, shape = tile_at(tx, ty)
-                if material in QUARTERS_PER_DIG and _in_path(tile_at, tx, ty, [rect]):
+                if material in dug and _in_path(tile_at, tx, ty, [rect]):
                     if dy < 0 or part == 1:
                         return (tx, ty), None   # Up or down: the nearest
                     left_here = solid_count(material, shape)
@@ -222,9 +247,10 @@ def near_side(player: Player, target: tuple[int, int], dx: int) -> int:
     return FROM_LEFT if dx > 0 else FROM_RIGHT
 
 
-def diggable(tile: tuple[int, int]) -> bool:
-    """What a straight dig takes: terrain to erode, or a tree's part."""
-    return tile[0] in QUARTERS_PER_DIG or tile[0] in CHOPPABLE
+def diggable(tile: tuple[int, int], dug: dict[int, int] = TOOL_QUARTERS[inventory.KIND_WOOD_PICK]) -> bool:
+    """What a straight dig takes: terrain the tool erodes (dug: quarters()),
+    or a tree's part."""
+    return tile[0] in dug or tile[0] in CHOPPABLE
 
 
 def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands, int, tuple[int, int] | None]:
@@ -238,10 +264,10 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
         dx = (1 if inputs & INPUT_RIGHT else 0) - (1 if inputs & INPUT_LEFT else 0)
         dy = (1 if inputs & INPUT_DOWN else 0) - (1 if inputs & INPUT_UP else 0)
         if dx and dy:
-            target, ramp = diagonal(player, dx, dy, world.tile_at)
+            target, ramp = diagonal(player, dx, dy, world.tile_at, quarters(hands))
             side = near_side(player, target, dx) if target else None
         else:
-            target = aim(player, inputs, lambda x, y: in_world(x, y) and diggable(world.tile_at(x, y)),
+            target = aim(player, inputs, lambda x, y: in_world(x, y) and diggable(world.tile_at(x, y), quarters(hands)),
                          most_left_of=world.tile_at)
             ramp, side = None, dig_direction(player, inputs)
         if target is not None:
@@ -257,7 +283,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
                 if world.set_tile(*target, (background(behind), SHAPE_FULL | behind)):
                     return replace(hands, cooldown=DIG_FRAMES), DIG, target
                 return hands, NONE, None
-            left = dig_shape(shape & SHAPE_BITS, QUARTERS_PER_DIG[material], side)
+            left = dig_shape(shape & SHAPE_BITS, quarters(hands)[material], side)
             tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
             if world.set_tile(*target, tile):
                 return _dug(hands, material, left), DIG, target
@@ -276,14 +302,24 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             target = own if world.tile_at(*own)[0] in EMPTY else None
         if target is not None and world.set_tile(*target, (inventory.PLACES[hand],
                                                            SHAPE_FULL | background_bits(*target))):
-            return Hands(inventory.spend(hands.counts, hand), PLACE_FRAMES, hand, hands.torches + torch), PLACE, target
+            return (replace(hands, counts=inventory.spend(hands.counts, hand), cooldown=PLACE_FRAMES, hand=hand,
+                            torches=hands.torches + torch), PLACE, target)
     return hands, NONE, None
 
 
 def _dug(hands: Hands, material: int, left: int | None) -> Hands:
     """The hands after a dig of `material` that left `left` of it (None if
-    nothing): a tile dug away entirely is carried; the hand stays."""
+    nothing): a tile dug away entirely is carried; the hand stays. The tool
+    in use wears: at its DURABILITY'th dig it breaks, one fewer of it."""
+    hands = replace(hands, cooldown=DIG_FRAMES)
+    tool = tool_in_use(hands)
+    if tool != NO_TOOL:
+        index = inventory.TOOLS.index(tool)
+        wear = hands.wear[index] + 1
+        counts = hands.counts
+        if wear >= DURABILITY[tool]:
+            wear, counts = 0, inventory.spend(counts, tool)
+        hands = replace(hands, counts=counts, wear=hands.wear[:index] + (wear,) + hands.wear[index + 1:])
     if left is not None:
-        return replace(hands, cooldown=DIG_FRAMES)
-    kind = inventory.YIELDS[material]
-    return Hands(inventory.gain(hands.counts, kind), DIG_FRAMES, hands.hand, hands.torches)
+        return hands
+    return replace(hands, counts=inventory.gain(hands.counts, inventory.YIELDS[material]))

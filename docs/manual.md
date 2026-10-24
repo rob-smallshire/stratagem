@@ -121,6 +121,9 @@ the red function keys, f0 to f9. In your pack, choose a tool, then press a
 function key to hang it there; out in the world, press that key to take it
 in hand. The belt is shown along the bottom of your pack.
 
+Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
+tree, though, comes down to bare hands: start there.
+
 Tools wear out, and break without warning. Make another of the same kind
 and its slot on your belt works again.
 
