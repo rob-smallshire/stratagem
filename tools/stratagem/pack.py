@@ -100,6 +100,7 @@ def grid_left(size: int) -> int:
 PANEL_COLOUR = 0                    # black, in the sprite colour group
 DIGIT_COLOUR = 7                    # white
 MARK_COLOUR = 3                     # yellow
+TOOL_MARK_COLOUR = 6                # cyan: the belt's, and the hand's at a tool
 SOCKET_COLOUR = 4                   # blue
 
 
@@ -347,14 +348,14 @@ def digit(digit: int) -> bytes:
                  for column in range(2) for line in range(8))
 
 
-def mark(side: str) -> bytes:
+def mark(side: str, colour: int = MARK_COLOUR) -> bytes:
     """An arrowhead's cell, centred on the count's digits: "right" points
     right, before the slot; "left" points left, after it; "blank" is
     neither."""
     if side == "blank":
         return bytes(CELL_BYTES)
     rows = [line for line in _MARKS[side].split()]
-    pixels = [[PANEL_COLOUR] * 2] * 2 + [[MARK_COLOUR if c == "#" else PANEL_COLOUR for c in row] for row in rows] \
+    pixels = [[PANEL_COLOUR] * 2] * 2 + [[colour if c == "#" else PANEL_COLOUR for c in row] for row in rows] \
         + [[PANEL_COLOUR] * 2]
     assert len(pixels) == CELL_BYTES
     return bytes(mode2_byte(*row) for row in pixels)
@@ -399,10 +400,11 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
         for line in range(CELL_BYTES):
             image[address + line] = data[line]
 
-    def slot(left: int, top: int, kind: int, count: int, right: str, left_mark: str) -> None:
+    def slot(left: int, top: int, kind: int, count: int, right: str, left_mark: str,
+             colour: int = MARK_COLOUR) -> None:
         """An icon from column left + 1, row top, its count below, and the
-        arrowheads either side of the count; a socket and no count if there
-        are none."""
+        arrowheads either side of the count, in colour; a socket and no
+        count if there are none."""
         picture = icon(kind) if count else socket()
         for cell in range(8):
             put(left + 1 + cell % 4, top + cell // 4, picture[cell * 8:cell * 8 + 8])
@@ -416,14 +418,14 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
             units = digit(count % 10)
             put(left + 3, top + 2, units[:8])
             put(left + 4, top + 2, units[8:])
-        put(left, top + 2, mark(right))
-        put(left + 5, top + 2, mark(left_mark))
+        put(left, top + 2, mark(right, colour))
+        put(left + 5, top + 2, mark(left_mark, colour))
 
     for i, kind in enumerate(kinds):
         left = PANEL_LEFT + i % PACK_COLUMNS * SLOT_CELLS + 1
         top = PANEL_TOP + 1 + i // PACK_COLUMNS * ROWS_PER_SLOT_ROW
         marks = ("right", "left") if kind == hand else ("blank", "blank")
-        slot(left, top, kind, counts[kind], *marks)
+        slot(left, top, kind, counts[kind], *marks, TOOL_MARK_COLOUR if kind in TOOLS else MARK_COLOUR)
 
     size = GRID_SIZES[station]
     grid_top = PANEL_TOP + kind_rows(len(kinds))
@@ -449,6 +451,6 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
         put(left + 2, belt_top + 2, number[:8])
         put(left + 3, belt_top + 2, number[8:])
         if index == tool_slot:
-            put(left, belt_top + 2, mark("right"))
-            put(left + 5, belt_top + 2, mark("left"))
+            put(left, belt_top + 2, mark("right", TOOL_MARK_COLOUR))
+            put(left + 5, belt_top + 2, mark("left", TOOL_MARK_COLOUR))
     return image

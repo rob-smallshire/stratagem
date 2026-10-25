@@ -124,7 +124,8 @@ to take one out of your pack and hang it there; press the number again to
 put it back. Out in the world, press that number to take it in hand. The
 tool shows above you for a moment, with its number beside it, whenever you
 press its number; 0 shows the tool you're holding. The belt is shown along
-the bottom of your pack.
+the bottom of your pack, its arrowheads cyan; your hand's arrowheads turn
+cyan too when they're at a tool, something that can hang on the belt.
 
 Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.

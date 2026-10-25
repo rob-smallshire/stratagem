@@ -1034,8 +1034,8 @@ ASSERT GRID_PITCH = 5
     CMP pack_drawn_slot         \ hand moved
     BEQ next
 .draw_marks
-    LDX #LO(pack_marks)         \ The tool hand's: arrowheads; the others
-    LDY #HI(pack_marks)         \ blank cells
+    LDX #LO(pack_tool_marks)    \ The tool hand's: a tool's arrowheads; the
+    LDY #HI(pack_tool_marks)    \ others blank cells
     LDA pack_grid_cell
     CMP host_pack_slot
     BEQ hand
@@ -1263,17 +1263,24 @@ ASSERT GRID_PITCH = 5
     RTS
 }
 
-\ Draw slot pack_slot's arrowheads, if it is the hand's, or blank cells.
+\ Draw slot pack_slot's arrowheads, if it is the hand's (a tool's if it
+\ holds a tool), or blank cells.
 .pack_slot_marks
 {
-    LDX #LO(pack_marks)
-    LDY #HI(pack_marks)
-    LDA pack_slot
-    CMP host_pack_index
-    BEQ hand
     LDX #LO(pack_marks + 2 * CELL_BYTES)
     LDY #HI(pack_marks + 2 * CELL_BYTES)
-.hand
+    LDA pack_slot
+    CMP host_pack_index
+    BNE marks
+    TAX
+    LDA host_pack_kinds,X
+    LDX #LO(pack_marks)
+    LDY #HI(pack_marks)
+    CMP #TOOL_FIRST
+    BCC marks
+    LDX #LO(pack_tool_marks)
+    LDY #HI(pack_tool_marks)
+.marks
     STX zp_tile
     STY zp_tile + 1
     LDA pack_left
@@ -1404,7 +1411,7 @@ ASSERT GRID_PITCH = 5
 \ icons of kinds that aren't materials (a tile's 64 bytes each; a
 \ material's is its whole tile in material_pages), each kind's icon's
 \ address, the digits (two cells each) and the arrowheads (pointing right,
-\ then left, then two blank cells).
+\ then left, then two blank cells, then a tool's, right and left).
 .pack_icons
     PACK_ICONS
 .pack_icon_low
@@ -1415,6 +1422,7 @@ ASSERT GRID_PITCH = 5
     PACK_DIGITS
 .pack_marks
     PACK_MARKS
+pack_tool_marks = pack_marks + 4 * CELL_BYTES
 .pack_socket                    \ An empty cell of the grid
     PACK_SOCKET
 .grid_lefts                     \ The grid's first column, by its size
