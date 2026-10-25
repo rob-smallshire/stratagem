@@ -439,7 +439,8 @@ def panel(screen_start: int, counts: tuple[int, ...], hand: int, kinds: list[int
                     picture[cell * 8:cell * 8 + 8])
     made = result(grid, station)
     if made is not None:
-        slot(left + size * GRID_PITCH, grid_top, made[0], made[1], "right", "blank")
+        slot(left + size * GRID_PITCH, grid_top, made[0], made[1], "right", "blank",
+             TOOL_MARK_COLOUR if made[0] in TOOLS else MARK_COLOUR)
 
     belt_top = grid_top + ROWS_PER_GRID_ROW * size
     for index, kind in enumerate(belt):

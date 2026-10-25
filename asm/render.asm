@@ -943,10 +943,16 @@ ASSERT ROWS_PER_GRID_ROW = 3
     JSR pack_kind_icon
     LDA host_pack_made_count
     JSR pack_count
-    LDA #LO(pack_marks)         \ An arrowhead pointing at the count, and a
-    STA zp_tile                 \ blank cell after it
-    LDA #HI(pack_marks)
-    STA zp_tile + 1
+    LDX #LO(pack_marks)         \ An arrowhead pointing at the count (a
+    LDY #HI(pack_marks)         \ tool's if it makes a tool), and a blank
+    LDA host_pack_made          \ cell after it
+    CMP #TOOL_FIRST
+    BCC mark
+    LDX #LO(pack_tool_marks)
+    LDY #HI(pack_tool_marks)
+.mark
+    STX zp_tile
+    STY zp_tile + 1
     LDA pack_left
     JSR pack_put_count
     JSR pack_blank_tile
