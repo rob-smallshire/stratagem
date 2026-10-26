@@ -17,6 +17,7 @@ strat-daylight-lab = "stratagem.daylight_lab:main"
 strat-chunk-lab = "stratagem.chunk_lab:main"
 strat-piece-lab = "stratagem.piece_lab:main"
 strat-feature-lab = "stratagem.feature_lab:main"
+strat-loading-lab = "stratagem.loading_lab:main"
 
 [dependency-groups]
 test = [
