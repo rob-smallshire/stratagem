@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from stratagem import actions, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
+from stratagem import actions, loading_screen, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
 
 
 def _bytes_lines(data: bytes | list[int], per_line: int = 16) -> list[str]:
@@ -676,3 +676,4 @@ def generate_all(generated_dirpath: Path) -> None:
     (generated_dirpath / "pack.asm").write_text(pack_source())
     (generated_dirpath / "crafting.asm").write_text(crafting_source())
     (generated_dirpath / "smooth_flood.asm").write_text(smooth_flood_source())
+    loading_screen.generate(generated_dirpath)

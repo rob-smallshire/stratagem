@@ -15,6 +15,17 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
 - OSFILE writes the file's catalogue information back into its control
   block, so set the block up afresh for every call. **V**
 
+- The Video ULA's flash bit (`&FE20` bit 0) shows a flashing physical
+  colour 8 + c as c when clear and as 7 - c when set. **U**
+- With interlace off (`*TV 0,1`), a MODE 1 frame is 312 lines of exactly
+  64us, and the User VIA's timers count at 1MHz from the same crystal, so a
+  free-running timer 1 of 64us stays at the same place in every line:
+  `LOADSCR`'s writes land at CRTC column 103-107 of 128 on both machines,
+  with nothing else interrupting. **V** (Beebium)
+- Beebium draws flashing colours in their first colour whatever the flash
+  bit, so a screen that toggles it can't be checked from a captured frame;
+  check the writes to `&FE20` against the CRTC's position instead. **V**
+
 ## BBC B+ 128K
 
 - The shadow RAM is the screen. The CPU reaches it at `&3000`-`&7FFF` only

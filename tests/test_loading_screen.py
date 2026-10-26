@@ -83,3 +83,34 @@ def test_flashing_every_colour_loses_black_and_white():
     for level, shows in ((0.0, 1 / 6), (1.0, 5 / 6)):
         shown = PHYSICAL_LINEAR[physical(dither(np.full((32, 64, 3), level), lines), lines)]
         assert abs(shown.mean() - shows) < 0.01
+
+
+# LOADSCR, in Beebium. Beebium draws flashing colours in their first colour
+# whatever the flash bit, so the screen is checked by when and what the
+# handler writes to the control register, not by the picture.
+
+LINES_PER_FRAME = 312
+BLANKING_COLUMNS = range(84, 124)      # CRTC columns (of 128, 80 displayed) safe to switch in
+
+
+def test_loadscr_shows_the_screen_and_switches_the_flash_bit_each_line(launch_bbc, machine, game_build):
+    from conftest import boot_until_ready
+    from stratagem.build import GENERATED_DIRPATH
+    from stratagem.loading_screen import LOADING_SCHEME
+
+    bbc = launch_bbc(machine)
+    labels = boot_until_ready(bbc, game_build, "LOADSCR", command="*RUN LOADSCR")
+    screen = (GENERATED_DIRPATH / "loading_screen.bin").read_bytes()
+    assert bytes(bbc.memory.address.peek[SCREEN_START:SCREEN_START + SCREEN_SIZE]) == screen
+    palette = bbc.video_ula.palette
+    assert [palette[index] for index in range(16)] == [p & 15 ^ 7 for p in palette_writes(LOADING_SCHEME)]
+
+    seen = set()
+    for _ in range(LINES_PER_FRAME):
+        bbc.debugger.run_to(labels["control_written"], skip_current=True)
+        crtc, control = bbc.crtc.state, bbc.video_ula.state.control
+        line = crtc.row * 8 + crtc.raster
+        assert crtc.column in BLANKING_COLUMNS, f"line {line}: written at column {crtc.column}"
+        assert control == 0xD8 | (line + 1) % LINES_PER_FRAME & 1, f"line {line}: {control:02X}"
+        seen.add(line)
+    assert len(seen) == LINES_PER_FRAME

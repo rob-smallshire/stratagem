@@ -11,7 +11,7 @@ Writes, into build/features/:
     loading-detail.png      a part of each, enlarged: pixels and blended
     loading-kernels.png     the 8-colour screen dithered each way
     loading-schemes.png     each way of splitting the pairs between lines
-    loading-screen.bin      the 7-colour screen's 20K, for &3000
+    loading-screen.bin      the 6-colour screen's 20K, the loading screen, for &3000
 
 and prints each screen's error (the mean Oklab distance, x100, from the art,
 both slightly blurred) and the palette and control register values.
@@ -26,16 +26,14 @@ import numpy as np
 from PIL import Image
 
 from stratagem.lighting_lab import sheet
-from stratagem.loading_screen import (BLACK, CYAN, FLASHING, FLASHING_SCHEMES, KERNELS, MAGENTA,
-                                      MODE2_WIDTH, RED, WHITE, YELLOW, Scheme, control_values, crt, display,
+from stratagem.loading_screen import (ART_FILEPATH, LOADING_SCHEME, BLACK, CYAN, FLASHING, FLASHING_SCHEMES, KERNELS, MAGENTA,
+                                      MODE2_WIDTH, RED, YELLOW, Scheme, control_values, crt, display,
                                       dither, encode_mode1, error, flashing, load_art, nearest, palette_writes,
                                       physical, render, to_image)
 
-ART_FILEPATH = Path("art/cover/stratagem-4x3.png")
-
 EIGHT = flashing(BLACK, CYAN, MAGENTA, YELLOW)                          # KCMY / WRGB
 SEVEN = Scheme((BLACK, FLASHING | CYAN, FLASHING | MAGENTA, FLASHING | YELLOW))   # KCMY / KRGB
-SIX = Scheme((BLACK, WHITE, FLASHING | CYAN, FLASHING | YELLOW))          # KWCY / KWRB
+SIX = LOADING_SCHEME                                                    # KWCY / KWRB
 FOUR = Scheme((BLACK, RED, YELLOW, CYAN))                               # the best 4 of 8
 ALL_EIGHT = np.arange(8)
 
@@ -109,11 +107,11 @@ def main() -> None:
         panels.append((f"even {scheme.name.replace('/', ', odd ')}", to_image(crt(colours, 2))))
     sheet(panels, 4).save(output_dirpath / "loading-schemes.png")
 
-    lp = SEVEN.line_palettes()
+    lp = SIX.line_palettes()
     screen = encode_mode1(dither(art, lp, KERNEL, METRIC))
-    assert (render(screen, SEVEN) == shown[-2][1]).all()
+    assert (render(screen, SIX) == shown[-1][1]).all()
     (output_dirpath / "loading-screen.bin").write_bytes(screen)
-    print(f"{SEVEN.name}: palette (&FE21)", " ".join(f"{b:02X}" for b in palette_writes(SEVEN)))
+    print(f"{SIX.name}: palette (&FE21)", " ".join(f"{b:02X}" for b in palette_writes(SIX)))
     print("control (&FE20), even and odd lines:", " ".join(f"{b:02X}" for b in control_values()))
 
 

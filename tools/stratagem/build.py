@@ -47,6 +47,7 @@ SOURCES = {
     "TUBE": ASM_DIRPATH / "tube_proto.asm",       # TUBEH (host), TUBEP (parasite)
     "SMOOTH": ASM_DIRPATH / "smooth_light.asm",   # SMOOTH (parasite)
     "TUBE_DRAW": ASM_DIRPATH / "tube_draw.asm",   # TDRAWH (host), TDRAWP (parasite)
+    "LOADSCR": ASM_DIRPATH / "loadscr.asm",       # LOADSCR, LSCREEN
 }
 BOOT_FILE = "STRAT"
 

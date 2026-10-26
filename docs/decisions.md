@@ -393,3 +393,13 @@ A running log of design decisions. Add to it whenever one is made.
   adds to it, one taken carries as much as it can. So the digs left in all
   your tools of a kind are exactly kept, nothing is repaired by moving it,
   and nothing is lost.
+- **The loading screen is the cover in MODE 1, six colours:** black and
+  white steady, the other two logical colours flashing cyan/red and
+  yellow/blue, with the flash bit switched every line, so lines alternate
+  KWCY and KWRB (stratagem.loading_screen, LOADSCR). With all four
+  flashing, eight colours show but no line has both black and white, so
+  the cover's black outlines go grey; steady black alone (seven colours)
+  was close, but the six keep the whites crisper. Each switch is made by
+  a User VIA timer 1 interrupt every line, which takes the line's parity
+  from timer 2's count, so a late interrupt costs one line, not the rest
+  of the frame.
