@@ -11,7 +11,7 @@ Writes, into build/features/:
     loading-detail.png      a part of each, enlarged: pixels and blended
     loading-kernels.png     the 8-colour screen dithered each way
     loading-schemes.png     each way of splitting the pairs between lines
-    loading-screen.bin      the 6-colour screen's 20K, for &3000
+    loading-screen.bin      the 7-colour screen's 20K, for &3000
 
 and prints each screen's error (the mean Oklab distance, x100, from the art,
 both slightly blurred) and the palette and control register values.
@@ -109,11 +109,11 @@ def main() -> None:
         panels.append((f"even {scheme.name.replace('/', ', odd ')}", to_image(crt(colours, 2))))
     sheet(panels, 4).save(output_dirpath / "loading-schemes.png")
 
-    lp = SIX.line_palettes()
+    lp = SEVEN.line_palettes()
     screen = encode_mode1(dither(art, lp, KERNEL, METRIC))
-    assert (render(screen, SIX) == shown[-1][1]).all()
+    assert (render(screen, SEVEN) == shown[-2][1]).all()
     (output_dirpath / "loading-screen.bin").write_bytes(screen)
-    print(f"{SIX.name}: palette (&FE21)", " ".join(f"{b:02X}" for b in palette_writes(SIX)))
+    print(f"{SEVEN.name}: palette (&FE21)", " ".join(f"{b:02X}" for b in palette_writes(SEVEN)))
     print("control (&FE20), even and odd lines:", " ".join(f"{b:02X}" for b in control_values()))
 
 
