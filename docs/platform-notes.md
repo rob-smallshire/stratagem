@@ -16,7 +16,9 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   block, so set the block up afresh for every call. **V**
 
 - The Video ULA's flash bit (`&FE20` bit 0) shows a flashing physical
-  colour 8 + c as c when clear and as 7 - c when set. **U**
+  colour 8 + c as c when clear and as 7 - c when set, from the moment it
+  is written. **U** (as jsbeeb does it, `src/video.js`; not yet seen on
+  hardware)
 - With interlace off (`*TV 0,1`), a MODE 1 frame is 312 lines of exactly
   64us, and the User VIA's timers count at 1MHz from the same crystal, so a
   free-running timer 1 of 64us stays at the same place in every line:
@@ -25,6 +27,9 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
 - Beebium draws flashing colours in their first colour whatever the flash
   bit, so a screen that toggles it can't be checked from a captured frame;
   check the writes to `&FE20` against the CRTC's position instead. **V**
+  It is a defect: `VideoUla::write` makes each entry's RGB from
+  `physical & 7` when the palette is written, and the control register's
+  flash bit is never consulted, so the OS's flashing colours never flash.
 
 ## BBC B+ 128K
 
