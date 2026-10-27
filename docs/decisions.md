@@ -415,3 +415,11 @@ A running log of design decisions. Add to it whenever one is made.
   delayed switch still sets the line being drawn. What's left, while a
   file is read, is the start of some lines in the other palette and
   sometimes a whole line.
+- **The cover becomes a title screen, with a plainer loading screen after
+  it:** loading beneath the picture through an unmodified filing system
+  spoils some lines (the DFS's NMIs and its stretches with interrupts
+  off), and only fitting to the filing system would make it clean. The
+  picture, shown with nothing loading, is exact, so it stands alone as
+  the title (music may come later), and the game loads after it under a
+  screen with nothing timed to the line: a MODE 2 title and a progress
+  bar, say. The work and its measurements are in `docs/loading-screen.md`.

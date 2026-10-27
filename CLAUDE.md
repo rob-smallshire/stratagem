@@ -13,6 +13,8 @@ filing system resident, and is tested in the Beebium emulator.
   how the format and renderer could carry it.
 - `docs/inventory-and-crafting.md`: how other games hold, show and craft
   things, and the proposed design for Stratagem.
+- `docs/loading-screen.md`: the cover shown with the flash bit switched
+  every line, loading beneath it, and what we learned.
 - `docs/manual.md`: the player's manual: keys, the pack, the first shapes.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).

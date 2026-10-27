@@ -99,7 +99,8 @@ past it shows the start of a line in the other palette. On the DFS, in
 Beebium, 0.4-2.2% of lines are late while the parasite's files load over
 the Tube, nearly all by under 8 columns, and about 0.1% are skipped (the
 whole line in the other palette). Loads into the host's own memory
-(RENDER, MAIN) are worse: 6-9% late, 1.2% skipped.
+(RENDER, MAIN) are worse: 6-9% late, 1.2% skipped. The whole story, and the
+direction from here, is in `docs/loading-screen.md`.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs
