@@ -122,6 +122,16 @@ details.
   to 12000 when many voices start notes at once. Under the title, whose
   line interrupt takes more than half the CPU, that still fits a frame.
 
+### After the board: processing its output
+
+`uv run strat-m5-master` simulates what an analogue or simple digital chain
+after a real board's output might add (`tools/stratagem/m5_master.py` has
+the details): a low cut at 25Hz; EQ, +6dB shelf below 120Hz, +2dB at 250Hz
+and at 3kHz; gentle valve- or tape-like saturation; bus compression, 2.5:1
+above -20dBFS; a concert hall's reverb, 2.2s, a quarter of the mix; a
+little stereo width. It writes `build/features/overture-processed.wav`
+from the recording.
+
 ## Under the title screen: M5TITLE
 
 While the title shows, the System VIA's interrupts are off, so there's no

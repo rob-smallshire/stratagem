@@ -20,6 +20,7 @@ strat-piece-lab = "stratagem.piece_lab:main"
 strat-feature-lab = "stratagem.feature_lab:main"
 strat-loading-lab = "stratagem.loading_lab:main"
 strat-m5-record = "stratagem.m5_record:main"
+strat-m5-master = "stratagem.m5_master:main"
 
 [dependency-groups]
 test = [
@@ -31,6 +32,7 @@ test = [
 ]
 dev = [
     { include-group = "test" },
+    "scipy>=1.18.1",
 ]
 
 # Resolve from public PyPI, whatever the machine's default index, so that
