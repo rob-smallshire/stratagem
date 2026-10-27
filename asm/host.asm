@@ -6,6 +6,7 @@
 \   MAIN    program RAM: each frame's reading and drawing
 \   RENDER  the render region: the renderer, and the light's draw list
 \   LSCREEN the title screen (tools/stratagem/loading_screen.py)
+\   MUSIC   the title's music on the Music 5000, in user RAM until MAIN
 
 INCLUDE "asm/os.asm"
 INCLUDE "asm/layout.asm"
@@ -33,6 +34,7 @@ ENDMACRO
 INCLUDE "asm/host_zeropage.asm"
 INCLUDE "asm/host_low.asm"
 INCLUDE "asm/host_main.asm"
+INCLUDE "asm/host_music.asm"
 INCLUDE "asm/render.asm"
 INCLUDE "asm/render_light.asm"
 .host_render_end

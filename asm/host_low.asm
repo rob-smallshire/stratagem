@@ -345,8 +345,8 @@ ENDMACRO
 }
 
 \ Load the cover art (LSCREEN, the title screen's 20K) into user RAM, copy
-\ it to the screen, and start toggling the flash bit every line
-\ (asm/loading_screen.asm). Only code at RENDER_CODE sees the screen on the
+\ it to the screen, load the music (MUSIC) in its place, and start toggling
+\ the flash bit every line (asm/loading_screen.asm). Only code at RENDER_CODE sees the screen on the
 \ B+ (with ANDY paged in, as on the Integra-B MEMSEL with the render bank),
 \ so a small copier is put there, and the picture goes through the render
 \ region below it, BOUNCE_PAGES at a time. RENDER, loaded later,
@@ -408,13 +408,23 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     STA page
     CMP #HI(SCREEN_END)
     BNE chunk
+
+    LDX #LO(file_music)         \ The music, where the picture was
+    LDY #HI(file_music)
+    JSR load_file
+    LDA #LO(score_overture)
+    STA zp_score
+    LDA #HI(score_overture)
+    STA zp_score + 1
+    JSR music_init
     JMP loading_screen_on
 .page
     SKIP 1
 }
 
-\ Wait until SPACE is pressed, reading the keyboard itself: the OS doesn't,
-\ with the System VIA's interrupts off.
+\ Play the music until SPACE is pressed, reading the keyboard itself: the
+\ OS doesn't, with the System VIA's interrupts off. The music ticks at each
+\ vertical sync, whose flag the System VIA still sets. Then silence it.
 .wait_for_space
 {
     LDA #3                      \ Stop its scanning
@@ -422,13 +432,19 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     LDA #&7F                    \ Port A: a key number out, its state in
     STA SYSTEM_VIA_DDRA         \ (bit 7)
 .wait
+    LDA #VIA_CA1                \ A vertical sync since the last tick?
+    BIT SYSTEM_VIA_IFR
+    BEQ key
+    STA SYSTEM_VIA_IFR          \ (clears it)
+    JSR music_tick
+.key
     LDA #KEY_SPACE
     STA SYSTEM_VIA_A_NO_HANDSHAKE
     LDA SYSTEM_VIA_A_NO_HANDSHAKE
     BPL wait
     LDA #&0B                    \ Let it scan again
     STA SYSTEM_VIA_B
-    RTS
+    JMP music_silence
 }
 
 \ Copy X pages from (zp_temp) to (zp_ptr). Copied to RENDER_CODE and run
@@ -523,6 +539,7 @@ ASSERT vdu_setup_end - vdu_strings < 256
 
 .file_screen    EQUS "LSCREEN", 13
 .file_render    EQUS "RENDER", 13
+.file_music     EQUS "MUSIC", 13
 .file_main      EQUS "MAIN", 13
 .command_world  EQUS "LOAD PWORLD", 13
 .command_light  EQUS "LOAD PLIGHT", 13

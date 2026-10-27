@@ -423,3 +423,10 @@ A running log of design decisions. Add to it whenever one is made.
   the title (music may come later), and the game loads after it under a
   screen with nothing timed to the line: a MODE 2 title and a progress
   bar, say. The work and its measurements are in `docs/loading-screen.md`.
+- **The title plays the Stratagem Overture on the Music 5000, driven
+  directly:** no AMPLE ROM is needed (the board only synthesises; envelopes
+  and sequencing are the host's), so STRAT plays it with its own player,
+  from the MIDI file (`art/music/Stratagem_Overture.mid`) arranged for the
+  board's sixteen channels (`docs/music-5000.md`). It loads MUSIC whether
+  or not a board is fitted, since the board can't be detected; the game
+  itself will have other music, adapted differently.

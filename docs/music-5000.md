@@ -132,6 +132,17 @@ above -20dBFS; a concert hall's reverb, 2.2s, a quarter of the mix; a
 little stereo width. It writes `build/features/overture-processed.wav`
 from the recording.
 
+## In STRAT's title
+
+STRAT plays the overture under the title (`asm/host_music.asm`): MUSIC, the
+player and the score (12.7K), is assembled with the host at `&3000` and
+loaded into user RAM once the picture is on the shadow screen, where the
+picture was; MAIN overwrites it later. The title's wait for SPACE ticks the
+music at each vertical sync, as M5TITLE does, and SPACE silences the board
+before the game loads. `tests/test_loader.py` checks, on a machine with
+the board, that it plays, that the flash bit is still switched in every
+line's blanking, and that the game is silent.
+
 ## Under the title screen: M5TITLE
 
 While the title shows, the System VIA's interrupts are off, so there's no
@@ -171,9 +182,8 @@ load on the B+, 2.05s on the Integra-B, in Beebium).
   already has the vertical sync; the score could come from the parasite.
 - **The overture, interpreted.** The mood (`art/music/style.md`) and the
   board's sound suggest changes (see the decisions to come).
-- **The overture under STRAT's title.** Its data doesn't fit beside
-  M5TITLE's unshadowed screen; in STRAT, user RAM is free once the picture
-  is copied to the shadow screen.
+- **Detecting the board,** so that a machine without one needn't load
+  MUSIC: it can't be read back, so perhaps ask the player.
 - **Modulation** (the alternate bank): a channel switches its neighbour
   between the two banks on its own wave's sign, which gives ring- and
   FM-like sounds.

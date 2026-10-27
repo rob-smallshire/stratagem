@@ -81,17 +81,22 @@ STRAT, run by !BOOT, checks the machine, then shows the title screen, the
 cover (`stratagem.loading_screen`): it selects a shadow MODE 1 with
 interlace off, loads LSCREEN into user RAM and copies it to the screen,
 through the render region, by a small copier it puts at `&A008` (the only
-code that sees the screen on the B+). Then it starts switching the Video
-ULA's flash bit every line, from a User VIA timer interrupt with the System
-VIA's interrupts off, and waits, reading the keyboard itself, for SPACE.
-Then it gives the VIAs and IRQ1V back, selects the game's shadow MODE 2,
+code that sees the screen on the B+). It loads MUSIC, the title's music
+for the Music 5000, where the picture was in user RAM. Then it starts
+switching the Video ULA's flash bit every line, from a User VIA timer
+interrupt with the System VIA's interrupts off, and waits, reading the
+keyboard itself, for SPACE, ticking the music at each vertical sync (whose
+flag the System VIA still sets). Then it silences the board, gives the VIAs
+and IRQ1V back, selects the game's shadow MODE 2,
 and loads RENDER, MAIN, PWORLD, PLIGHT and PGAME, all through the OS, so
 any filing system will do. Last, it starts PGAME in the parasite itself,
 through the Tube host (`&0406`, type 4), as `*RUN` would.
 
 Nothing loads beneath the picture: a filing system's interrupts spoil
 some of its lines (`docs/loading-screen.md`). A plainer loading screen,
-with nothing timed to the line, is to come.
+with nothing timed to the line, is to come. The music is the Stratagem
+Overture (`docs/music-5000.md`); on a machine without the board, its writes
+go nowhere, and MUSIC costs only its loading (12.7K).
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs

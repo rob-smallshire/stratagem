@@ -111,6 +111,21 @@ RELEASE = 3
     RTS
 }
 
+\ Silence every channel (each takes amplitude 0 at its next wave wrap).
+.music_silence
+{
+    LDA #REGISTER_PAGE
+    STA JIM_COPY
+    STA JIM_PAGE
+    LDA #0
+    LDX #CHANNELS - 1
+.channel
+    STA AMPLITUDE,X
+    DEX
+    BPL channel
+    RTS
+}
+
 \ Advance every voice a tick: take its next events when its current one
 \ ends; move its pitch for vibrato; and write its amplitude.
 \

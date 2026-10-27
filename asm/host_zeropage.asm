@@ -16,6 +16,7 @@ GUARD &90
 .zp_mask            SKIP 2      \ ... the dither masks for the cell
 .zp_ptr             SKIP 2
 .zp_temp            SKIP 2
+zp_score = zp_temp              \ The music's score, while music_init runs (MUSIC)
 .zp_render_u        SKIP 1      \ Render parameters: world cell column (low 7 bits)
 .zp_render_v        SKIP 1      \ ... world cell row (low 6 bits)
 .zp_render_count    SKIP 1      \ ... cells along a row, or rows down columns

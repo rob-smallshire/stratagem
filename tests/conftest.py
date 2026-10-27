@@ -230,18 +230,30 @@ def tube_machine(request) -> Machine:
     return request.param
 
 
-@pytest.fixture
-def tube_bbc(tube_machine):
-    machine = tube_machine
+MUSIC_5000_EXTENSION = "--hybrid-music-5000"
+
+
+def launch_tube(machine: Machine, extra_args: list[str]) -> Iterator[Beebium]:
     with contextlib.ExitStack() as stack:
         try:
             bbc = stack.enter_context(Beebium.launch(variant=machine.variant, preset=machine.preset,
-                                                     extra_args=[TUBE_EXTENSION]))
+                                                     extra_args=[TUBE_EXTENSION] + extra_args))
         except ServerNotFoundError as e:
             pytest.skip(str(e))
         bbc.system.set_speed_multiplier(0.0)
         wait_for_prompt(bbc)
         yield bbc
+
+
+@pytest.fixture
+def tube_bbc(tube_machine):
+    yield from launch_tube(tube_machine, [])
+
+
+@pytest.fixture
+def tube_music_bbc(tube_machine):
+    """A machine with a second processor and a Music 5000."""
+    yield from launch_tube(tube_machine, [MUSIC_5000_EXTENSION])
 
 
 def boot_to_title(bbc: Beebium, game_build: BuildResult) -> None:
