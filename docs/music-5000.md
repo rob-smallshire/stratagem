@@ -89,24 +89,33 @@ trumpets (bars 1-12); B minor, oboe, flute and clarinet (13-24); D major,
 tutti, trombone chords and a violin ostinato (25-36); a coda, horn and
 trumpets in octaves (37-40).
 
-`stratagem.overture` turns it into a score:
+`stratagem.overture` arranges it for the board; its docstring has the
+details.
 
 - **Each track is an instrument** of the orchestra in `stratagem.music5000`:
-  a wave (a guess at its spectrum) and an envelope, a level, and a place in
-  the stereo field, roughly as an orchestra sits. A note's velocity makes it
-  quieter from the track's level (20 log10(v / 127) dB).
-- **Time** is quantised to 32 ticks a quarter, 93.75 beats a minute (the
-  file's is 96): every note starts on a sixteenth, and articulation keeps to
-  within a tick.
-- **Sixteen channels.** At most sixteen notes sound at once (nineteen in
-  one bar, where the strings strike their chord again while it sounds: the
-  first is ended). With releases ringing on there would be up to 27, so
-  notes go to a channel whose last release has finished, or else cut a
-  release short, the same track's if they can (a chord struck again): 299
-  are cut, nearly all the strings' and cellos' bar-long chords.
-- 3.6K of streams; 105 seconds with a bar's silence before it plays again.
-
-It is a faithful first version, to judge by ear, before interpreting it.
+  a wave (a guess at its spectrum), an envelope, vibrato or none, a level,
+  and a place in the stereo field. A note's velocity makes it quieter from
+  the track's level (20 log10(v / 127) dB).
+- **Time:** 96 beats a minute, 31.25 ticks a quarter, each note's start and
+  end to the nearest tick.
+- **Shaped dynamics,** which the file doesn't have: a quiet opening that
+  swells, a withdrawn B minor, a swell and a timpani roll into the tutti, a
+  bare coda, and a last full chord of D. Long notes change volume as they
+  sound.
+- **Space:** the strings' chords spread across the stereo field; where a
+  channel is free, each melody is doubled on a second channel slightly
+  detuned (an ensemble), and echoed, quieter, on the other side.
+- **Sixteen channels.** The sustained parts move from chord to chord on
+  the same channels, legato; the other notes take a channel whose release
+  has finished, or cut one short. The decorations take only what's left,
+  never displacing the score: about a third of them fit, mostly in the
+  opening and the woodwinds' section (the tutti fills all sixteen).
+- **The player's vibrato:** a triangle of eight ticks (6.25Hz), two units
+  either side, the unit being the note's frequency shifted right (by 8: 6.8
+  cents); it starts some ticks into a note. The same unit detunes.
+- **The cost,** with vibrato on most voices: about 2700 cycles a tick, up
+  to 12000 when many voices start notes at once. Under the title, whose
+  line interrupt takes more than half the CPU, that still fits a frame.
 
 ## Under the title screen: M5TITLE
 
@@ -129,9 +138,9 @@ before. Nothing in the interrupt changes.
 
 ## While a file loads: M5LOAD
 
-The tune from the vertical sync event, while the idle loop loads a 20K file
-through the OS, again and again (2.8s a load on the B+, 2.05s on the
-Integra-B, in Beebium).
+The music from the vertical sync event, while the idle loop loads a file
+through the OS, again and again (RENDER, 11.6K; a 20K file took 2.8s a
+load on the B+, 2.05s on the Integra-B, in Beebium).
 
 - The event keeps coming. Ticks are at most 0.3ms late on the B+ and 0.6ms
   on the Integra-B (the DFS holds interrupts off at times), and none is

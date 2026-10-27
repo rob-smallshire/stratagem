@@ -102,6 +102,8 @@ RELEASE = 3
     STA voice_level,X
     STA voice_quieter,X
     STA voice_release,X
+    STA voice_detune,X
+    STA voice_vibrato,X
     LDA #RELEASE
     STA voice_phase,X
     DEX
@@ -110,7 +112,12 @@ RELEASE = 3
 }
 
 \ Advance every voice a tick: take its next events when its current one
-\ ends, and write its amplitude.
+\ ends; move its pitch for vibrato; and write its amplitude.
+\
+\ A note's frequency is the pitch table's, detuned by so many units of it
+\ shifted right by the instrument's shift; vibrato then moves it a unit a
+\ tick, in a triangle of eight ticks (6.25Hz), two units either side, from
+\ the instrument's vibrato delay into the note.
 .music_tick
 {
     LDA #REGISTER_PAGE
@@ -121,7 +128,7 @@ RELEASE = 3
 .voice
     DEC voice_ticks,X
     BEQ fetch
-    JMP envelope
+    JMP vibrato
 .fetch
     LDA voice_low,X
     STA zp_ptr
@@ -156,6 +163,18 @@ RELEASE = 3
     STA voice_quieter,X
     JMP next
 .not_volume
+    CMP #PAN
+    BNE not_pan
+    LDA music_argument
+    STA CONTROL,X
+    JMP next
+.not_pan
+    CMP #DETUNE
+    BNE not_detune
+    LDA music_argument
+    STA voice_detune,X
+    JMP next
+.not_detune
     CMP #INSTRUMENT
     BNE timed
     LDY music_argument
@@ -171,6 +190,10 @@ RELEASE = 3
     STA WAVE_SELECT,X
     LDA instrument_stereos,Y
     STA CONTROL,X
+    LDA instrument_shifts,Y
+    STA voice_shift,X
+    LDA instrument_vibratos,Y
+    STA voice_vibrato,X
     JMP next
 .timed
     PHA                         \ A note, HOLD or REST
@@ -184,20 +207,75 @@ RELEASE = 3
     CMP #REST
     BEQ release
     CMP #HOLD
-    BEQ envelope
-    TAY                         \ A note
+    BEQ vibrato
+    TAY                         \ A note: its pitch...
     LDA pitch_low,Y
-    STA FREQ_LOW,X
+    STA voice_freq_low,X
+    STA music_unit
     LDA pitch_middle,Y
-    STA FREQ_MIDDLE,X
+    STA voice_freq_middle,X
+    STA music_unit + 1
     LDA pitch_high,Y
-    STA FREQ_HIGH,X
+    STA voice_freq_high,X
+    STA music_unit + 2
+    LDY voice_shift,X           \ ... its unit...
+.shift
+    LSR music_unit + 2
+    ROR music_unit + 1
+    ROR music_unit
+    DEY
+    BNE shift
+    LDA music_unit
+    STA voice_unit_low,X
+    LDA music_unit + 1
+    STA voice_unit_high,X
+    LDY voice_detune,X          \ ... detuned
+    BEQ tuned
+    BMI flat
+.sharp
+    JSR unit_up
+    DEY
+    BNE sharp
+    BEQ tuned                   \ (always)
+.flat
+    JSR unit_down
+    INY
+    BNE flat
+.tuned
+    JSR write_frequency
+    LDA voice_vibrato,X
+    STA voice_vibrato_count,X
+    LDA #0
+    STA voice_lfo,X
     LDA #ATTACK
     STA voice_phase,X
     BPL envelope                \ (always)
 .release
     LDA #RELEASE
     STA voice_phase,X
+
+.vibrato
+    LDA voice_vibrato,X         \ None for this instrument
+    BEQ envelope
+    LDA voice_vibrato_count,X
+    BEQ vibrating
+    DEC voice_vibrato_count,X   \ Not yet
+    JMP envelope
+.vibrating
+    LDY voice_lfo,X
+    INY
+    TYA
+    AND #7
+    STA voice_lfo,X
+    TAY
+    LDA vibrato_up,Y
+    BEQ down
+    JSR unit_up
+    JMP vibrated
+.down
+    JSR unit_down
+.vibrated
+    JSR write_frequency
 
 .envelope
     LDY voice_phase,X
@@ -254,6 +332,54 @@ RELEASE = 3
     RTS
 }
 
+\ Raise and lower voice X's frequency by its unit.
+.unit_up
+{
+    CLC
+    LDA voice_freq_low,X
+    ADC voice_unit_low,X
+    STA voice_freq_low,X
+    LDA voice_freq_middle,X
+    ADC voice_unit_high,X
+    STA voice_freq_middle,X
+    LDA voice_freq_high,X
+    ADC #0
+    STA voice_freq_high,X
+    RTS
+}
+
+.unit_down
+{
+    SEC
+    LDA voice_freq_low,X
+    SBC voice_unit_low,X
+    STA voice_freq_low,X
+    LDA voice_freq_middle,X
+    SBC voice_unit_high,X
+    STA voice_freq_middle,X
+    LDA voice_freq_high,X
+    SBC #0
+    STA voice_freq_high,X
+    RTS
+}
+
+\ Write voice X's frequency to its channel, bit 0 clear (set is phase-set).
+.write_frequency
+{
+    LDA voice_freq_low,X
+    AND #&FE
+    STA FREQ_LOW,X
+    LDA voice_freq_middle,X
+    STA FREQ_MIDDLE,X
+    LDA voice_freq_high,X
+    STA FREQ_HIGH,X
+    RTS
+}
+
+\ The triangle's steps: up (1) or down (0), into each of its eight ticks.
+.vibrato_up
+    EQUB 1, 1, 1, 0, 0, 0, 0, 1
+
 INCLUDE "build/generated/music5000.asm"
 
 \ A score's voice table is copied here (stratagem.music5000.score_source).
@@ -273,4 +399,15 @@ INCLUDE "build/generated/music5000.asm"
 .voice_decay        SKIP MAX_VOICES
 .voice_sustain      SKIP MAX_VOICES
 .voice_release      SKIP MAX_VOICES
+.voice_shift        SKIP MAX_VOICES \ Its unit's: the pitch shifted right this far
+.voice_vibrato      SKIP MAX_VOICES \ Ticks into a note to vibrato, or 0: none
+.voice_detune       SKIP MAX_VOICES \ Units (signed)
+.voice_freq_low     SKIP MAX_VOICES \ Its frequency
+.voice_freq_middle  SKIP MAX_VOICES
+.voice_freq_high    SKIP MAX_VOICES
+.voice_unit_low     SKIP MAX_VOICES \ Its unit, for detuning and vibrato
+.voice_unit_high    SKIP MAX_VOICES
+.voice_vibrato_count SKIP MAX_VOICES \ Ticks before vibrato
+.voice_lfo          SKIP MAX_VOICES \ The vibrato's tick, 0-7
 .music_argument     SKIP 1
+.music_unit         SKIP 3

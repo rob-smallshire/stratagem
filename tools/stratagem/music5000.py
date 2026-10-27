@@ -149,13 +149,17 @@ PITCHES = [frequency_register(note_hz(LOWEST_NOTE + i)) for i in range(NOTES)]
 class Instrument:
     """A wave, an envelope and a place: up by attack amplitude steps a
     tick to FULL, down by decay to sustain, held; at a note's end, down by
-    release to silence."""
+    release to silence. Its unit of pitch, for detuning and vibrato, is the
+    note's frequency shifted right by shift (8: 6.8 cents); vibrato, two
+    units either side at 6.25Hz, starts vibrato ticks into a note (0: none)."""
     wave: str
     attack: int
     decay: int
     sustain: int
     release: int
     stereo: int = CENTRE
+    shift: int = 8
+    vibrato: int = 0
 
     def release_ticks(self) -> int:
         """The longest release, from FULL."""
@@ -165,13 +169,17 @@ class Instrument:
 # A voice is a list of events:
 #   ("instrument", name)            take an instrument (its wave and stereo now)
 #   ("volume", steps)               play this many amplitude steps quieter
+#   ("pan", position)               a stereo position other than the instrument's
+#   ("detune", units)               detune notes from here on (signed)
 #   ("note", note number, ticks)    start a note, for so many ticks
 #   ("hold", ticks)                 keep on, for so many more
 #   ("rest", ticks)                 release, for so many
 # The score format, a stream per voice: a note's index in the pitch table
 # (0 to NOTES - 1), HOLD or REST, each with a length in ticks, 1-255;
-# INSTRUMENT and an instrument's number; VOLUME and steps; LOOP, back to
-# the start.
+# INSTRUMENT and an instrument's number; VOLUME and steps; PAN and a
+# position; DETUNE and units (two's complement); LOOP, back to the start.
+DETUNE = 0xF9
+PAN = 0xFA
 VOLUME = 0xFB
 INSTRUMENT = 0xFC
 HOLD = 0xFD
@@ -189,6 +197,12 @@ def voice_bytes(voice: list[Event]) -> bytes:
         elif kind == "volume":
             assert 0 <= event[1] <= FULL
             out += bytes([VOLUME, event[1]])
+        elif kind == "pan":
+            assert 0 <= event[1] <= 15
+            out += bytes([PAN, event[1]])
+        elif kind == "detune":
+            assert -8 <= event[1] <= 8
+            out += bytes([DETUNE, event[1] & 0xFF])
         elif kind == "note":
             index = event[1] - LOWEST_NOTE
             assert 0 <= index < NOTES and 1 <= event[2] <= 255, event
@@ -245,6 +259,11 @@ class VoiceState:
     phase: int = RELEASE
     quieter: int = 0                # steps below the envelope
     instrument: Instrument | None = None
+    detune: int = 0
+    frequency: int = 0
+    unit: int = 0
+    vibrato_count: int = 0
+    lfo: int = 0
 
 
 @dataclass
@@ -262,10 +281,16 @@ class Player:
     def amplitudes(self) -> list[int]:
         return [max(0, s.level - s.quieter) for s in self.states]
 
+    @staticmethod
+    def frequency_writes(channel: int, state: VoiceState) -> list[tuple[int, int]]:
+        return [(FREQ_LOW + channel, state.frequency & 0xFE), (FREQ_MIDDLE + channel, state.frequency >> 8 & 0xFF),
+                (FREQ_HIGH + channel, state.frequency >> 16)]
+
     def tick(self) -> list[tuple[int, int]]:
         writes = []
         instruments = list(INSTRUMENTS)
         for channel, (stream, state) in enumerate(zip(self.streams, self.states)):
+            started = False
             state.ticks -= 1
             if state.ticks == 0:
                 while True:
@@ -281,6 +306,10 @@ class Player:
                                    (CONTROL + channel, state.instrument.stereo)]
                     elif byte == VOLUME:
                         state.quieter = argument
+                    elif byte == PAN:
+                        writes.append((CONTROL + channel, argument))
+                    elif byte == DETUNE:
+                        state.detune = argument - 256 if argument & 0x80 else argument
                     else:
                         break
                 state.ticks = argument
@@ -288,10 +317,22 @@ class Player:
                     state.phase = RELEASE
                 elif byte != HOLD:
                     pitch = PITCHES[byte]
-                    writes += [(FREQ_LOW + channel, pitch & 0xFF), (FREQ_MIDDLE + channel, pitch >> 8 & 0xFF),
-                               (FREQ_HIGH + channel, pitch >> 16)]
+                    state.unit = pitch >> state.instrument.shift & 0xFFFF
+                    state.frequency = (pitch + state.detune * state.unit) & 0xFFFFFF
+                    writes += self.frequency_writes(channel, state)
+                    state.vibrato_count = state.instrument.vibrato
+                    state.lfo = 0
                     state.phase = ATTACK
+                    started = True
             instrument = state.instrument
+            if not started and instrument and instrument.vibrato:
+                if state.vibrato_count:
+                    state.vibrato_count -= 1
+                else:
+                    state.lfo = (state.lfo + 1) & 7
+                    step = state.unit if VIBRATO_UP[state.lfo] else -state.unit
+                    state.frequency = (state.frequency + step) & 0xFFFFFF
+                    writes += self.frequency_writes(channel, state)
             if state.phase == ATTACK:
                 state.level = min(FULL, state.level + instrument.attack)
                 if state.level == FULL:
@@ -304,6 +345,9 @@ class Player:
                 state.level = max(0, state.level - instrument.release)
             writes.append((AMPLITUDE + channel, max(0, state.level - state.quieter)))
         return writes
+
+
+VIBRATO_UP = [1, 1, 1, 0, 0, 0, 0, 1]    # the triangle: up a unit into each tick, or down
 
 
 # Scores
@@ -327,18 +371,18 @@ MAX_VOICES = CHANNELS
 # harmonics; its envelope, in amplitude steps (0.38dB) a tick (20ms).
 INSTRUMENTS = {
     "tone": Instrument("sine", attack=128, decay=0, sustain=FULL, release=128, stereo=RIGHT),
-    "horn": Instrument("horn", attack=10, decay=1, sustain=0x78, release=5, stereo=12),
-    "trumpet": Instrument("trumpet", attack=24, decay=2, sustain=0x74, release=6, stereo=14),
-    "trombone": Instrument("trombone", attack=10, decay=1, sustain=0x7C, release=4, stereo=15),
-    "violin": Instrument("violin", attack=12, decay=1, sustain=0x7A, release=5, stereo=11),
-    "strings": Instrument("strings", attack=4, decay=0, sustain=FULL, release=3, stereo=12),
-    "cello": Instrument("cello", attack=4, decay=0, sustain=FULL, release=3, stereo=14),
-    "bass": Instrument("bass", attack=6, decay=0, sustain=FULL, release=3, stereo=15),
-    "flute": Instrument("flute", attack=10, decay=1, sustain=0x78, release=6, stereo=13),
-    "oboe": Instrument("oboe", attack=16, decay=1, sustain=0x78, release=8, stereo=13),
+    "horn": Instrument("horn", attack=10, decay=1, sustain=0x78, release=5, stereo=12, shift=9, vibrato=12),
+    "trumpet": Instrument("trumpet", attack=24, decay=2, sustain=0x74, release=6, stereo=14, shift=9, vibrato=14),
+    "trombone": Instrument("trombone", attack=10, decay=1, sustain=0x7C, release=5, stereo=15),
+    "violin": Instrument("violin", attack=12, decay=1, sustain=0x7A, release=6, stereo=11, shift=8, vibrato=6),
+    "strings": Instrument("strings", attack=4, decay=1, sustain=0x74, release=5, stereo=12, shift=9, vibrato=10),
+    "cello": Instrument("cello", attack=4, decay=1, sustain=0x74, release=5, stereo=14, shift=9, vibrato=12),
+    "bass": Instrument("bass", attack=6, decay=0, sustain=FULL, release=5, stereo=15),
+    "flute": Instrument("flute", attack=10, decay=1, sustain=0x78, release=6, stereo=13, shift=9, vibrato=8),
+    "oboe": Instrument("oboe", attack=16, decay=1, sustain=0x78, release=8, stereo=13, shift=9, vibrato=8),
     "clarinet": Instrument("clarinet", attack=14, decay=1, sustain=0x78, release=8, stereo=14),
-    "harp": Instrument("harp", attack=128, decay=2, sustain=0, release=4, stereo=11),
-    "timpani": Instrument("timpani", attack=128, decay=3, sustain=0, release=4, stereo=13),
+    "harp": Instrument("harp", attack=128, decay=2, sustain=0, release=6, stereo=11),
+    "timpani": Instrument("timpani", attack=128, decay=3, sustain=0, release=6, stereo=13),
 }
 
 # One voice, long notes: for measuring pitch.
@@ -376,6 +420,8 @@ def common_source() -> str:
     lines = ["\\ Generated by stratagem.music5000: do not edit.",
              f"MAX_VOICES = {MAX_VOICES}",
              f"WAVES = {len(waves)}",
+             f"DETUNE = &{DETUNE:02X}",
+             f"PAN = &{PAN:02X}",
              f"VOLUME = &{VOLUME:02X}",
              f"INSTRUMENT = &{INSTRUMENT:02X}",
              f"HOLD = &{HOLD:02X}",
@@ -394,7 +440,9 @@ def common_source() -> str:
     for name, values in (("attack", [i.attack for i in instruments]), ("decay", [i.decay for i in instruments]),
                          ("sustain", [i.sustain for i in instruments]), ("release", [i.release for i in instruments]),
                          ("wave", [WAVE_NUMBERS[i.wave] << 4 for i in instruments]),
-                         ("stereo", [i.stereo for i in instruments])):
+                         ("stereo", [i.stereo for i in instruments]),
+                         ("shift", [i.shift for i in instruments]),
+                         ("vibrato", [i.vibrato for i in instruments])):
         lines += [f".instrument_{name}s", "    EQUB " + ", ".join(f"&{v:02X}" for v in values)]
     return "\n".join(lines) + "\n"
 

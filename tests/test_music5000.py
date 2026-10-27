@@ -39,12 +39,12 @@ def test_pitches():
 
 
 def test_the_overture_fits_the_board_and_keeps_time():
-    from stratagem import midi
-    from stratagem.overture import MIDI_FILEPATH, TAIL_TICKS, TICKS_PER_QUARTER
-    song = midi.read(MIDI_FILEPATH)
+    from stratagem.overture import TAIL_TICKS, TICKS_PER_QUARTER, bar_tick
     assert len(OVERTURE.voices) <= 16
-    # (ticks() asserts that every voice keeps the same time)
-    assert OVERTURE.ticks() == round(song.end * TICKS_PER_QUARTER / song.division) + TAIL_TICKS
+    # (ticks() asserts that every voice keeps the same time.) It ends on a
+    # chord held into bar 41, its echo, and a silence.
+    held = bar_tick(41.75) + TAIL_TICKS
+    assert held <= OVERTURE.ticks() <= held + TICKS_PER_QUARTER
 
 
 # M5PLAY in Beebium
@@ -123,10 +123,12 @@ def test_m5play_plays_the_overture_as_the_model_does(launch_bbc, machine, game_b
 
     def played():
         return [tuple(peek[labels[name] + v] for name in ("voice_level", "voice_phase", "voice_ticks", "voice_quieter"))
+                + (peek[labels["voice_freq_low"] + v] | peek[labels["voice_freq_middle"] + v] << 8
+                   | peek[labels["voice_freq_high"] + v] << 16,)
                 for v in range(voices)]
 
     def modelled(player):
-        return [(s.level, s.phase, s.ticks, s.quieter) for s in player.states]
+        return [(s.level, s.phase, s.ticks, s.quieter, s.frequency) for s in player.states]
 
     # Catch the model up with the ticks already played, then follow the
     # player through the whole tune and into its loop.
@@ -147,13 +149,15 @@ def test_m5play_plays_the_overture_as_the_model_does(launch_bbc, machine, game_b
         costs.append(bbc.debugger.cycle_count - start)
         player.tick()
         assert played() == modelled(player), f"tick {ticks + tick}"
-    # A frame is 40000 cycles: the tick is under 3% of it on average; when
-    # all sixteen voices take new events at once (at the bar, with changes
-    # of instrument and volume), about 16%.
-    assert np.mean(costs) < 1300 and max(costs) < 7000, (np.mean(costs), max(costs))
+    # A frame is 40000 cycles: the tick, with vibrato on most voices, is
+    # about 7% of it on average; when many voices start notes at once
+    # (each detuned, with its vibrato's unit to work out), up to 30%. Under
+    # the title, whose line interrupt takes more than half the CPU, that
+    # still fits a frame.
+    assert np.mean(costs) < 3200 and max(costs) < 14000, (np.mean(costs), max(costs))
 
-    audio = capture(bbc, 3.5)[AUDIO_RATE:]
-    assert np.abs(audio).max() > 1000, "it's silent"
+    audio = capture(bbc, 3.5)[AUDIO_RATE:]   # (its opening, which is quiet)
+    assert np.abs(audio).max() > 100, "it's silent"
     assert np.abs(audio).max() < 32000, "it clips"
 
 
@@ -185,7 +189,7 @@ def test_m5load_plays_while_the_filing_system_loads(launch_bbc, machine, game_bu
     bbc = launch_bbc(machine, extra_args=[MUSIC_5000])
     labels = boot_until_ready(bbc, game_build, "M5PLAY", command="*RUN M5LOAD")
     starts, loads = [], bbc.debugger.add_breakpoint(labels["loaded"], condition="false")
-    for _ in range(400):                # 8s: a 20K file takes 2-3s
+    for _ in range(400):                # 8s: an 11.6K file takes 1-2s
         bbc.debugger.run_to(labels["music_tick"], skip_current=True)
         starts.append(bbc.debugger.cycle_count)
     hits = {b.id: b.hit_count for b in bbc.debugger.list_breakpoints()}

@@ -1,7 +1,7 @@
 \ M5PLAY: an experiment in driving the Music 5000 directly, without AMPLE
 \ (asm/music5000.asm): it plays a score from the OS's vertical sync event,
 \ one tick a frame. M5SCALE plays one voice of long notes, for measuring
-\ pitch. M5LOAD plays the tune while it loads a file again and again, to
+\ pitch. M5LOAD plays the overture while it loads a file again and again, to
 \ see how the filing system delays the ticks. The board is write-only, so the tests compare the player's own
 \ variables with the model's.
 
@@ -73,7 +73,8 @@ INCLUDE "asm/music5000.asm"
     JMP idle
 }
 
-.load_command   EQUS "LOAD LSCREEN 3000", 13
+LOAD_ADDRESS = &4C00             \ RENDER's 11.6K, below MODE 7's screen
+.load_command   EQUS "LOAD RENDER 4C00", 13
 
 .event
 {
@@ -106,6 +107,7 @@ INCLUDE "build/generated/m5_overture.asm"
 INCLUDE "build/generated/m5_scale.asm"
 
 .m5play_end
+ASSERT m5play_end <= LOAD_ADDRESS
 
 SAVE "M5PLAY", m5play, m5play_end, m5play_start
 SAVE "M5SCALE", m5play, m5play_end, m5scale_start

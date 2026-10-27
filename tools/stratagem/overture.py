@@ -1,19 +1,35 @@
 """The Stratagem Overture (art/music/Stratagem_Overture.mid) as a Music 5000
-score (stratagem.music5000), for the title screen.
+score (stratagem.music5000), for the title screen, arranged for the board
+(art/music/style.md is the mood).
 
 Each MIDI track becomes an instrument of music5000's orchestra, with a level;
 a note's velocity makes it quieter or louder from there. Times are
-quantised to the player's 50 ticks a second at 32 ticks a quarter, 93.75
-beats a minute (the MIDI file's is 96). Every note starts on a sixteenth,
-or two thirds of one, so the timing keeps; lengths shorter than a whole
-beat, its articulation, keep to within a tick.
+quantised to the player's 50 ticks a second at 96 beats a minute, 31.25
+ticks a quarter, each note's start and end to the nearest tick.
 
-The notes are given to the board's sixteen channels as they come, each to a
-channel that has finished its last note's release, the one this track used
-last if it can, else to the one released longest ago; if every channel is
-busy, a release is cut short, the same track's if it can (a chord struck
-again, legato). A note struck again while it sounds ends the
-first.
+The arrangement, beyond the file:
+
+- Dynamics over the whole: a quiet opening that swells into bar 5, the
+  woodwinds' B minor a little withdrawn, a swell into the tutti at bar 25,
+  a bare coda, and a last chord that opens out and dies away. A long note
+  changes volume as it sounds.
+- The cellos in open fifths (their chords without the third), which is
+  clearer through the board's filter, and more open.
+- The strings' chords spread across the stereo field.
+- A timpani roll into the tutti, and another into a last full chord of D
+  (strings, cellos, bass, timpani) under the horns' and trumpets' D.
+- Decorations, placed only where a channel is free and never displacing
+  the score's own notes: each melody doubled on a second channel slightly
+  detuned (an ensemble rather than one player), the strings' chords
+  likewise, and the melody echoed, quieter, on the other side.
+
+The score's notes are given to the board's sixteen channels as they come.
+The sustained parts' chords move legato, each onto the channels of the one
+before, cutting its release. Other notes go to a channel that has finished
+its last note's release, the one this track used last if it can, else to
+the one released longest ago; if every channel is busy, a release is cut
+short, the same track's if it can. A note struck again while it sounds ends the
+first. Decorations then take what is left.
 
     uv run python -m stratagem.overture     # how it fits
 """
@@ -21,129 +37,311 @@ first.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from functools import cache
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from stratagem import midi
-from stratagem.music5000 import (CHANNELS, DB_PER_STEP, FULL, INSTRUMENTS, Event, Score, timed)
+from stratagem.music5000 import CHANNELS, DB_PER_STEP, FULL, INSTRUMENTS, Event, Score, note_number, timed
 
 MIDI_FILEPATH = Path(__file__).resolve().parents[2] / "art" / "music" / "Stratagem_Overture.mid"
-TICKS_PER_QUARTER = 32
-TAIL_TICKS = 4 * TICKS_PER_QUARTER  # a bar's silence before it plays again
+TICKS_PER_SECOND = 50
+BEATS_PER_MINUTE = 96
+TICKS_PER_QUARTER = TICKS_PER_SECOND * 60 / BEATS_PER_MINUTE    # 31.25
+TICKS_PER_BAR = 4 * TICKS_PER_QUARTER
+TAIL_TICKS = 2 * round(TICKS_PER_BAR)   # silence before it plays again
+HEADROOM_DB = 4                         # below full, for the swells
+SEGMENT_TICKS = 6                       # how often a long note's volume may change
 
-# Track name -> instrument, level (dB), and priority: higher takes a channel first.
+# Track name -> instrument, level (dB), stereo position or None (the
+# instrument's), and priority: higher takes a channel first.
 TRACKS = {
-    "Horn": ("horn", -1, 3),
-    "Trumpets": ("trumpet", 0, 3),
-    "Violins": ("violin", -2, 3),
-    "Flute": ("flute", 0, 3),
-    "Oboe": ("oboe", -1, 3),
-    "Clarinet": ("clarinet", -1, 3),
-    "Trombones": ("trombone", -8, 2),
-    "Bass": ("bass", -2, 2),
-    "Timpani": ("timpani", 0, 2),
-    "Harp": ("harp", -3, 1),
-    "Cellos": ("cello", -9, 1),
-    "Strings": ("strings", -10, 1),
+    "Horn": ("horn", -1, None, 3),
+    "Trumpets": ("trumpet", -1, None, 3),
+    "Violins": ("violin", -2, None, 3),
+    "Flute": ("flute", 0, None, 3),
+    "Oboe": ("oboe", -1, None, 3),
+    "Clarinet": ("clarinet", -1, None, 3),
+    "Trombones": ("trombone", -8, None, 2),
+    "Bass": ("bass", -5, None, 2),
+    "Timpani": ("timpani", -2, None, 2),
+    "Harp": ("harp", -4, None, 1),
+    "Cellos": ("cello", -11, None, 1),
+    "Strings": ("strings", -11, None, 1),
 }
+MELODIES = ("Horn", "Trumpets", "Violins", "Flute", "Oboe", "Clarinet")
+LEGATO = ("Strings", "Cellos", "Bass", "Trombones")     # each chord on the last one's channels
+
+# Stereo positions: 8 all left, 11-15 five sixths to one sixth left, 0 all right.
+STRING_SPREAD = (11, 13, 15)            # a chord's notes, low to high
+OPPOSITE = {11: 15, 12: 14, 13: 13, 14: 12, 15: 11, 8: 0, 0: 8}
+
+# Dynamics: (bar, dB) points, from bar 1; straight lines between.
+DYNAMICS = [(1, -15), (4.5, -4), (5, -2), (9, 0), (12.5, 0), (13, -3), (23.5, -3), (25, 2),
+            (33, 3), (36.5, 4), (37, -5), (39.5, -5), (40, -2), (41, 4), (42, -6), (43, -20)]
 
 
-@dataclass
+def bar_tick(bar: float) -> int:
+    """The tick at which a bar (from 1) starts, or part way into it."""
+    return round((bar - 1) * TICKS_PER_BAR)
+
+
+def dynamics_db(tick: float) -> float:
+    points = [(bar_tick(b), db) for b, db in DYNAMICS]
+    if tick <= points[0][0]:
+        return points[0][1]
+    for (t0, d0), (t1, d1) in zip(points, points[1:]):
+        if tick <= t1:
+            return d0 + (d1 - d0) * (tick - t0) / max(1, t1 - t0)
+    return points[-1][1]
+
+
+@dataclass(frozen=True)
 class Placed:
     start: int
     end: int
     pitch: int
     track: str
-    quieter: int
+    velocity: int
+    level_db: float = 0             # beyond the track's
+    pan: int | None = None
+    detune: int = 0
+    optional: int = 0               # 0: the score's; else a decoration, lower placed first
+
+    @property
+    def instrument(self) -> str:
+        return TRACKS[self.track][0]
+
+    def quieter(self, tick: int) -> int:
+        """Amplitude steps below full at a tick: the track's level, the
+        velocity's (20 log10(velocity / 127)), the dynamics and the
+        headroom."""
+        db = (TRACKS[self.track][1] + self.level_db + 20 * math.log10(self.velocity / 127)
+              + dynamics_db(tick) - HEADROOM_DB)
+        return min(FULL, max(0, round(-db / DB_PER_STEP)))
+
+    def release_end(self) -> int:
+        """When its release is over: as the envelope has it, from the level
+        it has reached by its end (from silence: it may be less)."""
+        return self.end + release_ticks(self.instrument, self.end - self.start)
 
 
-def volume_steps(level_db: float, velocity: int) -> int:
-    """Amplitude steps below full: the track's level and the velocity's,
-    20 log10(velocity / 127)."""
-    db = level_db + 20 * math.log10(velocity / 127)
-    return min(FULL, max(0, round(-db / DB_PER_STEP)))
+@cache
+def release_ticks(instrument_name: str, length: int) -> int:
+    """Ticks to release a note of this length (from silence) to silence."""
+    instrument = INSTRUMENTS[instrument_name]
+    level, decaying = 0, False
+    for _ in range(length):
+        if not decaying:
+            level = min(FULL, level + instrument.attack)
+            decaying = level == FULL
+        else:
+            level = max(instrument.sustain, level - instrument.decay)
+    return -(-level // instrument.release)
 
 
-def notes(song: midi.Song) -> list[Placed]:
+def file_notes(song: midi.Song) -> list[Placed]:
     scale = TICKS_PER_QUARTER / song.division
-    placed = []
+    placed: list[Placed] = []
     for track in song.tracks:
         if track.name not in TRACKS:
             assert not track.notes, f"no instrument for track '{track.name}'"
             continue
-        _, level_db, _ = TRACKS[track.name]
-        sounding: dict[int, Placed] = {}
+        sounding: dict[int, int] = {}       # pitch -> index in placed
         for note in sorted(track.notes, key=lambda n: n.start):
             start, end = round(note.start * scale), round((note.start + note.length) * scale)
             previous = sounding.get(note.pitch)
-            if previous and previous.end > start:
-                previous.end = start
-            p = Placed(start, max(end, start + 1), note.pitch, track.name, volume_steps(level_db, note.velocity))
-            sounding[note.pitch] = p
-            placed.append(p)
+            if previous is not None and placed[previous].end > start:
+                placed[previous] = replace(placed[previous], end=start)
+            sounding[note.pitch] = len(placed)
+            placed.append(Placed(start, max(end, start + 1), note.pitch, track.name, note.velocity,
+                                 pan=TRACKS[track.name][2]))
     return [p for p in placed if p.end > p.start]
+
+
+def chords(notes: list[Placed], track: str) -> dict[int, list[int]]:
+    """A track's notes by start: their indices, low to high."""
+    by_start: dict[int, list[int]] = {}
+    for index, note in enumerate(notes):
+        if note.track == track:
+            by_start.setdefault(note.start, []).append(index)
+    return {start: sorted(chord, key=lambda i: notes[i].pitch) for start, chord in by_start.items()}
+
+
+def open_fifths(notes: list[Placed]) -> list[Placed]:
+    """The cellos' triads without their thirds."""
+    thirds = {chord[1] for chord in chords(notes, "Cellos").values() if len(chord) == 3}
+    return [n for i, n in enumerate(notes) if i not in thirds]
+
+
+def spread_strings(notes: list[Placed]) -> list[Placed]:
+    notes = list(notes)
+    for chord in chords(notes, "Strings").values():
+        for place, index in enumerate(chord):
+            notes[index] = replace(notes[index], pan=STRING_SPREAD[min(place, len(STRING_SPREAD) - 1)])
+    return notes
+
+
+def roll(pitch: str, from_bar: float, to_bar: float, velocities: tuple[int, int]) -> list[Placed]:
+    """A timpani roll: strokes every eighth of a beat, louder as it goes."""
+    start, end = bar_tick(from_bar), bar_tick(to_bar)
+    stroke = TICKS_PER_QUARTER / 8
+    count = int((end - start) / stroke)
+    return [Placed(round(start + i * stroke), round(start + (i + 1) * stroke), note_number(pitch), "Timpani",
+                   round(velocities[0] + (velocities[1] - velocities[0]) * i / max(1, count - 1)))
+            for i in range(count)]
+
+
+def ending(notes: list[Placed]) -> list[Placed]:
+    """A last chord of D under the horns' and trumpets' D, held, after a
+    timpani roll through the half bar before."""
+    last, held = bar_tick(40), bar_tick(41.75)
+    notes = [replace(n, end=held) if n.start >= last else n for n in notes]
+    chord = [("Strings", p, 70) for p in ("D4", "F#4", "A4", "D5")] + \
+            [("Cellos", p, 64) for p in ("D3", "A3")] + [("Bass", "D2", 70)]
+    notes = spread_strings(notes + [Placed(last, held, note_number(p), track, v) for track, p, v in chord])
+    return notes + [Placed(last, last + 30, note_number("D3"), "Timpani", 80)] + roll("D3", 39.5, 40, (30, 75))
+
+
+def decorations(notes: list[Placed]) -> list[Placed]:
+    """Each melody doubled, detuned; the strings' chords likewise; the
+    melodies echoed on the other side, a dotted eighth later."""
+    echo_ticks = round(0.75 * TICKS_PER_QUARTER)
+    extra = []
+    for note in notes:
+        pan = note.pan if note.pan is not None else INSTRUMENTS[note.instrument].stereo
+        other = OPPOSITE.get(pan, pan)
+        if note.track in MELODIES:
+            extra.append(replace(note, level_db=-4, detune=1, pan=other, optional=1))
+            extra.append(replace(note, start=note.start + echo_ticks, end=note.end + echo_ticks, level_db=-13,
+                                 pan=other, optional=2))
+        elif note.track == "Strings":
+            extra.append(replace(note, level_db=-3, detune=2, pan=other, optional=3))
+    return extra
+
+
+def arranged(song: midi.Song) -> list[Placed]:
+    notes = file_notes(song)
+    notes = open_fifths(notes)
+    notes = spread_strings(notes)
+    notes += roll("A2", 24.5, 25, (25, 70))
+    notes = ending(notes)
+    return notes + decorations(notes)
 
 
 @dataclass
 class Channel:
-    events: list[Event]
-    time: int = 0                   # the end of its last event
-    released: int = 0               # when its last note's release ends
-    track: str | None = None
-    instrument: str | None = None
-    quieter: int | None = None
+    notes: list[Placed]
+
+    def busy(self) -> list[tuple[int, int]]:
+        """From each note's start to the end of its release, or the next
+        note's start."""
+        notes = sorted(self.notes, key=lambda n: n.start)
+        return [(n.start, min(n.release_end(), following.start) if following else n.release_end())
+                for n, following in zip(notes, notes[1:] + [None])]
+
+    def free_for(self, note: Placed) -> bool:
+        """Free from the note's start to the end of its release, cutting no
+        other note's release short."""
+        return all(end <= note.start or start >= note.release_end() for start, end in self.busy())
+
+    def last_before(self, tick: int) -> Placed | None:
+        before = [n for n in self.notes if n.start < tick]
+        return max(before, key=lambda n: n.start) if before else None
 
 
-def allocate(placed: list[Placed]) -> tuple[list[Channel], int]:
-    """The notes on channels, and how many releases were cut short."""
+def allocate(notes: list[Placed]) -> tuple[list[Channel], int, int]:
+    """The notes on channels; how many releases were cut short, and how many
+    decorations found no channel."""
     channels = [Channel([]) for _ in range(CHANNELS)]
     cut = 0
-    priority = {name: p for name, (_, _, p) in TRACKS.items()}
-    for note in sorted(placed, key=lambda n: (n.start, -priority[n.track], -n.pitch)):
-        free = [c for c in channels if c.time <= note.start]
+    priority = {name: p for name, (_, _, _, p) in TRACKS.items()}
+    for note in sorted((n for n in notes if not n.optional),
+                       key=lambda n: (n.start, -priority[n.track], -n.pitch)):
+        free = [c for c in channels if all(n.end <= note.start for n in c.notes)]
         assert free, f"no channel for a note at tick {note.start}"
-        released = [c for c in free if c.released <= note.start]
-        if released:
-            same = [c for c in released if c.track == note.track]
-            channel = same[0] if same else min(released, key=lambda c: c.released)
-        else:
-            same = [c for c in free if c.track == note.track]
-            channel = min(same or free, key=lambda c: c.time)
+        released = [c for c in free if all(n.release_end() <= note.start for n in c.notes)]
+        legato = [c for c in free if c.notes and c.notes[-1].track == note.track
+                  and note.start - c.notes[-1].end <= TICKS_PER_QUARTER / 2] if note.track in LEGATO else []
+        if legato:
+            channel = legato[0]
             cut += 1
-        instrument, _, _ = TRACKS[note.track]
-        if channel.instrument is None:      # (a stream starts with one)
-            channel.events.append(("instrument", instrument))
-            channel.instrument = instrument
-        if note.start > channel.time:
-            channel.events += timed("rest", note.start - channel.time)
-        if channel.instrument != instrument:
-            channel.events.append(("instrument", instrument))
-            channel.instrument = instrument
-        if channel.quieter != note.quieter:
-            channel.events.append(("volume", note.quieter))
-            channel.quieter = note.quieter
-        channel.events += timed("note", note.end - note.start, note.pitch)
-        channel.time = note.end
-        channel.released = note.end + INSTRUMENTS[instrument].release_ticks()
-        channel.track = note.track
-    return [c for c in channels if c.events], cut
+        elif released:
+            same = [c for c in released if c.notes and c.notes[-1].track == note.track]
+            channel = same[0] if same else min(released, key=lambda c: c.notes[-1].release_end() if c.notes else -1)
+        else:
+            same = [c for c in free if c.notes[-1].track == note.track]
+            channel = min(same or free, key=lambda c: c.notes[-1].end)
+            cut += 1
+        channel.notes.append(note)
+    dropped = 0
+    for note in sorted((n for n in notes if n.optional), key=lambda n: (n.optional, n.start)):
+        free = [c for c in channels if c.free_for(note)]
+        if not free:
+            dropped += 1
+            continue
+        same = [c for c in free if (last := c.last_before(note.start)) and last.track == note.track]
+        channel = (same or free)[0]
+        channel.notes.append(note)
+        channel.notes.sort(key=lambda n: n.start)
+    return [c for c in channels if c.notes], cut, dropped
 
 
-def score(filepath: Path = MIDI_FILEPATH) -> tuple[Score, int]:
-    channels, cut = allocate(notes(midi.read(filepath)))
-    end = max(c.time for c in channels) + TAIL_TICKS
-    for channel in channels:
-        channel.events += timed("rest", end - channel.time)
-    return Score([c.events for c in channels]), cut
+def channel_events(notes: list[Placed], end: int) -> list[Event]:
+    events: list[Event] = []
+    time = 0
+    instrument = pan = quieter = None
+    detune = 0
+    for note in sorted(notes, key=lambda n: n.start):
+        if instrument is None:              # (a stream starts with one)
+            events.append(("instrument", note.instrument))
+            instrument, pan = note.instrument, INSTRUMENTS[note.instrument].stereo
+        if note.start > time:
+            events += timed("rest", note.start - time)
+        if instrument != note.instrument:
+            events.append(("instrument", note.instrument))
+            instrument, pan = note.instrument, INSTRUMENTS[note.instrument].stereo
+        wanted_pan = note.pan if note.pan is not None else INSTRUMENTS[note.instrument].stereo
+        if pan != wanted_pan:
+            events.append(("pan", wanted_pan))
+            pan = wanted_pan
+        if detune != note.detune:
+            events.append(("detune", note.detune))
+            detune = note.detune
+        # The note, its volume changing as the dynamics do.
+        tick, first = note.start, True
+        while tick < note.end:
+            q = note.quieter(tick)
+            if q != quieter:
+                events.append(("volume", q))
+                quieter = q
+            length = min(SEGMENT_TICKS, note.end - tick)
+            while tick + length < note.end and note.quieter(tick + length) == q:
+                length += 1
+            events += timed("note", length, note.pitch) if first else timed("hold", length)
+            first = False
+            tick += length
+        time = note.end
+    if end > time:
+        events += timed("rest", end - time)
+    return events
 
 
-SCORE, RELEASES_CUT = score()
+def score(filepath: Path = MIDI_FILEPATH) -> tuple[Score, int, int]:
+    notes = arranged(midi.read(filepath))
+    channels, cut, dropped = allocate(notes)
+    end = max(n.end for c in channels for n in c.notes) + TAIL_TICKS
+    return Score([channel_events(c.notes, end) for c in channels]), cut, dropped
+
+
+SCORE, RELEASES_CUT, DECORATIONS_DROPPED = score()
 
 
 def main() -> None:
     streams = SCORE.streams()
-    print(f"{len(SCORE.voices)} channels, {SCORE.ticks()} ticks ({SCORE.ticks() / 50:.1f}s), "
-          f"{sum(map(len, streams))} bytes; {RELEASES_CUT} releases cut short")
+    print(f"{len(SCORE.voices)} channels, {SCORE.ticks()} ticks ({SCORE.ticks() / TICKS_PER_SECOND:.1f}s), "
+          f"{sum(map(len, streams))} bytes; {RELEASES_CUT} releases cut short, "
+          f"{DECORATIONS_DROPPED} decorations without a channel")
     for index, (voice, stream) in enumerate(zip(SCORE.voices, streams)):
         tracks = sorted({e[1] for e in voice if e[0] == "instrument"})
         print(f"  channel {index}: {len(stream)} bytes, {', '.join(tracks)}")
