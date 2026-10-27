@@ -55,13 +55,15 @@ IER_T1 = &C0                    \ Enable timer 1's interrupt
 LINE_MICROSECONDS = 64
 \ Microseconds from the vertical sync being seen to timer 1's first
 \ interrupt, and the count at which the handler stops waiting: together
-\ they land the write at column 90-91 on both machines, early in the
-\ blanking, to leave as much of it as can be for a delay. The handler
-\ waits about 20us of each line, so an interruption of up to that long
-\ before it is due costs nothing (a longer wait would take more of the
-\ CPU from the loading).
+\ they land the write early in the blanking (unseen from column 82), to
+\ leave as much of it as can be for a delay. The handler polls timer 1
+\ every 5us or so, so where the write lands depends on the instruction it
+\ interrupted: with music playing in the foreground (M5TITLE) it lands at
+\ column 85 to 96. The handler waits about 20us of each line, so an
+\ interruption of up to that long before it is due costs nothing (a
+\ longer wait would take more of the CPU from the loading).
 FIRST_LINE_DELAY = 48
-SWITCH_COUNT = 31               \ Wait while timer 1's count is at least this
+SWITCH_COUNT = 28               \ Wait while timer 1's count is at least this
 \ Timer 2's first count: it puts the change in bit 6 about 5us before the
 \ handler reads it (it reads the wrong line's parity from &12).
 T2_START = &0D

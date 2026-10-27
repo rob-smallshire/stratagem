@@ -25,11 +25,13 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   write to `&FE20` at CRTC column c takes effect from about column c - 2,
   so it is unseen from column 82 to column 1 of the next line (in MODE 1:
   128 columns, 80 displayed); a write at 80 shows on the last 8 pixels, one
-  at 4 on the first 8. The title screen's writes land at column 90-91 on
-  both machines (narrowed to 64 columns, they landed 6us apart: the
-  Integra-B's vertical sync comes later in a line; `docs/loading-screen.md`).
-  **V**
-  (Beebium; by moving the writes and comparing frames)
+  at 4 on the first 8. In MODE 1 the CRTC runs at 2MHz, so a column is
+  half a microsecond, a CPU cycle. The title screen's writes land at
+  column 85-96: the handler polls timer 1 every 10 cycles or so, so the
+  instruction it interrupts moves the write by up to that (with music
+  playing in the foreground; with an idle loop they land at the same
+  column every line). **V** (Beebium; by moving the writes and comparing
+  frames)
 - Beebium draws the flash bit from 0.15.0, from the pixel after the write
   (beebium #226), so a captured frame shows `LOADSCR`'s six colours
   exactly as `stratagem.loading_screen` simulates them. Before, it drew

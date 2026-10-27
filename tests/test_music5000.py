@@ -147,3 +147,40 @@ def test_m5play_plays_the_tune_as_the_model_does(launch_bbc, machine, game_build
     audio = capture(bbc, 3.5)[AUDIO_RATE:]
     assert np.abs(audio).max() > 1000, "it's silent"
     assert np.abs(audio).max() < 32000, "it clips"
+
+
+def test_m5title_plays_under_the_title_screen(launch_bbc, machine, game_build):
+    """The music ticks once a frame from the main loop, and the line
+    interrupt still switches the flash bit in every line's blanking."""
+    from conftest import boot_until_ready
+    from test_loading_screen import BLANKING_COLUMNS, LINES_PER_FRAME
+    bbc = launch_bbc(machine, extra_args=[MUSIC_5000])
+    labels = boot_until_ready(bbc, game_build, "M5TITLE", command="*RUN M5TITLE")
+    for _ in range(3 * LINES_PER_FRAME):
+        bbc.debugger.run_to(labels["control_written"], skip_current=True)
+        assert bbc.crtc.state.column in BLANKING_COLUMNS, f"written at column {bbc.crtc.state.column}"
+    starts = []
+    for _ in range(20):
+        bbc.debugger.run_to(labels["music_tick"], skip_current=True)
+        starts.append(bbc.debugger.cycle_count)
+    frame = LINES_PER_FRAME * 128
+    intervals = np.diff(starts)         # (a line's interrupt may come first: 60us)
+    assert np.abs(intervals - frame).max() < 200, f"a tick a frame, not {intervals.tolist()}"
+    audio = capture(bbc, 2.5)[AUDIO_RATE:]
+    assert np.abs(audio).max() > 1000, "it's silent"
+
+
+def test_m5load_plays_while_the_filing_system_loads(launch_bbc, machine, game_build):
+    """The vertical sync event keeps coming while a file loads, a little
+    late at times (the DFS holds interrupts off), never missed."""
+    from conftest import boot_until_ready
+    bbc = launch_bbc(machine, extra_args=[MUSIC_5000])
+    labels = boot_until_ready(bbc, game_build, "M5PLAY", command="*RUN M5LOAD")
+    starts, loads = [], bbc.debugger.add_breakpoint(labels["loaded"], condition="false")
+    for _ in range(400):                # 8s: a 20K file takes 2-3s
+        bbc.debugger.run_to(labels["music_tick"], skip_current=True)
+        starts.append(bbc.debugger.cycle_count)
+    hits = {b.id: b.hit_count for b in bbc.debugger.list_breakpoints()}
+    assert hits[loads.id] >= 2, "it didn't load"
+    late = np.diff(starts) - 312 * 128
+    assert np.abs(late).max() < 1600, f"a tick {np.abs(late).max()} cycles off"

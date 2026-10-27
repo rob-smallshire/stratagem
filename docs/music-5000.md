@@ -7,8 +7,11 @@ own documentation is `docs/music-5000.md` and `docs/music5000/` in the
 Beebium tree, and the `beebium-music-5000` session knows it well.
 
 The code: `tools/stratagem/music5000.py` (the encodings, waves, pitches,
-score format, and a model of the player), `asm/m5play.asm` (`M5PLAY`, which
-plays a tune; `M5SCALE`, one voice of long notes), `tests/test_music5000.py`.
+score format, and a model of the player), `asm/music5000.asm` (the player),
+`asm/m5play.asm` (`M5PLAY`, which plays a tune from the vertical sync event;
+`M5SCALE`, one voice of long notes; `M5LOAD`, the tune while a file loads
+again and again), `asm/m5title.asm` (`M5TITLE`, the title screen with the
+tune), `tests/test_music5000.py`.
 
 ## What the board does, and what's left to the host
 
@@ -72,15 +75,46 @@ What we measured, on both machines (`tests/test_music5000.py`):
 - Recordings: `build/features/m5play-<machine>.wav` (made by a scratch
   script; the tests don't write them).
 
+## Under the title screen: M5TITLE
+
+While the title shows, the System VIA's interrupts are off, so there's no
+vertical sync event. But the System VIA still sets its flag for the
+vertical sync (CA1) each frame, so the title's main loop watches the flag
+and ticks the music, while the line interrupt switches the flash bit as
+before. Nothing in the interrupt changes.
+
+- The ticks come once a frame, within 60us (a line's interrupt may come
+  first).
+- **The music moved the switch.** The line's handler polls timer 1 every
+  10 cycles or so, and with the music running in the foreground, the
+  instruction it interrupts varies, so the write moved by up to 10
+  columns: a few lines in a thousand landed at column 80-82, where they can
+  show at the end of a line. With the idle loop of LOADSCR it had landed at
+  the same column every line. Waiting 3us longer (`SWITCH_COUNT` 28, from
+  31) puts every write at column 85-96, inside the blanking, on both
+  machines; the tests check every line of three frames.
+
+## While a file loads: M5LOAD
+
+The tune from the vertical sync event, while the idle loop loads a 20K file
+through the OS, again and again (2.8s a load on the B+, 2.05s on the
+Integra-B, in Beebium).
+
+- The event keeps coming. Ticks are at most 0.3ms late on the B+ and 0.6ms
+  on the Integra-B (the DFS holds interrupts off at times), and none is
+  missed: inaudible.
+- So music can play under a loading screen that has nothing timed to the
+  line, through any filing system that leaves interrupts on most of the
+  time.
+
 ## To try next
 
-- **Music under the title screen.** The System VIA's interrupts are off
-  then, so there is no vertical sync event: tick from the line interrupt's
-  count of lines, or from the title's main loop.
-- **Music while the game loads,** through the OS and the filing system.
-  The vertical sync event keeps running, but how late do the ticks come,
-  with the DFS holding interrupts off?
-- **Music in the game:** the host's frame is busy, but a tick is cheap.
+- **Music in the game.** The host's frame is busy, but a tick is cheap: 1%
+  of a frame on average, 2% at worst, for four voices. The game's host
+  already has the vertical sync; the score could come from the parasite.
+- **A real tune and instruments,** and sound effects on spare channels.
 - **Modulation** (the alternate bank): a channel switches its neighbour
   between the two banks on its own wave's sign, which gives ring- and
   FM-like sounds.
+- **The Music 5000 as an option:** detect it (it can't be read back, so
+  perhaps ask the player), and fall back to the SN76489 or silence.
