@@ -48,6 +48,7 @@ SOURCES = {
     "SMOOTH": ASM_DIRPATH / "smooth_light.asm",   # SMOOTH (parasite)
     "TUBE_DRAW": ASM_DIRPATH / "tube_draw.asm",   # TDRAWH (host), TDRAWP (parasite)
     "LOADSCR": ASM_DIRPATH / "loadscr.asm",       # LOADSCR, LSCREEN
+    "M5PLAY": ASM_DIRPATH / "m5play.asm",         # M5PLAY, M5SCALE (the Music 5000)
 }
 BOOT_FILE = "STRAT"
 

@@ -36,7 +36,7 @@ MACHINES = [
     Machine("integra-b", "model-b-integra-b", "model-b-integra-b-disc", "main_ram"),
 ]
 
-Launcher = Callable[[Machine], Beebium]
+Launcher = Callable[..., Beebium]
 
 
 @pytest.fixture(params=MACHINES, ids=[m.name for m in MACHINES])
@@ -48,9 +48,10 @@ def machine(request) -> Machine:
 def launch_bbc() -> Iterator[Launcher]:
     with contextlib.ExitStack() as stack:
 
-        def launch(machine: Machine) -> Beebium:
+        def launch(machine: Machine, extra_args: list[str] | None = None) -> Beebium:
             try:
-                bbc = stack.enter_context(Beebium.launch(variant=machine.variant, preset=machine.preset))
+                bbc = stack.enter_context(Beebium.launch(variant=machine.variant, preset=machine.preset,
+                                                         extra_args=extra_args or []))
             except ServerNotFoundError as e:
                 pytest.skip(str(e))
             bbc.system.set_speed_multiplier(0.0)

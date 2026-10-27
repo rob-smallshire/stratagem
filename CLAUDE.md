@@ -15,6 +15,8 @@ filing system resident, and is tested in the Beebium emulator.
   things, and the proposed design for Stratagem.
 - `docs/loading-screen.md`: the cover shown with the flash bit switched
   every line, loading beneath it, and what we learned.
+- `docs/music-5000.md`: experiments in driving the Music 5000 directly,
+  without AMPLE (M5PLAY).
 - `docs/manual.md`: the player's manual: keys, the pack, the first shapes.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).
@@ -40,7 +42,7 @@ uv run python -m stratagem.index_disassembly SRC INDEX   # index a Level 7 disas
   run by !BOOT; `MAIN`; `RENDER`, the render region) and `asm/parasite.asm`
   (the second processor: `PGAME`, `PWORLD`, `PLIGHT`). Each assembles its
   parts together, one label namespace each. `PROBE` is a separate
-  diagnostic; the other sources are prototypes.
+  diagnostic; the other sources are prototypes and experiments.
   Sources are listed in `SOURCES` in `tools/stratagem/build.py`; assemble
   from the project root (INCLUDE paths are relative to it). Each part
   CLEARs its address range before its ORG.
