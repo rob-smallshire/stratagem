@@ -18,8 +18,8 @@ ORG &70
 .zp_score           SKIP 2
 .zp_loading         SKIP 1      \ Non-zero: load files while it plays
 
-ORG &2000
-GUARD &3000
+ORG &1900
+GUARD &7C00                     \ MODE 7's screen
 
 .m5play
 INCLUDE "asm/music5000.asm"
@@ -30,8 +30,8 @@ INCLUDE "asm/music5000.asm"
 .m5play_start
     LDX #0
 .tune
-    LDA #LO(score_tune)
-    LDY #HI(score_tune)
+    LDA #LO(score_overture)
+    LDY #HI(score_overture)
     BNE start                   \ (always)
 .m5scale_start
     LDX #0
@@ -101,6 +101,9 @@ INCLUDE "asm/music5000.asm"
 
 .old_evntv          SKIP 2
 ASSERT LO(old_evntv) <> &FF     \ JMP (indirect) on the NMOS 6502
+
+INCLUDE "build/generated/m5_overture.asm"
+INCLUDE "build/generated/m5_scale.asm"
 
 .m5play_end
 

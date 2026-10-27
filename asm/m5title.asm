@@ -56,9 +56,9 @@ INCLUDE "asm/music5000.asm"
     LDY #HI(load_command)
     JSR OSCLI
 
-    LDA #LO(score_tune)
+    LDA #LO(score_scale)
     STA zp_score
-    LDA #HI(score_tune)
+    LDA #HI(score_scale)
     STA zp_score + 1
     JSR music_init
     JSR loading_screen_on
@@ -80,6 +80,8 @@ INCLUDE "asm/music5000.asm"
 .vdu_setup_end
 
 .load_command   EQUS "LOAD LSCREEN 3000", 13
+
+INCLUDE "build/generated/m5_scale.asm"
 
 .m5title_end
 

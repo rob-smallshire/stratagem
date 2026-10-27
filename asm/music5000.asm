@@ -1,14 +1,15 @@
 \ A player for the Music 5000, driven directly, without AMPLE
 \ (tools/stratagem/music5000.py, docs/music-5000.md): music_init clears the
 \ board, loads its waves and starts the score at zp_score; music_tick, once
-\ a frame, advances each voice, a channel with a stream of notes and rests
-\ and an envelope.
+\ a frame, advances each voice, a channel with a stream of notes, rests and
+\ changes of instrument and volume, and an envelope.
 \
 \ JIM's page register is write-only, and shared: the OS keeps a copy of it
 \ at &EE, written before it. music_tick leaves the register page selected;
 \ a caller at interrupt time puts back the page it found in &EE.
 \
-\ The includer declares zp_ptr and zp_score (two bytes each).
+\ The includer declares zp_ptr and zp_score (two bytes each), and includes
+\ the scores it plays (build/generated/m5_<score>.asm).
 
 JIM_PAGE = &FCFF                \ Write only: a read loads it from the bus
 JIM_COPY = &EE                  \ The OS's copy of it, written first
@@ -78,8 +79,8 @@ RELEASE = 3
     BPL copy
 
     \ Every channel running, silent, so that each latches its amplitude
-    \ (the board takes a new one only at a wave wrap); then each voice's
-    \ wave and stereo position.
+    \ (the board takes a new one only at a wave wrap). Each voice's stream
+    \ starts with its instrument.
     LDA #REGISTER_PAGE
     STA JIM_COPY
     STA JIM_PAGE
@@ -91,15 +92,6 @@ RELEASE = 3
     STA FREQ_MIDDLE,X
     LDA #PITCH_FIRST >> 16
     STA FREQ_HIGH,X
-    DEX
-    BPL channel
-    LDX voice_count
-    DEX
-.voice
-    LDA voice_wave,X
-    STA WAVE_SELECT,X
-    LDA voice_stereo,X
-    STA CONTROL,X
     LDA voice_start_low,X
     STA voice_low,X
     LDA voice_start_high,X
@@ -108,16 +100,17 @@ RELEASE = 3
     STA voice_ticks,X
     LDA #0
     STA voice_level,X
+    STA voice_quieter,X
+    STA voice_release,X
     LDA #RELEASE
     STA voice_phase,X
     DEX
-    BPL voice
-
+    BPL channel
     RTS
 }
 
-\ Advance every voice a tick, writing its amplitude, and its pitch when a
-\ note starts.
+\ Advance every voice a tick: take its next events when its current one
+\ ends, and write its amplitude.
 .music_tick
 {
     LDA #REGISTER_PAGE
@@ -127,11 +120,14 @@ RELEASE = 3
     DEX
 .voice
     DEC voice_ticks,X
-    BNE playing
-    LDA voice_low,X             \ The next event
+    BEQ fetch
+    JMP envelope
+.fetch
+    LDA voice_low,X
     STA zp_ptr
     LDA voice_high,X
     STA zp_ptr + 1
+.next
     LDY #0
     LDA (zp_ptr),Y
     CMP #LOOP
@@ -140,24 +136,56 @@ RELEASE = 3
     STA zp_ptr
     LDA voice_start_high,X
     STA zp_ptr + 1
-    LDA (zp_ptr),Y
+    JMP next
 .event
-    INY
     PHA
+    INY
     LDA (zp_ptr),Y
-    STA voice_ticks,X
+    STA music_argument
     CLC
     LDA zp_ptr
     ADC #2
+    STA zp_ptr
+    BCC advanced
+    INC zp_ptr + 1
+.advanced
+    PLA
+    CMP #VOLUME
+    BNE not_volume
+    LDA music_argument
+    STA voice_quieter,X
+    JMP next
+.not_volume
+    CMP #INSTRUMENT
+    BNE timed
+    LDY music_argument
+    LDA instrument_attacks,Y
+    STA voice_attack,X
+    LDA instrument_decays,Y
+    STA voice_decay,X
+    LDA instrument_sustains,Y
+    STA voice_sustain,X
+    LDA instrument_releases,Y
+    STA voice_release,X
+    LDA instrument_waves,Y
+    STA WAVE_SELECT,X
+    LDA instrument_stereos,Y
+    STA CONTROL,X
+    JMP next
+.timed
+    PHA                         \ A note, HOLD or REST
+    LDA zp_ptr
     STA voice_low,X
     LDA zp_ptr + 1
-    ADC #0
     STA voice_high,X
+    LDA music_argument
+    STA voice_ticks,X
     PLA
     CMP #REST
     BEQ release
-    STA voice_note,X
-    TAY
+    CMP #HOLD
+    BEQ envelope
+    TAY                         \ A note
     LDA pitch_low,Y
     STA FREQ_LOW,X
     LDA pitch_middle,Y
@@ -167,10 +195,6 @@ RELEASE = 3
     LDA #ATTACK
     STA voice_phase,X
     BPL envelope                \ (always)
-.playing
-    LDA voice_ticks,X
-    CMP voice_release_ticks,X
-    BNE envelope
 .release
     LDA #RELEASE
     STA voice_phase,X
@@ -215,7 +239,12 @@ RELEASE = 3
 .store
     STA voice_level,X
 .write
-    LDA voice_level,X
+    LDA voice_level,X           \ The envelope, quieter by the voice's volume
+    SEC
+    SBC voice_quieter,X
+    BCS loud
+    LDA #0
+.loud
     STA AMPLITUDE,X
     DEX
     BMI done
@@ -225,26 +254,23 @@ RELEASE = 3
     RTS
 }
 
-INCLUDE "build/generated/m5play.asm"
+INCLUDE "build/generated/music5000.asm"
 
 \ A score's voice table is copied here (stratagem.music5000.score_source).
 .voice_table
 .voice_count        SKIP 1
 .voice_start_low    SKIP MAX_VOICES
 .voice_start_high   SKIP MAX_VOICES
-.voice_attack       SKIP MAX_VOICES
-.voice_decay        SKIP MAX_VOICES
-.voice_sustain      SKIP MAX_VOICES
-.voice_release      SKIP MAX_VOICES
-.voice_release_ticks SKIP MAX_VOICES
-.voice_wave         SKIP MAX_VOICES
-.voice_stereo       SKIP MAX_VOICES
 .voice_table_end
 \ Each voice's state
 .voice_low          SKIP MAX_VOICES \ Its next event
 .voice_high         SKIP MAX_VOICES
 .voice_ticks        SKIP MAX_VOICES \ Ticks left of the current one
-.voice_level        SKIP MAX_VOICES \ The amplitude written
+.voice_level        SKIP MAX_VOICES \ The envelope's
 .voice_phase        SKIP MAX_VOICES
-.voice_note         SKIP MAX_VOICES \ The pitch sounding (an index)
-
+.voice_quieter      SKIP MAX_VOICES \ Steps below the envelope (its volume)
+.voice_attack       SKIP MAX_VOICES \ Its instrument's envelope
+.voice_decay        SKIP MAX_VOICES
+.voice_sustain      SKIP MAX_VOICES
+.voice_release      SKIP MAX_VOICES
+.music_argument     SKIP 1

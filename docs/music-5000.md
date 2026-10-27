@@ -9,9 +9,12 @@ Beebium tree, and the `beebium-music-5000` session knows it well.
 The code: `tools/stratagem/music5000.py` (the encodings, waves, pitches,
 score format, and a model of the player), `asm/music5000.asm` (the player),
 `asm/m5play.asm` (`M5PLAY`, which plays a tune from the vertical sync event;
-`M5SCALE`, one voice of long notes; `M5LOAD`, the tune while a file loads
-again and again), `asm/m5title.asm` (`M5TITLE`, the title screen with the
-tune), `tests/test_music5000.py`.
+`M5SCALE`, one voice of long notes; `M5LOAD`, the music while a file loads
+again and again), `asm/m5title.asm` (`M5TITLE`, the title screen with
+music), `tools/stratagem/overture.py` (the Stratagem Overture, from MIDI),
+`tools/stratagem/midi.py` (MIDI files, through mido),
+`tests/test_music5000.py`. `uv run strat-m5-record` records the overture
+to `build/features/overture.wav`.
 
 ## What the board does, and what's left to the host
 
@@ -55,25 +58,55 @@ Integra-B.
 
 ## M5PLAY
 
-A player of four voices, one tick a frame, from the OS's vertical sync
-event (`EVNTV`, OSBYTE 14,4). Each voice is a channel with a stream of
-notes and rests (a byte for the note, an index into a 96-note pitch table,
-and a byte for its length in ticks), and an instrument: a wave, and an
-envelope of attack, decay, sustain and release in amplitude steps per tick.
-The tune is a placeholder: eight bars in A minor, lead, arpeggio, bass and
-a noise hi-hat. Waves are made from harmonics in Python.
+The player: one tick a frame, from the OS's vertical sync event (`EVNTV`,
+OSBYTE 14,4), up to sixteen voices, each a channel. A voice is a stream of
+events, two bytes each: a note (an index into a 96-note pitch table) and its
+length in ticks; HOLD (keep it on) or REST (release it) and a length; a
+change of instrument or volume. An instrument is a wave and an envelope of
+attack, decay, sustain and release, in amplitude steps a tick, and a place
+in the stereo field; a voice's volume makes it so many steps quieter. Waves
+are made from harmonics in Python.
 
 What we measured, on both machines (`tests/test_music5000.py`):
 
-- **The cost to the host:** a tick of four voices is about 350 cycles
-  (175us), 766 at most, under 1% of a frame on average, 2% at the worst.
-  The 1 MHz bus stretches each write to `&FDxx` by a cycle or two, which is
-  a small part of that; the player's own logic is the rest.
-- **It plays as the model says:** each voice's level, phase and ticks match
-  the Python model's, tick by tick, through the whole tune and its loop.
+- **It plays as the model says:** each voice's envelope, phase, ticks and
+  volume match the Python model's, tick by tick, through the whole overture
+  and into its loop.
 - **In tune:** M5SCALE's notes come out within 0.3% of their pitch.
-- Recordings: `build/features/m5play-<machine>.wav` (made by a scratch
-  script; the tests don't write them).
+- **The cost to the host:** with four voices (the first tune), about 350
+  cycles a tick (175us), 766 at most. With the overture's sixteen, about
+  1100 (under 3% of a frame); about 3000 when every voice starts a note at
+  once, and up to 6300 (3ms, 16% of a frame) when they also change
+  instrument and volume. The 1 MHz bus stretches each write to `&FDxx` by a
+  cycle or two, a small part of that; the player's own logic is the rest.
+
+## The Stratagem Overture
+
+`art/music/Stratagem_Overture.mid`, twelve orchestral tracks, 40 bars, is
+the title's music; `art/music/style.md` says what it is to evoke. It is in
+four parts: D major, I-vi-IV-V, the theme on the horn, then violins and
+trumpets (bars 1-12); B minor, oboe, flute and clarinet (13-24); D major,
+tutti, trombone chords and a violin ostinato (25-36); a coda, horn and
+trumpets in octaves (37-40).
+
+`stratagem.overture` turns it into a score:
+
+- **Each track is an instrument** of the orchestra in `stratagem.music5000`:
+  a wave (a guess at its spectrum) and an envelope, a level, and a place in
+  the stereo field, roughly as an orchestra sits. A note's velocity makes it
+  quieter from the track's level (20 log10(v / 127) dB).
+- **Time** is quantised to 32 ticks a quarter, 93.75 beats a minute (the
+  file's is 96): every note starts on a sixteenth, and articulation keeps to
+  within a tick.
+- **Sixteen channels.** At most sixteen notes sound at once (nineteen in
+  one bar, where the strings strike their chord again while it sounds: the
+  first is ended). With releases ringing on there would be up to 27, so
+  notes go to a channel whose last release has finished, or else cut a
+  release short, the same track's if they can (a chord struck again): 299
+  are cut, nearly all the strings' and cellos' bar-long chords.
+- 3.6K of streams; 105 seconds with a bar's silence before it plays again.
+
+It is a faithful first version, to judge by ear, before interpreting it.
 
 ## Under the title screen: M5TITLE
 
@@ -112,7 +145,11 @@ Integra-B, in Beebium).
 - **Music in the game.** The host's frame is busy, but a tick is cheap: 1%
   of a frame on average, 2% at worst, for four voices. The game's host
   already has the vertical sync; the score could come from the parasite.
-- **A real tune and instruments,** and sound effects on spare channels.
+- **The overture, interpreted.** The mood (`art/music/style.md`) and the
+  board's sound suggest changes (see the decisions to come).
+- **The overture under STRAT's title.** Its data doesn't fit beside
+  M5TITLE's unshadowed screen; in STRAT, user RAM is free once the picture
+  is copied to the shadow screen.
 - **Modulation** (the alternate bank): a channel switches its neighbour
   between the two banks on its own wave's sign, which gives ring- and
   FM-like sounds.

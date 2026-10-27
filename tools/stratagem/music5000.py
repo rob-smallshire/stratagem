@@ -27,7 +27,6 @@ phase wrap, so changing it doesn't click.
 from __future__ import annotations
 
 import math
-import random
 from dataclasses import dataclass, field
 
 SAMPLE_RATE = 46875
@@ -102,17 +101,20 @@ def harmonic_wave(amplitudes: dict[int, float]) -> bytes:
     return bytes(encode_sample(v / peak) for v in values)
 
 
-def noise_wave(seed: int = 5000) -> bytes:
-    rng = random.Random(seed)
-    return bytes(encode_sample(rng.uniform(-1, 1)) for _ in range(WAVE_BYTES))
-
-
 WAVES = {
     "sine": harmonic_wave({1: 1.0}),
-    "square": harmonic_wave({n: 1 / n for n in range(1, 12, 2)}),
-    "saw": harmonic_wave({n: 1 / n for n in range(1, 13)}),
-    "organ": harmonic_wave({1: 1.0, 2: 0.5, 4: 0.25, 8: 0.12}),
-    "noise": noise_wave(),
+    "horn": harmonic_wave({1: 1.0, 2: 0.55, 3: 0.3, 4: 0.15, 5: 0.07}),
+    "trumpet": harmonic_wave({1: 1.0, 2: 0.9, 3: 0.75, 4: 0.6, 5: 0.45, 6: 0.33, 7: 0.22, 8: 0.14}),
+    "trombone": harmonic_wave({1: 1.0, 2: 0.8, 3: 0.6, 4: 0.4, 5: 0.25, 6: 0.15}),
+    "violin": harmonic_wave({n: 1 / n for n in range(1, 13)}),
+    "strings": harmonic_wave({n: n ** -1.3 for n in range(1, 11)}),
+    "cello": harmonic_wave({n: n ** -1.2 for n in range(1, 10)}),
+    "bass": harmonic_wave({1: 1.0, 2: 0.45, 3: 0.2, 4: 0.08}),
+    "flute": harmonic_wave({1: 1.0, 2: 0.2, 3: 0.08}),
+    "oboe": harmonic_wave({1: 0.45, 2: 0.8, 3: 1.0, 4: 0.75, 5: 0.5, 6: 0.3, 7: 0.18}),
+    "clarinet": harmonic_wave({1: 1.0, 2: 0.04, 3: 0.6, 5: 0.35, 7: 0.2, 9: 0.1}),
+    "harp": harmonic_wave({1: 1.0, 2: 0.35, 3: 0.15, 4: 0.05}),
+    "timpani": harmonic_wave({1: 1.0, 2: 0.25, 3: 0.08}),
 }
 WAVE_NUMBERS = {name: number for number, name in enumerate(WAVES)}
 
@@ -145,52 +147,88 @@ PITCHES = [frequency_register(note_hz(LOWEST_NOTE + i)) for i in range(NOTES)]
 
 @dataclass(frozen=True)
 class Instrument:
-    """A wave and an envelope, in amplitude steps per tick: up by attack to
-    FULL, down by decay to sustain, held, then down by release to silence
-    for the note's last release_ticks."""
+    """A wave, an envelope and a place: up by attack amplitude steps a
+    tick to FULL, down by decay to sustain, held; at a note's end, down by
+    release to silence."""
     wave: str
     attack: int
     decay: int
     sustain: int
     release: int
-    release_ticks: int
     stereo: int = CENTRE
 
-
-@dataclass(frozen=True)
-class Voice:
-    instrument: Instrument
-    events: list[tuple[int | None, int]]      # (note number or None for a rest, ticks)
+    def release_ticks(self) -> int:
+        """The longest release, from FULL."""
+        return -(-FULL // self.release)
 
 
-# The score format, one stream per voice: a note (its index into the pitch
-# table, 0 to NOTES - 1) and its length in ticks; REST and a length; or LOOP,
-# back to the start.
+# A voice is a list of events:
+#   ("instrument", name)            take an instrument (its wave and stereo now)
+#   ("volume", steps)               play this many amplitude steps quieter
+#   ("note", note number, ticks)    start a note, for so many ticks
+#   ("hold", ticks)                 keep on, for so many more
+#   ("rest", ticks)                 release, for so many
+# The score format, a stream per voice: a note's index in the pitch table
+# (0 to NOTES - 1), HOLD or REST, each with a length in ticks, 1-255;
+# INSTRUMENT and an instrument's number; VOLUME and steps; LOOP, back to
+# the start.
+VOLUME = 0xFB
+INSTRUMENT = 0xFC
+HOLD = 0xFD
 REST = 0xFE
 LOOP = 0xFF
+Event = tuple
 
 
-def voice_bytes(voice: Voice) -> bytes:
+def voice_bytes(voice: list[Event]) -> bytes:
     out = bytearray()
-    for note, ticks in voice.events:
-        assert 1 <= ticks <= 255
-        if note is None:
-            out += bytes([REST, ticks])
+    for event in voice:
+        kind = event[0]
+        if kind == "instrument":
+            out += bytes([INSTRUMENT, list(INSTRUMENTS).index(event[1])])
+        elif kind == "volume":
+            assert 0 <= event[1] <= FULL
+            out += bytes([VOLUME, event[1]])
+        elif kind == "note":
+            index = event[1] - LOWEST_NOTE
+            assert 0 <= index < NOTES and 1 <= event[2] <= 255, event
+            out += bytes([index, event[2]])
         else:
-            index = note - LOWEST_NOTE
-            assert 0 <= index < NOTES
-            assert ticks > voice.instrument.release_ticks
-            out += bytes([index, ticks])
+            assert 1 <= event[1] <= 255, event
+            out += bytes([HOLD if kind == "hold" else REST, event[1]])
     out.append(LOOP)
     return bytes(out)
 
 
-def parse(text: str, ticks_per_unit: int) -> list[tuple[int | None, int]]:
-    """'A4:4 C5:2 r:2' (lengths in units) as events."""
+def timed(kind: str, ticks: int, note: int | None = None) -> list[Event]:
+    """A note, hold or rest of any length, as events of at most 255 ticks."""
     events = []
+    while ticks > 0:
+        part = min(ticks, 255)
+        if kind == "note":
+            events.append(("note", note, part))
+            kind = "hold"
+        else:
+            events.append((kind, part))
+        ticks -= part
+    return events
+
+
+def voice_ticks(voice: list[Event]) -> int:
+    return sum(event[-1] for event in voice if event[0] in ("note", "hold", "rest"))
+
+
+def parse(instrument: str, text: str, ticks_per_unit: int, gap: int = 1) -> list[Event]:
+    """'A4:4 C5:2 r:2' (lengths in units) as a voice, each note released gap
+    ticks before the next."""
+    events: list[Event] = [("instrument", instrument)]
     for token in text.split():
         name, units = token.split(":")
-        events.append((None if name == "r" else note_number(name), int(units) * ticks_per_unit))
+        ticks = int(units) * ticks_per_unit
+        if name == "r":
+            events += timed("rest", ticks)
+        else:
+            events += timed("note", ticks - gap, note_number(name)) + timed("rest", gap)
     return events
 
 
@@ -203,44 +241,57 @@ ATTACK, DECAY, SUSTAIN, RELEASE = range(4)
 class VoiceState:
     position: int = 0               # into its byte stream
     ticks: int = 1                  # left of the current event; the first tick fetches
-    level: int = 0                  # the amplitude written
+    level: int = 0                  # the envelope's
     phase: int = RELEASE
-    note: int | None = None         # the pitch table index sounding
+    quieter: int = 0                # steps below the envelope
+    instrument: Instrument | None = None
 
 
 @dataclass
 class Player:
     """A model of the player: tick() advances every voice as M5PLAY does
     and returns the writes it makes, (register offset, value)."""
-    voices: list[Voice]
+    score: "Score"
     streams: list[bytes] = field(init=False)
     states: list[VoiceState] = field(init=False)
 
     def __post_init__(self):
-        self.streams = [voice_bytes(v) for v in self.voices]
-        self.states = [VoiceState() for _ in self.voices]
+        self.streams = self.score.streams()
+        self.states = [VoiceState() for _ in self.streams]
+
+    def amplitudes(self) -> list[int]:
+        return [max(0, s.level - s.quieter) for s in self.states]
 
     def tick(self) -> list[tuple[int, int]]:
         writes = []
-        for channel, (voice, stream, state) in enumerate(zip(self.voices, self.streams, self.states)):
-            instrument = voice.instrument
+        instruments = list(INSTRUMENTS)
+        for channel, (stream, state) in enumerate(zip(self.streams, self.states)):
             state.ticks -= 1
             if state.ticks == 0:
-                if stream[state.position] == LOOP:
-                    state.position = 0
-                byte, ticks = stream[state.position], stream[state.position + 1]
-                state.position += 2
-                state.ticks = ticks
+                while True:
+                    byte = stream[state.position]
+                    if byte == LOOP:
+                        state.position = 0
+                        continue
+                    argument = stream[state.position + 1]
+                    state.position += 2
+                    if byte == INSTRUMENT:
+                        state.instrument = INSTRUMENTS[instruments[argument]]
+                        writes += [(WAVE_SELECT + channel, WAVE_NUMBERS[state.instrument.wave] << 4),
+                                   (CONTROL + channel, state.instrument.stereo)]
+                    elif byte == VOLUME:
+                        state.quieter = argument
+                    else:
+                        break
+                state.ticks = argument
                 if byte == REST:
                     state.phase = RELEASE
-                else:
-                    state.note = byte
+                elif byte != HOLD:
                     pitch = PITCHES[byte]
                     writes += [(FREQ_LOW + channel, pitch & 0xFF), (FREQ_MIDDLE + channel, pitch >> 8 & 0xFF),
                                (FREQ_HIGH + channel, pitch >> 16)]
                     state.phase = ATTACK
-            elif state.ticks == instrument.release_ticks:
-                state.phase = RELEASE
+            instrument = state.instrument
             if state.phase == ATTACK:
                 state.level = min(FULL, state.level + instrument.attack)
                 if state.level == FULL:
@@ -251,112 +302,106 @@ class Player:
                     state.phase = SUSTAIN
             elif state.phase == RELEASE:
                 state.level = max(0, state.level - instrument.release)
-            writes.append((AMPLITUDE + channel, state.level))
+            writes.append((AMPLITUDE + channel, max(0, state.level - state.quieter)))
         return writes
 
 
 # Scores
 
-TICKS_PER_SIXTEENTH = 6             # at 50 ticks a second, 125 beats a minute
-MAX_VOICES = 6
+@dataclass(frozen=True)
+class Score:
+    voices: list[list[Event]]
 
-LEAD = Instrument("saw", attack=32, decay=2, sustain=0x70, release=6, release_ticks=2, stereo=CENTRE)
-ARPEGGIO = Instrument("organ", attack=16, decay=4, sustain=0x58, release=8, release_ticks=1, stereo=LEFT + 1)
-BASS = Instrument("square", attack=64, decay=2, sustain=0x68, release=8, release_ticks=2, stereo=CENTRE + 1)
-HAT = Instrument("noise", attack=128, decay=24, sustain=0, release=24, release_ticks=1, stereo=RIGHT + 4)
-TONE = Instrument("sine", attack=128, decay=0, sustain=FULL, release=128, release_ticks=1, stereo=RIGHT)
+    def streams(self) -> list[bytes]:
+        return [voice_bytes(v) for v in self.voices]
 
-CHORDS = [("A", "C", "E"), ("F", "A", "C"), ("C", "E", "G"), ("G", "B", "D"),
-          ("A", "C", "E"), ("F", "A", "C"), ("G", "B", "D"), ("E", "G#", "B")]
-
-MELODY = """
-    E5:4 A5:4 G5:2 E5:2 C5:4
-    D5:4 C5:2 A4:2 C5:8
-    E5:4 G5:4 C6:4 B5:2 G5:2
-    D6:6 B5:2 G5:8
-    E5:4 A5:4 B5:2 C6:2 B5:4
-    A5:4 F5:4 C6:4 A5:4
-    G5:4 F5:2 E5:2 D5:4 B4:4
-    G#4:4 B4:4 E5:8
-"""
+    def ticks(self) -> int:
+        lengths = {voice_ticks(v) for v in self.voices}
+        assert len(lengths) == 1, "the voices keep different time"
+        return lengths.pop()
 
 
-def arpeggio_text() -> str:
-    bars = []
-    for root, third, fifth in CHORDS:
-        bars.append(" ".join(f"{n}:1" for n in [root + "4", third + "4", fifth + "4", third + "4"] * 4))
-    return " ".join(bars).replace("C4", "C5").replace("E4", "E5").replace("D4", "D5")
+MAX_VOICES = CHANNELS
 
-
-def bass_text() -> str:
-    return " ".join(f"{root}2:2 {root}3:2 {root}2:2 {root}3:2 {root}2:2 {root}3:2 {root}2:2 {root}3:2"
-                    for root, _, _ in CHORDS)
-
-
-TUNE = [
-    Voice(LEAD, parse(MELODY, TICKS_PER_SIXTEENTH)),
-    Voice(ARPEGGIO, parse(arpeggio_text(), TICKS_PER_SIXTEENTH)),
-    Voice(BASS, parse(bass_text(), TICKS_PER_SIXTEENTH)),
-    Voice(HAT, parse("r:2 C6:2 " * 32, TICKS_PER_SIXTEENTH)),
-]
+# An orchestra. Each instrument's wave is a guess at its spectrum, a sum of
+# harmonics; its envelope, in amplitude steps (0.38dB) a tick (20ms).
+INSTRUMENTS = {
+    "tone": Instrument("sine", attack=128, decay=0, sustain=FULL, release=128, stereo=RIGHT),
+    "horn": Instrument("horn", attack=10, decay=1, sustain=0x78, release=5, stereo=12),
+    "trumpet": Instrument("trumpet", attack=24, decay=2, sustain=0x74, release=6, stereo=14),
+    "trombone": Instrument("trombone", attack=10, decay=1, sustain=0x7C, release=4, stereo=15),
+    "violin": Instrument("violin", attack=12, decay=1, sustain=0x7A, release=5, stereo=11),
+    "strings": Instrument("strings", attack=4, decay=0, sustain=FULL, release=3, stereo=12),
+    "cello": Instrument("cello", attack=4, decay=0, sustain=FULL, release=3, stereo=14),
+    "bass": Instrument("bass", attack=6, decay=0, sustain=FULL, release=3, stereo=15),
+    "flute": Instrument("flute", attack=10, decay=1, sustain=0x78, release=6, stereo=13),
+    "oboe": Instrument("oboe", attack=16, decay=1, sustain=0x78, release=8, stereo=13),
+    "clarinet": Instrument("clarinet", attack=14, decay=1, sustain=0x78, release=8, stereo=14),
+    "harp": Instrument("harp", attack=128, decay=2, sustain=0, release=4, stereo=11),
+    "timpani": Instrument("timpani", attack=128, decay=3, sustain=0, release=4, stereo=13),
+}
 
 # One voice, long notes: for measuring pitch.
 SCALE_NOTES = ["A3", "A4", "E5", "C6"]
 SCALE_TICKS = 25
-SCALE = [Voice(TONE, [(note_number(n), SCALE_TICKS) for n in SCALE_NOTES])]
-
-SCORES = {"tune": TUNE, "scale": SCALE}
+SCALE = Score([parse("tone", " ".join(f"{n}:{SCALE_TICKS}" for n in SCALE_NOTES), 1)])
 
 
-def score_source(name: str, voices: list[Voice]) -> list[str]:
-    """A score's voice table, in the layout of M5PLAY's voice variables, and
-    its streams."""
-    assert len(voices) <= MAX_VOICES
-    pad = MAX_VOICES - len(voices)
+def scores() -> dict[str, Score]:
+    from stratagem import overture
+    return {"scale": SCALE, "overture": overture.SCORE}
 
-    def row(values) -> str:
-        return "    EQUB " + ", ".join(f"&{v:02X}" for v in list(values) + [0] * pad)
 
-    instruments = [v.instrument for v in voices]
+def score_source(name: str, score: Score) -> list[str]:
+    """A score's voice table, in the layout of the player's (its number of
+    voices and their streams), and its streams."""
+    voices = len(score.voices)
+    assert voices <= MAX_VOICES
+    pad = ["0"] * (MAX_VOICES - voices)
     lines = [f".score_{name}",
-             f"    EQUB {len(voices)}",
-             "    EQUB " + ", ".join([f"LO(score_{name}_{i})" for i in range(len(voices))] + ["0"] * pad),
-             "    EQUB " + ", ".join([f"HI(score_{name}_{i})" for i in range(len(voices))] + ["0"] * pad),
-             row(i.attack for i in instruments),
-             row(i.decay for i in instruments),
-             row(i.sustain for i in instruments),
-             row(i.release for i in instruments),
-             row(i.release_ticks for i in instruments),
-             row(WAVE_NUMBERS[i.wave] << 4 for i in instruments),
-             row(i.stereo for i in instruments)]
-    for index, voice in enumerate(voices):
-        data = voice_bytes(voice)
+             f"    EQUB {voices}",
+             "    EQUB " + ", ".join([f"LO(score_{name}_{i})" for i in range(voices)] + pad),
+             "    EQUB " + ", ".join([f"HI(score_{name}_{i})" for i in range(voices)] + pad)]
+    for index, data in enumerate(score.streams()):
         lines.append(f".score_{name}_{index}")
         lines += ["    EQUB " + ", ".join(f"&{b:02X}" for b in data[i:i + 16]) for i in range(0, len(data), 16)]
     return lines
 
 
-def m5play_source() -> str:
+def common_source() -> str:
+    """The player's constants, waves, pitches and instruments."""
+    waves = list(WAVES.values())
+    waves += [bytes(WAVE_BYTES)] * (len(waves) % 2)     # whole pages
+    assert len(waves) <= WAVE_COUNT
     lines = ["\\ Generated by stratagem.music5000: do not edit.",
              f"MAX_VOICES = {MAX_VOICES}",
-             f"WAVES = {len(WAVES) + len(WAVES) % 2}",
+             f"WAVES = {len(waves)}",
+             f"VOLUME = &{VOLUME:02X}",
+             f"INSTRUMENT = &{INSTRUMENT:02X}",
+             f"HOLD = &{HOLD:02X}",
              f"REST = &{REST:02X}",
              f"LOOP = &{LOOP:02X}",
              f"FULL = &{FULL:02X}",
              f"PITCH_FIRST = {PITCHES[0]}",
              ".waves"]
-    waves = list(WAVES.values())
-    waves += [bytes(WAVE_BYTES)] * (len(waves) % 2)     # whole pages
     for wave in waves:
         lines += ["    EQUB " + ", ".join(f"&{b:02X}" for b in wave[i:i + 16]) for i in range(0, WAVE_BYTES, 16)]
     for name, shift in (("low", 0), ("middle", 8), ("high", 16)):
         values = [p >> shift & 0xFF for p in PITCHES]
         lines.append(f".pitch_{name}")
         lines += ["    EQUB " + ", ".join(f"&{v:02X}" for v in values[i:i + 16]) for i in range(0, NOTES, 16)]
-    for name, voices in SCORES.items():
-        lines += score_source(name, voices)
+    instruments = list(INSTRUMENTS.values())
+    for name, values in (("attack", [i.attack for i in instruments]), ("decay", [i.decay for i in instruments]),
+                         ("sustain", [i.sustain for i in instruments]), ("release", [i.release for i in instruments]),
+                         ("wave", [WAVE_NUMBERS[i.wave] << 4 for i in instruments]),
+                         ("stereo", [i.stereo for i in instruments])):
+        lines += [f".instrument_{name}s", "    EQUB " + ", ".join(f"&{v:02X}" for v in values)]
     return "\n".join(lines) + "\n"
 
 
 def generate(generated_dirpath) -> None:
-    (generated_dirpath / "m5play.asm").write_text(m5play_source())
+    """music5000.asm, the player's tables, and m5_<score>.asm, each score."""
+    (generated_dirpath / "music5000.asm").write_text(common_source())
+    for name, score in scores().items():
+        lines = ["\\ Generated by stratagem.music5000: do not edit."] + score_source(name, score)
+        (generated_dirpath / f"m5_{name}.asm").write_text("\n".join(lines) + "\n")

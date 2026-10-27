@@ -8,3 +8,8 @@ and README refer to them directly.
   For the README.
 - `cover/stratagem-4x3.png`: the cover adapted to 4:3, 1448 x 1086, the
   display's shape. To be reduced to a MODE 2 loading screen.
+- `music/Stratagem_Overture.mid`: the Stratagem Overture, a MIDI file of
+  twelve orchestral tracks, 40 bars at 96 beats a minute. The basis of the
+  title screen's music (`tools/stratagem/overture.py` turns it into a Music
+  5000 score). The title only: the game will have its own music.
+- `music/style.md`: the music's inspiration and the mood it is to set.
