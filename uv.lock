@@ -19,16 +19,16 @@ wheels = [
 
 [[package]]
 name = "beebium"
-version = "0.12.0"
+version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
     { name = "stevedore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7f/fb/0af984090739f8e1202aec48cfa722cf48009dc4b6f52d3d5deed7e71afa/beebium-0.12.0.tar.gz", hash = "sha256:26da695913e592e029118a7851cae9a802d3e0a92948cd4ec9a0f384d1f525f4", size = 576928, upload-time = "2026-10-20T03:15:05.259Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/a9/630fd509c0e047b1b3f55bcbc1ffc80e48a91066db2eb754bafb1dc4b980/beebium-0.15.0.tar.gz", hash = "sha256:8603c180b052f1132acc0e7ee7b496bc6c6409ab3365a43562d2a2641e5aae13", size = 602956, upload-time = "2026-10-27T08:23:31.735Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/cf/16265360a6b79c595260fb6e3013c530b3bf676404f63e2d819910ad37b7/beebium-0.12.0-py3-none-any.whl", hash = "sha256:3aafe88be3089b77f0c8b5c7c3ecbcdc8f14edb6edb639db13ae9e6ab51220c1", size = 462114, upload-time = "2026-10-20T03:15:03.533Z" },
+    { url = "https://files.pythonhosted.org/packages/22/23/6021a684158557d45c5b16b73126a0ac965c8f45992ef77fef9fa9303758/beebium-0.15.0-py3-none-any.whl", hash = "sha256:eccbb881ea0d6738ec85ae39d11fcd6ca8d52b1e6ea12fe6facf7d88f6536de7", size = 500890, upload-time = "2026-10-27T08:23:30.259Z" },
 ]
 
 [package.optional-dependencies]
@@ -38,14 +38,13 @@ imaging = [
 
 [[package]]
 name = "beebium-server"
-version = "0.12.0"
+version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/46/080eaebf11835d1c4c9ac3af94660403e1c7ddc42bce59d8334bc4d8a4f9/beebium_server-0.12.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:16bf07dd4119688b8e650c4e873558379185ce7889465f78c8df9fea619d02d0", size = 71542848, upload-time = "2026-10-20T04:19:08.606Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/82/06ff187c29dd03b76a8210460efcce8f3ffac4b7720af6aa8c44852d177a/beebium_server-0.12.0-py3-none-macosx_12_0_x86_64.whl", hash = "sha256:06d0b2b9a8a1d95ffd48ab37531aed2aea0352166ae285fa65c69f0f98d84792", size = 75101927, upload-time = "2026-10-20T04:19:13.739Z" },
-    { url = "https://files.pythonhosted.org/packages/22/26/1bcfaf594b4982be3903cba953655fd7c02d4a370738258ae66e7e12c88e/beebium_server-0.12.0-py3-none-manylinux_2_36_aarch64.whl", hash = "sha256:2aa7fe71622e4958bf9df42302da480a722a884b8d8b66c7f4f410823223c1e4", size = 89971193, upload-time = "2026-10-20T04:19:19.125Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/17/1724ad5e2bb7a40e0775aea2f5f82a592908a39ead957bac27c83c491026/beebium_server-0.12.0-py3-none-manylinux_2_36_x86_64.whl", hash = "sha256:53c04463abc61d8c3b3b14c496c9f036c9ca9116d0d80989d4f30543a30e7e5e", size = 91375352, upload-time = "2026-10-20T04:19:25.044Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/ee/5600b48dcb286faaaf0940cfae192144290d9d47afe0b7d8d409961eaf40/beebium_server-0.12.0-py3-none-win_amd64.whl", hash = "sha256:d1d6aa4a3a7353d22190d94cdf42144e7647ebfd298466a99073adfd270603e1", size = 53254683, upload-time = "2026-10-20T04:19:29.856Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/ae/a07d0b9aa7789e46a85e49ff088b139978bdffe60980ab7f681ab9b1b220/beebium_server-0.15.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:493736f4ba2a8915eb8c9f6f1f5cd59210c8d72e4a58113f8e56872b3d3e9a9d", size = 73773405, upload-time = "2026-10-27T08:58:48.187Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/3c/cbc11f8e00483731a05ae4635f057f13971cb77634b7796a6feadb29741b/beebium_server-0.15.0-py3-none-manylinux_2_36_aarch64.whl", hash = "sha256:9ef613c5c7c5a844f4418bff23da4a1a801a9cccb0e3bb6ac39831c17e8f1526", size = 92784196, upload-time = "2026-10-27T08:58:57.374Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/91/34dca87ed8d258e9ec00db86fc0873b4de6dade2182480b1aabaf49e98ed/beebium_server-0.15.0-py3-none-manylinux_2_36_x86_64.whl", hash = "sha256:5892d0ad9dda79fd74a49c543c5def4a53b132495afba8bab7efeee1fe8e56d2", size = 94349676, upload-time = "2026-10-27T08:59:06.139Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/23/924bc981febcad86175d049bed4a73b8128c28ecc085572a0fc5f5d20ee5/beebium_server-0.15.0-py3-none-win_amd64.whl", hash = "sha256:f8e34057ca849916c2fef55984ec737afe3593ef592ba967ad8d49a24f005e8a", size = 55200579, upload-time = "2026-10-27T08:59:12.598Z" },
 ]
 
 [[package]]
