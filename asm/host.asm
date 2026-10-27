@@ -5,6 +5,7 @@
 \   STRAT   low RAM: trampolines, the OSWRCH hook, the loader (run by !BOOT)
 \   MAIN    program RAM: each frame's reading and drawing
 \   RENDER  the render region: the renderer, and the light's draw list
+\   LSCREEN the loading screen (tools/stratagem/loading_screen.py)
 
 INCLUDE "asm/os.asm"
 INCLUDE "asm/layout.asm"
@@ -36,6 +37,7 @@ INCLUDE "asm/render.asm"
 INCLUDE "asm/render_light.asm"
 .host_render_end
 SAVE "RENDER", render_start, host_render_end
+PUTFILE "build/generated/loading_screen.bin", "LSCREEN", &3000
 
 ASSERT material_pages = HOST_MATERIAL_PAGES
 ASSERT light_masks = HOST_LIGHT_MASKS

@@ -61,7 +61,8 @@ While the host draws a frame, the parasite works out the next.
 
 | File | Where | What |
 |---|---|---|
-| `asm/host.asm` | host | STRAT (loader, hook, trampolines), MAIN (each frame), RENDER (+ `render_light.asm`) |
+| `asm/host.asm` | host | STRAT (loader, hook, trampolines), MAIN (each frame), RENDER (+ `render_light.asm`), LSCREEN |
+| `asm/loading_screen.asm` | host | the loading screen's interrupt, in STRAT (and LOADSCR) |
 | `asm/parasite.asm` | parasite | PGAME, PWORLD, PLIGHT; its memory map |
 | `asm/tube_layout.asm` | both | buffers, mailbox, packet layout, host addresses |
 | `asm/parasite_main.asm` | parasite | the frame, packets, strips of tiles |
@@ -73,6 +74,29 @@ While the host draws a frame, the parasite works out the next.
 | `asm/host_main.asm` | host | reading packets, the mailbox, drawing |
 | `asm/camera.asm`, `cache.asm`, `scroll.asm`, `pixels.asm` | parasite | the camera, the tile cache, scrolling |
 | `asm/view.asm`, `render.asm` | host | drawing rows, columns, the items and the sprite |
+
+### Loading
+
+STRAT, run by !BOOT, checks the machine, then shows the loading screen
+(`stratagem.loading_screen`): it selects a shadow MODE 1 with interlace
+off, loads LSCREEN into user RAM and copies it to the screen, through the
+render region, by a small copier it puts at `&A008` (the only code that
+sees the screen on the B+). Then it starts switching the Video ULA's flash
+bit every line, from a User VIA timer interrupt with the System VIA's
+interrupts off, and loads RENDER, MAIN, PWORLD, PLIGHT and PGAME beneath
+the picture, all through the OS, so any filing system will do. Last, it
+gives the VIAs and IRQ1V back, selects the game's shadow MODE 2, and starts
+PGAME in the parasite itself, through the Tube host (`&0406`, type 4), as
+`*RUN` would.
+
+While a file is read, the filing system's interrupts (the DFS's NMI for
+each byte, the Tube host holding interrupts off as it sets a transfer up)
+delay some switches. The handler is entered about 20us early and waits, so
+a delay over by then costs nothing; one that runs on past it shows the
+start of a line in the other palette. On the DFS, in Beebium, that is about
+5-13% of the lines drawn while the game loads, most by up to 20 columns;
+of 40 frames captured, 14 had some wrong, often a whole line or two among
+them, and the rest none.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs

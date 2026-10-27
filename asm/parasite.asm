@@ -148,6 +148,7 @@ ORG slot_visibility_even + &200
 .pair_slot              SKIP FRONT_PAIR + PIECE_COUNT * 2   \ Each pair's slot, or PIECE_NO_SLOT
 
 SAVE "PGAME", pgame_start, pgame_end, pgame_start
+ASSERT pgame_start = PGAME_START
 
 ASSERT sl_plane = &2800 AND sl_grid = &3800
 

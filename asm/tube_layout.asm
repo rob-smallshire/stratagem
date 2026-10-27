@@ -8,6 +8,9 @@
 \ list, drawing each cell as it reads it. Meanwhile the parasite works out
 \ the next frame, from that input, into the other buffer.
 
+\ Where PGAME is loaded and run in the parasite (the host's loader starts it)
+PGAME_START = &4300
+
 \ The parasite's buffers
 PACKET_BUFFER_0 = &0800         \ The first part, frame 0, 2, 4...
 LIST_BUFFER_0 = &0D00           \ The second part

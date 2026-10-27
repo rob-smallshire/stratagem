@@ -7,17 +7,28 @@
 \ Even lines are drawn with the flash bit clear, odd lines with it set, so
 \ lines alternate KWCY and KWRB.
 \
-\ The User VIA's timer 1 interrupts every 64us, a line, in the horizontal
-\ blanking; the handler sets the flash bit for the line to come. Which line
-\ that is comes from timer 2, left counting down at 1MHz from the start:
-\ bit 6 of its count changes every 64us, and as a frame is an even number
-\ of lines (312, with interlace off) and the count wraps every 65536us, a
-\ multiple of 128, bit 6 gives the line's parity in every frame. A late
-\ interrupt so costs only the line it was late for. Both timers are started
+\ A write to the control register at CRTC column c takes effect from about
+\ column c - 2, so it is unseen from column 82 to column 1 of the next line
+\ (of 128; 80 displayed). The User VIA's timer 1 interrupts every 64us, a
+\ line, some way ahead of that; the handler waits, watching timer 1, until
+\ column 90 or so, then sets the flash bit for the line to come. While the
+\ game loads, other interrupts (a filing system's NMIs, the Tube host
+\ holding interrupts off) delay the handler; it waits only if it isn't
+\ late, so that an interruption already over by the time it is due costs
+\ nothing, and one that runs on past it costs only the time it runs on:
+\ the start of the next line, drawn in the other palette.
+\
+\ Which line that is comes from timer 2, left counting down at 1MHz from
+\ the start: bit 6 of its count changes every 64us, and as a frame is an
+\ even number of lines (312, with interlace off) and the count wraps every
+\ 65536us, a multiple of 128, bit 6 gives the line's parity in every
+\ frame. It changes just before the handler reads it, at about the end of
+\ the line drawn, so that a handler delayed by up to most of a line still
+\ sets the flash bit for the line being drawn. Both timers are started
 \ once, just after a vertical sync.
 \
-\ The System VIA's interrupts are switched off while it runs, so that
-\ nothing but the filing system's NMIs delays the handler.
+\ The System VIA's interrupts are switched off while it runs, and nothing
+\ in it depends on a particular filing system.
 
 IRQ1V = &0204                   \ The OS's first interrupt vector
 IRQ_A = &FC                     \ Where the OS keeps A when it takes an interrupt
@@ -43,9 +54,17 @@ IER_T1 = &C0                    \ Enable timer 1's interrupt
 
 LINE_MICROSECONDS = 64
 \ Microseconds from the vertical sync being seen to timer 1's first
-\ interrupt: it lands the write to the control register in the
-\ horizontal blanking, about 52us into a line.
-FIRST_LINE_DELAY = 75
+\ interrupt, and the count at which the handler stops waiting: together
+\ they land the write at column 90-91 on both machines, early in the
+\ blanking, to leave as much of it as can be for a delay. The handler
+\ waits about 20us of each line, so an interruption of up to that long
+\ before it is due costs nothing (a longer wait would take more of the
+\ CPU from the loading).
+FIRST_LINE_DELAY = 48
+SWITCH_COUNT = 31               \ Wait while timer 1's count is at least this
+\ Timer 2's first count: it puts the change in bit 6 about 5us before the
+\ handler reads it (it reads the wrong line's parity from &12).
+T2_START = &0D
 
 \ Show the loading screen's palette and start toggling the flash bit every
 \ line, with only this interrupt from the VIAs. The screen must be MODE 1
@@ -83,8 +102,9 @@ FIRST_LINE_DELAY = 75
     STA USER_VIA_T1C_L
     LDA #HI(FIRST_LINE_DELAY)
     STA USER_VIA_T1C_H          \ Starts timer 1
-    LDA #&FF
+    LDA #T2_START
     STA USER_VIA_T2C_L
+    LDA #&FF
     STA USER_VIA_T2C_H          \ Starts timer 2
     LDA #LO(LINE_MICROSECONDS - 2)
     STA USER_VIA_T1L_L
@@ -126,20 +146,24 @@ FIRST_LINE_DELAY = 75
     RTS
 }
 
-\ Timer 1, every line: the flash bit for the line to come is bit 6 of timer
-\ 2's count. Only timer 1 can interrupt from the User VIA.
+\ Timer 1, every line: wait until timer 1's count is below SWITCH_COUNT,
+\ then set the flash bit for the line to come, from bit 6 of timer 2's
+\ count. Only timer 1 can interrupt from the User VIA.
 .loading_irq
 {
     LDA USER_VIA_IFR
     BPL not_ours
-    LDA USER_VIA_T2C_L
-    ASL A
-    ASL A                       \ Bit 6 into carry
+.wait
+    LDA USER_VIA_T1C_L          \ (Clears the interrupt)
+    CMP #SWITCH_COUNT
+    BCS wait
     LDA #LOADING_CONTROL
-    ADC #0
+    BIT USER_VIA_T2C_L
+    BVC write
+    LDA #LOADING_CONTROL + 1
+.write
     STA ULA_CONTROL
 .*control_written
-    LDA USER_VIA_T1C_L          \ Clears the interrupt
     LDA IRQ_A
     RTI
 .not_ours

@@ -403,3 +403,15 @@ A running log of design decisions. Add to it whenever one is made.
   a User VIA timer 1 interrupt every line, which takes the line's parity
   from timer 2's count, so a late interrupt costs one line, not the rest
   of the frame.
+- **The loader shows the loading screen while the game loads:** STRAT
+  selects a shadow MODE 1 and copies the cover to the screen, then loads
+  everything beneath it through the OS and its filing system, and starts
+  PGAME through the Tube host itself, so the picture stays up to the
+  last. Nothing in it is fitted to a particular filing system: rather than
+  read the disc controller (as some games do, for the same effect), it
+  takes the filing system's interrupts as they come. The line's interrupt
+  is taken early and waits, so a delay that is over in time costs
+  nothing, and timer 2's parity changes just before it is read, so a
+  delayed switch still sets the line being drawn. What's left, while a
+  file is read, is the start of some lines in the other palette and
+  sometimes a whole line.

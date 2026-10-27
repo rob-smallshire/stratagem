@@ -21,9 +21,12 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   hardware)
 - With interlace off (`*TV 0,1`), a MODE 1 frame is 312 lines of exactly
   64us, and the User VIA's timers count at 1MHz from the same crystal, so a
-  free-running timer 1 of 64us stays at the same place in every line:
-  `LOADSCR`'s writes land at CRTC column 103-107 of 128 on both machines,
-  with nothing else interrupting. **V** (Beebium)
+  free-running timer 1 of 64us stays at the same place in every line. A
+  write to `&FE20` at CRTC column c takes effect from about column c - 2,
+  so it is unseen from column 82 to column 1 of the next line (in MODE 1:
+  128 columns, 80 displayed); a write at 80 shows on the last 8 pixels, one
+  at 4 on the first 8. The loading screen's writes land at column 90-91 on
+  both machines. **V** (Beebium; by moving the writes and comparing frames)
 - Beebium draws the flash bit from 0.15.0, from the pixel after the write
   (beebium #226), so a captured frame shows `LOADSCR`'s six colours
   exactly as `stratagem.loading_screen` simulates them. Before, it drew

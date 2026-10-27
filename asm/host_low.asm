@@ -223,15 +223,28 @@ ENDMACRO
     STA host_store_banks
     LDA ram_banks + 2
     STA host_store_banks + 1
+    LDA ROMSEL_COPY
+    AND #&7F
+    STA zp_romsel_game
+    LDA zp_romsel_render        \ The render region is ANDY on the B+, the
+    LDX zp_machine              \ render bank on the Integra-B
+    CPX #MACHINE_B_PLUS
+    BEQ compose
+    AND #&0F
+.compose
+    STA zp_romsel_compose       \ (ANDY on the B+; no MEMSEL on the Integra-B)
 
-    \ A shadow MODE 2, so that user RAM at &3000-&7FFF is not the screen.
+    \ The loading screen, a shadow MODE 1 with interlace off, so that user
+    \ RAM at &3000-&7FFF is not the screen and the files load beneath it.
+    LDA #144
     LDX #0
-.vdu_loop
-    LDA vdu_setup,X
-    JSR OSWRCH
-    INX
-    CPX #vdu_setup_end - vdu_setup
-    BNE vdu_loop
+    LDY #1
+    JSR OSBYTE
+    STX old_tv
+    STY old_tv + 1
+    LDX #loading_vdu - vdu_strings
+    LDY #loading_vdu_end - vdu_strings
+    JSR vdu_string
     LDA #&84                    \ HIMEM is &8000 only in a shadow mode
     JSR OSBYTE
     CPY #&80
@@ -240,22 +253,14 @@ ENDMACRO
     LDY #HI(message_shadow)
     JMP fail
 .shadow_ok
+    JSR show_loading_screen
 
-    \ The render region is ANDY on the B+, the render bank on the Integra-B.
-    LDA ROMSEL_COPY
-    AND #&7F
-    STA zp_romsel_game
     LDX #LO(file_render)
     LDY #HI(file_render)
     JSR load_file
-    LDA zp_romsel_render
-    LDX zp_machine
-    CPX #MACHINE_B_PLUS
-    BEQ copy_render
-    AND #&0F
-.copy_render
-    STA zp_romsel_compose       \ (ANDY on the B+; no MEMSEL on the Integra-B)
+    LDA zp_romsel_compose
     LDX #HI(RENDER_REGION_END - RENDER_START)
+    LDY #HI(LOAD_BUFFER)
     JSR copy_to_paged
 
     LDA zp_romsel_game          \ The host's game code, in program RAM
@@ -263,6 +268,26 @@ ENDMACRO
     LDX #LO(file_main)
     LDY #HI(file_main)
     JSR load_file
+
+    LDX #LO(command_world)      \ The parasite's files, into the parasite
+    LDY #HI(command_world)
+    JSR OSCLI
+    LDX #LO(command_light)
+    LDY #HI(command_light)
+    JSR OSCLI
+    LDX #LO(command_game)
+    LDY #HI(command_game)
+    JSR OSCLI
+
+    \ The game's screen: a shadow MODE 2, with interlace as it was.
+    JSR loading_screen_off
+    LDA #144
+    LDX old_tv
+    LDY old_tv + 1
+    JSR OSBYTE
+    LDX #vdu_setup - vdu_strings
+    LDY #vdu_setup_end - vdu_strings
+    JSR vdu_string
     JSR host_init
 
     SEI                         \ Hook OSWRCH
@@ -276,17 +301,13 @@ ENDMACRO
     STA WRCHV + 1
     CLI
 
-    LDX #LO(command_world)      \ The parasite's files, into the parasite,
-    LDY #HI(command_world)      \ and run the game there (never returning)
-    JSR OSCLI
-    LDX #LO(command_light)
-    LDY #HI(command_light)
-    JSR OSCLI
     LDA #BOOT_READY
     STA zp_boot_status
-    LDX #LO(command_game)
-    LDY #HI(command_game)
-    JMP OSCLI
+    JSR host_claim              \ Run the game in the parasite, as *RUN
+    LDA #TUBE_EXECUTE           \ would (never returning: the Tube host's
+    LDX #LO(pgame_address)      \ idle loop serves the parasite from here
+    LDY #HI(pgame_address)      \ on)
+    JMP TUBE_ENTRY
 
 \ Print the message at YX and stop.
 .fail
@@ -302,6 +323,107 @@ ENDMACRO
 .message_done
     JMP message_done
 }
+
+\ Write vdu_strings from offset X up to offset Y to the VDU drivers.
+.vdu_string
+{
+    STY end
+.loop
+    LDA vdu_strings,X
+    JSR OSWRCH
+    INX
+    CPX end
+    BNE loop
+    RTS
+.end
+    SKIP 1
+}
+
+\ Load the cover art (LSCREEN, the loading screen's 20K) into user RAM, copy
+\ it to the screen, and start toggling the flash bit every line. Only code
+\ at RENDER_CODE sees the screen on the B+ (with ANDY paged in, as on the
+\ Integra-B MEMSEL with the render bank), so a small copier is put there,
+\ and the picture goes through the render region below it, BOUNCE_PAGES at
+\ a time. RENDER, loaded next, overwrites both.
+BOUNCE_PAGES = 16
+ASSERT (SCREEN_END - LOAD_BUFFER) DIV 256 MOD BOUNCE_PAGES = 0
+ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
+.show_loading_screen
+{
+    LDX #15                     \ All black while it loads
+.black_loop
+    TXA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA #7                      \ Physical colour 0, as the ULA wants it
+    STA ULA_PALETTE
+    DEX
+    BPL black_loop
+    LDX #LO(file_screen)
+    LDY #HI(file_screen)
+    JSR load_file
+
+    LDA zp_romsel_compose
+    SELECT_ROMSEL
+    LDX #screen_copier_end - screen_copier - 1
+.copier_loop
+    LDA screen_copier,X
+    STA RENDER_CODE,X
+    DEX
+    BPL copier_loop
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+
+    LDA #HI(LOAD_BUFFER)
+    STA page
+.chunk
+    LDA zp_romsel_compose       \ User RAM to the render region...
+    LDX #BOUNCE_PAGES
+    LDY page
+    JSR copy_to_paged
+    LDA #0
+    STA zp_temp
+    STA zp_ptr
+    LDA #HI(BANK_START)
+    STA zp_temp + 1
+    LDA page
+    STA zp_ptr + 1
+    LDA zp_romsel_render        \ ... and from there to the screen
+    SELECT_ROMSEL
+    LDX #BOUNCE_PAGES
+    JSR RENDER_CODE
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    LDA page
+    CLC
+    ADC #BOUNCE_PAGES
+    STA page
+    CMP #HI(SCREEN_END)
+    BNE chunk
+    JMP loading_screen_on
+.page
+    SKIP 1
+}
+
+\ Copy X pages from (zp_temp) to (zp_ptr). Copied to RENDER_CODE and run
+\ there, so position-independent.
+.screen_copier
+{
+    LDY #0
+.loop
+    LDA (zp_temp),Y
+    STA (zp_ptr),Y
+    INY
+    BNE loop
+    INC zp_temp + 1
+    INC zp_ptr + 1
+    DEX
+    BNE loop
+    RTS
+}
+.screen_copier_end
 
 \ Load the file named at YX to LOAD_BUFFER in the host. OSFILE writes the
 \ file's catalogue information back into its control block, so the block is
@@ -325,16 +447,15 @@ ENDMACRO
     JMP OSFILE
 }
 
-\ Copy X pages from LOAD_BUFFER to &8000 with ROMSEL value A paged in.
+\ Copy X pages from page Y to &8000 with ROMSEL value A paged in.
 .copy_to_paged
 {
+    STY source + 2
     PHA
     LDA ROMSEL_COPY
     STA saved_romsel
     PLA
     SELECT_ROMSEL
-    LDA #HI(LOAD_BUFFER)
-    STA source + 2
     LDA #HI(BANK_START)
     STA target + 2
     LDY #0
@@ -358,6 +479,14 @@ ENDMACRO
 
 .osfile_block
     SKIP 18
+.old_tv
+    SKIP 2                      \ *TV's settings before the loading screen
+
+.vdu_strings
+.loading_vdu
+    EQUB 22, 128 + 1            \ Shadow MODE 1
+    EQUB 23, 1, 0, 0, 0, 0, 0, 0, 0, 0     \ Cursor off
+.loading_vdu_end
 
 .vdu_setup
     EQUB 22, 128 + 2            \ Shadow MODE 2
@@ -366,12 +495,15 @@ ENDMACRO
         EQUB 19, logical, logical - 8, 0, 0, 0  \ Steady colours, not flashing
     NEXT
 .vdu_setup_end
+ASSERT vdu_setup_end - vdu_strings < 256
 
+.file_screen    EQUS "LSCREEN", 13
 .file_render    EQUS "RENDER", 13
 .file_main      EQUS "MAIN", 13
 .command_world  EQUS "LOAD PWORLD", 13
 .command_light  EQUS "LOAD PLIGHT", 13
-.command_game   EQUS "RUN PGAME", 13
+.command_game   EQUS "LOAD PGAME", 13
+.pgame_address  EQUD PGAME_START
 
 .message_tube       EQUS "Stratagem needs a 6502 second processor", 13, 0
 .message_machine    EQUS "Stratagem needs a BBC B+ 128K or an Integra-B", 13, 0
@@ -379,6 +511,7 @@ ENDMACRO
 .message_shadow     EQUS "Stratagem needs shadow RAM", 13, 0
 
 INCLUDE "asm/machine.asm"
+INCLUDE "asm/loading_screen.asm"
 
 .strat_end
 

@@ -66,4 +66,4 @@ INCLUDE "asm/loading_screen.asm"
 .loadscr_end
 
 SAVE "LOADSCR", loadscr_start, loadscr_end
-PUTFILE "build/generated/loading_screen.bin", "LSCREEN", &3000
+\ LSCREEN is put on the disc with the game's files (asm/host.asm).
