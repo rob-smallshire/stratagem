@@ -89,14 +89,17 @@ gives the VIAs and IRQ1V back, selects the game's shadow MODE 2, and starts
 PGAME in the parasite itself, through the Tube host (`&0406`, type 4), as
 `*RUN` would.
 
-While a file is read, the filing system's interrupts (the DFS's NMI for
-each byte, the Tube host holding interrupts off as it sets a transfer up)
-delay some switches. The handler is entered about 20us early and waits, so
-a delay over by then costs nothing; one that runs on past it shows the
-start of a line in the other palette. On the DFS, in Beebium, that is about
-5-13% of the lines drawn while the game loads, most by up to 20 columns;
-of 40 frames captured, 14 had some wrong, often a whole line or two among
-them, and the rest none.
+The picture is MODE 1 narrowed to 64 columns (256 pixels, 16K), so that
+the horizontal blanking, where the flash bit must be switched, is 64
+columns of the 128 rather than 48. While a file is read, the filing
+system's interrupts (the DFS's NMI for each byte; its own stretches with
+interrupts off) delay some switches. The handler is entered about 20us
+early and waits, so a delay over by then costs nothing; one that runs on
+past it shows the start of a line in the other palette. On the DFS, in
+Beebium, 0.4-2.2% of lines are late while the parasite's files load over
+the Tube, nearly all by under 8 columns, and about 0.1% are skipped (the
+whole line in the other palette). Loads into the host's own memory
+(RENDER, MAIN) are worse: 6-9% late, 1.2% skipped.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs
