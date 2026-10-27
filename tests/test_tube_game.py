@@ -6,7 +6,7 @@ the brighter of its tile's daylight and the parasite's smooth miner's light
 
 import pytest
 
-from conftest import RUN_TIMEOUT_EMULATED_SECONDS
+from conftest import boot_game
 from stratagem import camera, inventory, items, lighting, player, sprites
 from stratagem.inventory import KIND_TORCH
 from stratagem.player import Player
@@ -112,10 +112,7 @@ def test_tube_game_frames_match_model(tube_bbc, tube_machine, game_build, script
     bbc = tube_bbc
     labels = game_build.labels["HOST"]
     peek = bbc.memory.address.peek
-    bbc.disc.set_spin_up_delay(False)
-    bbc.boot_disc(str(game_build.disc_filepath))
-    started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
-    assert started, "the game did not start"
+    boot_game(bbc, game_build)
     frames = 0
     items_shown = 0
     for count, keys in script:
@@ -183,10 +180,7 @@ def test_host_keeps_the_store(tube_bbc, tube_machine, game_build):
     labels = game_build.labels["HOST"]
     plabels = game_build.labels["PARASITE"]
     peek = bbc.memory.address.peek
-    bbc.disc.set_spin_up_delay(False)
-    bbc.boot_disc(str(game_build.disc_filepath))
-    started = bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
-    assert started, "the game did not start"
+    boot_game(bbc, game_build)
     parasite = bbc.connect_coprocessor().memory.address
     play(bbc, game_build, STORE_SCRIPT)
     assert parasite.peek[plabels["cache_misses"]] == 0, "a chunk was needed before it was fetched"

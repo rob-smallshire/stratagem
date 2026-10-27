@@ -25,9 +25,10 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   write to `&FE20` at CRTC column c takes effect from about column c - 2,
   so it is unseen from column 82 to column 1 of the next line (in MODE 1:
   128 columns, 80 displayed); a write at 80 shows on the last 8 pixels, one
-  at 4 on the first 8. The loading screen, narrowed to 64 columns, writes
-  at column 77-78 on the B+ and 71-72 on the Integra-B, whose vertical sync
-  comes about 3us later in a line (`docs/loading-screen.md`). **V**
+  at 4 on the first 8. The title screen's writes land at column 90-91 on
+  both machines (narrowed to 64 columns, they landed 6us apart: the
+  Integra-B's vertical sync comes later in a line; `docs/loading-screen.md`).
+  **V**
   (Beebium; by moving the writes and comparing frames)
 - Beebium draws the flash bit from 0.15.0, from the pixel after the write
   (beebium #226), so a captured frame shows `LOADSCR`'s six colours

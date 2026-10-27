@@ -234,16 +234,16 @@ ENDMACRO
 .compose
     STA zp_romsel_compose       \ (ANDY on the B+; no MEMSEL on the Integra-B)
 
-    \ The loading screen, a shadow MODE 1 with interlace off, so that user
-    \ RAM at &3000-&7FFF is not the screen and the files load beneath it.
+    \ The title screen, a shadow MODE 1 with interlace off, so that user
+    \ RAM at &3000-&7FFF is not the screen and the picture loads beneath it.
     LDA #144
     LDX #0
     LDY #1
     JSR OSBYTE
     STX old_tv
     STY old_tv + 1
-    LDX #loading_vdu - vdu_strings
-    LDY #loading_vdu_end - vdu_strings
+    LDX #title_vdu - vdu_strings
+    LDY #title_vdu_end - vdu_strings
     JSR vdu_string
     LDA #&84                    \ HIMEM is &8000 only in a shadow mode
     JSR OSBYTE
@@ -253,7 +253,21 @@ ENDMACRO
     LDY #HI(message_shadow)
     JMP fail
 .shadow_ok
-    JSR show_loading_screen
+    JSR show_title
+    LDA #BOOT_TITLE
+    STA zp_boot_status
+    JSR wait_for_space
+
+    \ The game's screen, a shadow MODE 2 with interlace as it was, black
+    \ while the game loads.
+    JSR loading_screen_off
+    LDA #144
+    LDX old_tv
+    LDY old_tv + 1
+    JSR OSBYTE
+    LDX #vdu_setup - vdu_strings
+    LDY #vdu_setup_end - vdu_strings
+    JSR vdu_string
 
     LDX #LO(file_render)
     LDY #HI(file_render)
@@ -279,15 +293,6 @@ ENDMACRO
     LDY #HI(command_game)
     JSR OSCLI
 
-    \ The game's screen: a shadow MODE 2, with interlace as it was.
-    JSR loading_screen_off
-    LDA #144
-    LDX old_tv
-    LDY old_tv + 1
-    JSR OSBYTE
-    LDX #vdu_setup - vdu_strings
-    LDY #vdu_setup_end - vdu_strings
-    JSR vdu_string
     JSR host_init
 
     SEI                         \ Hook OSWRCH
@@ -339,16 +344,17 @@ ENDMACRO
     SKIP 1
 }
 
-\ Load the cover art (LSCREEN, the loading screen's 16K) into user RAM, copy
-\ it to the screen, and start toggling the flash bit every line. Only code
-\ at RENDER_CODE sees the screen on the B+ (with ANDY paged in, as on the
-\ Integra-B MEMSEL with the render bank), so a small copier is put there,
-\ and the picture goes through the render region below it, BOUNCE_PAGES at
-\ a time. RENDER, loaded next, overwrites both.
+\ Load the cover art (LSCREEN, the title screen's 20K) into user RAM, copy
+\ it to the screen, and start toggling the flash bit every line
+\ (asm/loading_screen.asm). Only code at RENDER_CODE sees the screen on the
+\ B+ (with ANDY paged in, as on the Integra-B MEMSEL with the render bank),
+\ so a small copier is put there, and the picture goes through the render
+\ region below it, BOUNCE_PAGES at a time. RENDER, loaded later,
+\ overwrites both.
 BOUNCE_PAGES = 16
-ASSERT LOADING_SCREEN_SIZE DIV 256 MOD BOUNCE_PAGES = 0
+ASSERT (SCREEN_END - LOAD_BUFFER) DIV 256 MOD BOUNCE_PAGES = 0
 ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
-.show_loading_screen
+.show_title
 {
     LDX #15                     \ All black while it loads
 .black_loop
@@ -400,11 +406,29 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     CLC
     ADC #BOUNCE_PAGES
     STA page
-    CMP #HI(LOAD_BUFFER + LOADING_SCREEN_SIZE)
+    CMP #HI(SCREEN_END)
     BNE chunk
     JMP loading_screen_on
 .page
     SKIP 1
+}
+
+\ Wait until SPACE is pressed, reading the keyboard itself: the OS doesn't,
+\ with the System VIA's interrupts off.
+.wait_for_space
+{
+    LDA #3                      \ Stop its scanning
+    STA SYSTEM_VIA_B
+    LDA #&7F                    \ Port A: a key number out, its state in
+    STA SYSTEM_VIA_DDRA         \ (bit 7)
+.wait
+    LDA #KEY_SPACE
+    STA SYSTEM_VIA_A_NO_HANDSHAKE
+    LDA SYSTEM_VIA_A_NO_HANDSHAKE
+    BPL wait
+    LDA #&0B                    \ Let it scan again
+    STA SYSTEM_VIA_B
+    RTS
 }
 
 \ Copy X pages from (zp_temp) to (zp_ptr). Copied to RENDER_CODE and run
@@ -480,13 +504,13 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
 .osfile_block
     SKIP 18
 .old_tv
-    SKIP 2                      \ *TV's settings before the loading screen
+    SKIP 2                      \ *TV's settings before the title screen
 
 .vdu_strings
-.loading_vdu
+.title_vdu
     EQUB 22, 128 + 1            \ Shadow MODE 1
     EQUB 23, 1, 0, 0, 0, 0, 0, 0, 0, 0     \ Cursor off
-.loading_vdu_end
+.title_vdu_end
 
 .vdu_setup
     EQUB 22, 128 + 2            \ Shadow MODE 2

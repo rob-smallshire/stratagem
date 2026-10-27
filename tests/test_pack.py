@@ -10,7 +10,7 @@ from dataclasses import replace
 
 import pytest
 
-from conftest import RUN_TIMEOUT_EMULATED_SECONDS
+from conftest import boot_game
 from mos6502 import Machine6502
 from stratagem import crafting, inventory, pack, sprites
 from stratagem.build import read_disc_file
@@ -317,9 +317,7 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     bbc = tube_bbc
     labels, plabels = game_build.labels["HOST"], game_build.labels["PARASITE"]
     peek = bbc.memory.address.peek
-    bbc.disc.set_spin_up_delay(False)
-    bbc.boot_disc(str(game_build.disc_filepath))
-    assert bbc.run_until_or_timeout(lambda: peek[labels["host_frame_count"]] >= 2, RUN_TIMEOUT_EMULATED_SECONDS)
+    boot_game(bbc, game_build)
     frames(bbc, labels, 4, ["Z", "L"])
     frames(bbc, labels, 40, ["M", "L"])
     frames(bbc, labels, 100)

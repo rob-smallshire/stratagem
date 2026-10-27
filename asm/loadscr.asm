@@ -2,7 +2,6 @@
 \ so that it can be looked at and tested apart from the game's loader.
 
 INCLUDE "asm/os.asm"
-INCLUDE "asm/layout.asm"
 
 BOOT_READY = &FF                \ As asm/zeropage.asm
 

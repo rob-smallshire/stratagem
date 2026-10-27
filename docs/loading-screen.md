@@ -104,7 +104,8 @@ switch with the code it interrupted, and frames captured mid-load):
   CRTC R1 = 64, R2 moved to centre it; 16K), the blanking is 64 columns
   and the switch can move earlier: 0.4-2.2% late, nearly all by under 8
   columns, and about 0.1% skipped. Loads into the host's own memory
-  (RENDER, MAIN) stay worse: 6-9% late, 1.2% skipped.
+  (RENDER, MAIN) stay worse: 6-9% late, 1.2% skipped. (Undone since: the
+  title screen, with nothing loading beneath it, is full width.)
 - **What it looks like.** About a third of captured frames show some wrong
   lines, mostly in the first two seconds, while RENDER and MAIN load. A
   frame captured mid-frame mixes two frames, which shows as one apparently
@@ -119,29 +120,22 @@ fitting to the filing system, which we won't do.
 
 ## The direction from here
 
-The picture is good in its own right. It becomes a **title screen**, shown
-with nothing loading beneath it, where the switching is exact (LOADSCR's
-test sees every switch in the blanking, every line, on both machines), so
-it can have its full 320 pixels back. Music (the Music 5000, which Beebium
-emulates) may come with it later. After the title, a separate, plainer
-**loading screen**: a MODE 2 title and a progress bar, say, with nothing
-timed to the line, so the filing system can do as it likes.
+The picture is good in its own right, so it is now a **title screen**,
+shown with nothing loading beneath it, where the switching is exact
+(LOADSCR's test sees every switch in the blanking, every line, on both
+machines), and with its full 320 pixels back. STRAT shows it until SPACE
+is pressed, then loads the game under a black MODE 2 screen. Music (the
+Music 5000, which Beebium emulates) may come with it later. After the
+title, a separate, plainer **loading screen** is to come: a MODE 2 title
+and a progress bar, say, with nothing timed to the line, so the filing
+system can do as it likes.
 
-What carries over: `asm/loading_screen.asm` as it is (start and stop the
-switching, hand back the VIAs), the dither and the lab, and the loader's
-way of putting a picture on the shadow screen (`show_loading_screen`:
-through user RAM and the render region, by a copier at `&A008`, the only
-place on the B+ that code sees the screen).
-
-Notes for the title screen:
-
-- With the System VIA's interrupts off, the OS doesn't scan the keyboard.
-  The keyboard's CA2 flag still latches in the IFR when a key goes down in
-  autoscan (SHIFT and CTRL aren't scanned), so a poll of it can end the
-  title; or read the keyboard directly.
-- The tests boot the game through STRAT, so a title that waits for a key
-  needs the boot helper (`boot_until_ready` in `tests/conftest.py`) to
-  press one.
+- With the System VIA's interrupts off, the OS doesn't scan the keyboard,
+  so `wait_for_space` (`asm/host_low.asm`) reads it itself, as the game
+  does. The line's interrupt doesn't touch the System VIA, so it needn't
+  hold interrupts off to do so.
+- The tests boot the game through STRAT, so `boot_game` in
+  `tests/conftest.py` presses SPACE at the title.
 - Ideas not pursued for a loading picture, should one come back: load the
   host's files first, before the picture shows; compress them, so less
   time is spent in host loads; a steady-colour margin in the dither; art

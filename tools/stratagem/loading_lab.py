@@ -11,8 +11,7 @@ Writes, into build/features/:
     loading-detail.png      a part of each, enlarged: pixels and blended
     loading-kernels.png     the 8-colour screen dithered each way
     loading-schemes.png     each way of splitting the pairs between lines
-    loading-screen.bin      the 6-colour screen's 16K (its middle 256 pixels),
-                            the loading screen, for &3000
+    loading-screen.bin      the 6-colour screen's 20K, the loading screen, for &3000
 
 and prints each screen's error (the mean Oklab distance, x100, from the art,
 both slightly blurred) and the palette and control register values.
@@ -27,8 +26,8 @@ import numpy as np
 from PIL import Image
 
 from stratagem.lighting_lab import sheet
-from stratagem.loading_screen import (ART_FILEPATH, BLACK, CROP_LEFT, CYAN, FLASHING, FLASHING_SCHEMES, KERNELS,
-                                      LOADING_SCHEME, MAGENTA, MODE2_WIDTH, RED, SCREEN_WIDTH, YELLOW, Scheme, control_values, crt, display,
+from stratagem.loading_screen import (ART_FILEPATH, LOADING_SCHEME, BLACK, CYAN, FLASHING, FLASHING_SCHEMES, KERNELS, MAGENTA,
+                                      MODE2_WIDTH, RED, YELLOW, Scheme, control_values, crt, display,
                                       dither, encode_mode1, error, flashing, load_art, nearest, palette_writes,
                                       physical, render, to_image)
 
@@ -110,7 +109,7 @@ def main() -> None:
 
     lp = SIX.line_palettes()
     screen = encode_mode1(dither(art, lp, KERNEL, METRIC))
-    assert (render(screen, SIX) == shown[-1][1][:, CROP_LEFT:CROP_LEFT + SCREEN_WIDTH]).all()
+    assert (render(screen, SIX) == shown[-1][1]).all()
     (output_dirpath / "loading-screen.bin").write_bytes(screen)
     print(f"{SIX.name}: palette (&FE21)", " ".join(f"{b:02X}" for b in palette_writes(SIX)))
     print("control (&FE20), even and odd lines:", " ".join(f"{b:02X}" for b in control_values()))

@@ -17,7 +17,8 @@ from beebium.client.exceptions import ServerNotFoundError
 
 from stratagem.build import BuildResult, build
 
-BOOT_READY = 0xFF   # asm/zeropage.asm; `=` constants are not exported as labels
+BOOT_READY = 0xFF   # asm/machine.asm; `=` constants are not exported as labels
+BOOT_TITLE = 0x01   # STRAT's, while it shows the title screen
 BOOT_TIMEOUT_EMULATED_SECONDS = 20.0
 SETTLE_EMULATED_SECONDS = 0.06     # three fields, so the screen has been scanned out
 
@@ -240,6 +241,33 @@ def tube_bbc(tube_machine):
         bbc.system.set_speed_multiplier(0.0)
         wait_for_prompt(bbc)
         yield bbc
+
+
+def boot_to_title(bbc: Beebium, game_build: BuildResult) -> None:
+    """Boot the game disc and run until STRAT shows the title screen."""
+    status_address = game_build.labels["HOST"]["zp_boot_status"]
+    bbc.disc.set_spin_up_delay(False)
+    bbc.boot_disc(str(game_build.disc_filepath))
+    titled = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[status_address] == BOOT_TITLE,
+                                      BOOT_TIMEOUT_EMULATED_SECONDS)
+    assert titled, "the title screen wasn't shown"
+
+
+def press_space(bbc: Beebium) -> None:
+    bbc.keyboard.key_down(" ")
+    bbc.run_for_emulated_seconds(SETTLE_EMULATED_SECONDS)
+    bbc.keyboard.key_up(" ")
+
+
+def boot_game(bbc: Beebium, game_build: BuildResult) -> None:
+    """Boot the game disc, press SPACE at the title, and run until the game
+    has drawn two frames."""
+    boot_to_title(bbc, game_build)
+    press_space(bbc)
+    frame_count_address = game_build.labels["HOST"]["host_frame_count"]
+    started = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[frame_count_address] >= 2,
+                                       RUN_TIMEOUT_EMULATED_SECONDS)
+    assert started, "the game did not start"
 
 
 def type_line(bbc: Beebium, line: str) -> None:

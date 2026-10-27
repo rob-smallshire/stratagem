@@ -77,30 +77,21 @@ While the host draws a frame, the parasite works out the next.
 
 ### Loading
 
-STRAT, run by !BOOT, checks the machine, then shows the loading screen
-(`stratagem.loading_screen`): it selects a shadow MODE 1 with interlace
-off, loads LSCREEN into user RAM and copies it to the screen, through the
-render region, by a small copier it puts at `&A008` (the only code that
-sees the screen on the B+). Then it starts switching the Video ULA's flash
-bit every line, from a User VIA timer interrupt with the System VIA's
-interrupts off, and loads RENDER, MAIN, PWORLD, PLIGHT and PGAME beneath
-the picture, all through the OS, so any filing system will do. Last, it
-gives the VIAs and IRQ1V back, selects the game's shadow MODE 2, and starts
-PGAME in the parasite itself, through the Tube host (`&0406`, type 4), as
-`*RUN` would.
+STRAT, run by !BOOT, checks the machine, then shows the title screen, the
+cover (`stratagem.loading_screen`): it selects a shadow MODE 1 with
+interlace off, loads LSCREEN into user RAM and copies it to the screen,
+through the render region, by a small copier it puts at `&A008` (the only
+code that sees the screen on the B+). Then it starts switching the Video
+ULA's flash bit every line, from a User VIA timer interrupt with the System
+VIA's interrupts off, and waits, reading the keyboard itself, for SPACE.
+Then it gives the VIAs and IRQ1V back, selects the game's shadow MODE 2,
+and loads RENDER, MAIN, PWORLD, PLIGHT and PGAME, all through the OS, so
+any filing system will do. Last, it starts PGAME in the parasite itself,
+through the Tube host (`&0406`, type 4), as `*RUN` would.
 
-The picture is MODE 1 narrowed to 64 columns (256 pixels, 16K), so that
-the horizontal blanking, where the flash bit must be switched, is 64
-columns of the 128 rather than 48. While a file is read, the filing
-system's interrupts (the DFS's NMI for each byte; its own stretches with
-interrupts off) delay some switches. The handler is entered about 20us
-early and waits, so a delay over by then costs nothing; one that runs on
-past it shows the start of a line in the other palette. On the DFS, in
-Beebium, 0.4-2.2% of lines are late while the parasite's files load over
-the Tube, nearly all by under 8 columns, and about 0.1% are skipped (the
-whole line in the other palette). Loads into the host's own memory
-(RENDER, MAIN) are worse: 6-9% late, 1.2% skipped. The whole story, and the
-direction from here, is in `docs/loading-screen.md`.
+Nothing loads beneath the picture: a filing system's interrupts spoil
+some of its lines (`docs/loading-screen.md`). A plainer loading screen,
+with nothing timed to the line, is to come.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs
