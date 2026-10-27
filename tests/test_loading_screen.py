@@ -85,22 +85,48 @@ def test_flashing_every_colour_loses_black_and_white():
         assert abs(shown.mean() - shows) < 0.01
 
 
-# LOADSCR, in Beebium. Beebium draws flashing colours in their first colour
-# whatever the flash bit, so the screen is checked by when and what the
-# handler writes to the control register, not by the picture.
+# LOADSCR, in Beebium: the picture it shows, and when it switches the flash
+# bit, which must be well inside the horizontal blanking for the margin a
+# real loader's other interrupts will eat into.
 
 LINES_PER_FRAME = 312
 BLANKING_COLUMNS = range(84, 124)      # CRTC columns (of 128, 80 displayed) safe to switch in
+FRAMES = 3
 
 
-def test_loadscr_shows_the_screen_and_switches_the_flash_bit_each_line(launch_bbc, machine, game_build):
-    from conftest import boot_until_ready
+def loading_screen_bytes() -> bytes:
     from stratagem.build import GENERATED_DIRPATH
+    return (GENERATED_DIRPATH / "loading_screen.bin").read_bytes()
+
+
+def shown_colours(frame) -> np.ndarray:
+    """A captured frame as physical colours 0-7."""
+    rgb = np.frombuffer(frame.pixels, np.uint8).reshape(frame.height, frame.width, 4)[..., [2, 1, 0]] > 127
+    return rgb[..., 0] * 1 + rgb[..., 1] * 2 + rgb[..., 2] * 4
+
+
+def test_loadscr_shows_the_six_colour_screen(launch_bbc, machine, game_build):
+    from conftest import SETTLE_EMULATED_SECONDS, boot_until_ready
+    from stratagem.loading_screen import LOADING_SCHEME
+
+    bbc = launch_bbc(machine)
+    boot_until_ready(bbc, game_build, "LOADSCR", command="*RUN LOADSCR")
+    expected = render(loading_screen_bytes(), LOADING_SCHEME)
+    for _ in range(FRAMES):
+        bbc.run_for_emulated_seconds(SETTLE_EMULATED_SECONDS)
+        shown = shown_colours(bbc.video.capture_frame())
+        assert shown.shape == expected.shape
+        wrong = np.nonzero((shown != expected).any(axis=1))[0]
+        assert not wrong.size, f"lines {wrong[:10].tolist()} differ"
+
+
+def test_loadscr_switches_the_flash_bit_in_each_lines_blanking(launch_bbc, machine, game_build):
+    from conftest import boot_until_ready
     from stratagem.loading_screen import LOADING_SCHEME
 
     bbc = launch_bbc(machine)
     labels = boot_until_ready(bbc, game_build, "LOADSCR", command="*RUN LOADSCR")
-    screen = (GENERATED_DIRPATH / "loading_screen.bin").read_bytes()
+    screen = loading_screen_bytes()
     assert bytes(bbc.memory.address.peek[SCREEN_START:SCREEN_START + SCREEN_SIZE]) == screen
     palette = bbc.video_ula.palette
     assert [palette[index] for index in range(16)] == [p & 15 ^ 7 for p in palette_writes(LOADING_SCHEME)]

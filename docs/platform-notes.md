@@ -24,12 +24,10 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   free-running timer 1 of 64us stays at the same place in every line:
   `LOADSCR`'s writes land at CRTC column 103-107 of 128 on both machines,
   with nothing else interrupting. **V** (Beebium)
-- Beebium draws flashing colours in their first colour whatever the flash
-  bit, so a screen that toggles it can't be checked from a captured frame;
-  check the writes to `&FE20` against the CRTC's position instead. **V**
-  It is a defect: `VideoUla::write` makes each entry's RGB from
-  `physical & 7` when the palette is written, and the control register's
-  flash bit is never consulted, so the OS's flashing colours never flash.
+- Beebium draws the flash bit from 0.15.0, from the pixel after the write
+  (beebium #226), so a captured frame shows `LOADSCR`'s six colours
+  exactly as `stratagem.loading_screen` simulates them. Before, it drew
+  flashing colours in their first colour whatever the bit. **V**
 
 ## BBC B+ 128K
 
