@@ -339,14 +339,14 @@ ENDMACRO
     SKIP 1
 }
 
-\ Load the cover art (LSCREEN, the loading screen's 20K) into user RAM, copy
+\ Load the cover art (LSCREEN, the loading screen's 16K) into user RAM, copy
 \ it to the screen, and start toggling the flash bit every line. Only code
 \ at RENDER_CODE sees the screen on the B+ (with ANDY paged in, as on the
 \ Integra-B MEMSEL with the render bank), so a small copier is put there,
 \ and the picture goes through the render region below it, BOUNCE_PAGES at
 \ a time. RENDER, loaded next, overwrites both.
 BOUNCE_PAGES = 16
-ASSERT (SCREEN_END - LOAD_BUFFER) DIV 256 MOD BOUNCE_PAGES = 0
+ASSERT LOADING_SCREEN_SIZE DIV 256 MOD BOUNCE_PAGES = 0
 ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
 .show_loading_screen
 {
@@ -400,7 +400,7 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     CLC
     ADC #BOUNCE_PAGES
     STA page
-    CMP #HI(SCREEN_END)
+    CMP #HI(LOAD_BUFFER + LOADING_SCREEN_SIZE)
     BNE chunk
     JMP loading_screen_on
 .page

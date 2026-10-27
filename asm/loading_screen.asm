@@ -7,11 +7,13 @@
 \ Even lines are drawn with the flash bit clear, odd lines with it set, so
 \ lines alternate KWCY and KWRB.
 \
-\ A write to the control register at CRTC column c takes effect from about
-\ column c - 2, so it is unseen from column 82 to column 1 of the next line
-\ (of 128; 80 displayed). The User VIA's timer 1 interrupts every 64us, a
-\ line, some way ahead of that; the handler waits, watching timer 1, until
-\ column 90 or so, then sets the flash bit for the line to come. While the
+\ The screen is MODE 1 narrowed to LOADING_COLUMNS (64) character columns,
+\ centred, so that the horizontal blanking is 64 columns of the 128 rather
+\ than 48. A write to the control register at CRTC column c takes effect
+\ from about column c - 2, so it is unseen from column 66 to column 1 of
+\ the next line. The User VIA's timer 1 interrupts every 64us, a line, some
+\ way ahead of that; the handler waits, watching timer 1, until column 72
+\ to 78, then sets the flash bit for the line to come. While the
 \ game loads, other interrupts (a filing system's NMIs, the Tube host
 \ holding interrupts off) delay the handler; it waits only if it isn't
 \ late, so that an interruption already over by the time it is due costs
@@ -55,23 +57,32 @@ IER_T1 = &C0                    \ Enable timer 1's interrupt
 LINE_MICROSECONDS = 64
 \ Microseconds from the vertical sync being seen to timer 1's first
 \ interrupt, and the count at which the handler stops waiting: together
-\ they land the write at column 90-91 on both machines, early in the
+\ they land the write at column 77-78 on the B+, 71-72 on the Integra-B
+\ (its vertical sync comes a little later in a line), early in the
 \ blanking, to leave as much of it as can be for a delay. The handler
 \ waits about 20us of each line, so an interruption of up to that long
-\ before it is due costs nothing (a longer wait would take more of the
-\ CPU from the loading).
-FIRST_LINE_DELAY = 48
+\ before it is due costs nothing (a longer wait would take more of the CPU
+\ from the loading).
+FIRST_LINE_DELAY = 42
 SWITCH_COUNT = 31               \ Wait while timer 1's count is at least this
 \ Timer 2's first count: it puts the change in bit 6 about 5us before the
 \ handler reads it (it reads the wrong line's parity from &12).
-T2_START = &0D
+T2_START = &07
 
-\ Show the loading screen's palette and start toggling the flash bit every
-\ line, with only this interrupt from the VIAs. The screen must be MODE 1
-\ with interlace off.
+\ Narrow the screen, show the loading screen's palette and start toggling
+\ the flash bit every line, with only this interrupt from the VIAs. The
+\ screen must be MODE 1 with interlace off.
 .loading_screen_on
 {
     SEI
+    LDA #1                      \ R1: characters per line
+    STA CRTC_ADDRESS
+    LDA #LOADING_COLUMNS
+    STA CRTC_DATA
+    LDA #2                      \ R2: horizontal sync position, to centre them
+    STA CRTC_ADDRESS
+    LDA #98 - (80 - LOADING_COLUMNS) DIV 2
+    STA CRTC_DATA
     LDA SYSTEM_VIA_IER
     STA loading_system_ier
     LDA USER_VIA_IER

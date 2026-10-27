@@ -3,27 +3,33 @@ palette and control values for flashing every line, and the dither."""
 
 import numpy as np
 
-from stratagem.loading_screen import (BLACK, BLUE, CYAN, FLASHING, FLASHING_SCHEMES, GREEN, HEIGHT, MAGENTA,
-                                      PHYSICAL_LINEAR, RED, SCREEN_SIZE, SCREEN_START, WHITE, WIDTH, YELLOW,
+from stratagem.loading_screen import (BLACK, BLUE, CROP_LEFT, CYAN, FLASHING, FLASHING_SCHEMES, GREEN, HEIGHT,
+                                      MAGENTA, PHYSICAL_LINEAR, RED, SCREEN_SIZE, SCREEN_START, SCREEN_WIDTH, WHITE,
+                                      WIDTH, YELLOW,
                                       Scheme, address, control_values, decode_mode1, dither, encode_mode1,
                                       flashing, palette_writes, physical, render)
 
 
 def test_mode1_bytes_hold_four_pixels_interleaved():
-    logical = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
+    logical = np.zeros((HEIGHT, SCREEN_WIDTH), dtype=np.uint8)
     logical[0, 0:4] = [3, 0, 0, 0]
     logical[0, 4:8] = [1, 2, 3, 0]
     logical[9, 8:12] = [0, 0, 0, 1]
     screen = encode_mode1(logical)
-    assert len(screen) == SCREEN_SIZE == 20 * 1024
+    assert len(screen) == SCREEN_SIZE == 16 * 1024
     assert screen[0] == 0x88
     assert screen[8] == 0b0110_1010             # bits 7-4 colour bit 1, bits 3-0 colour bit 0
-    assert screen[640 + 16 + 1] == 0x01         # row 1, column 2, line 1
-    assert address(319, 255) == SCREEN_START + SCREEN_SIZE - 1
+    assert screen[512 + 16 + 1] == 0x01         # row 1, column 2, line 1
+    assert address(255, 255) == SCREEN_START + SCREEN_SIZE - 1
+
+
+def test_the_screen_shows_the_middle_of_mode_1s_width():
+    logical = np.random.default_rng(2).integers(0, 4, (HEIGHT, WIDTH), dtype=np.uint8)
+    assert (decode_mode1(encode_mode1(logical)) == logical[:, CROP_LEFT:CROP_LEFT + SCREEN_WIDTH]).all()
 
 
 def test_screen_bytes_round_trip():
-    logical = np.random.default_rng(1).integers(0, 4, (HEIGHT, WIDTH), dtype=np.uint8)
+    logical = np.random.default_rng(1).integers(0, 4, (HEIGHT, SCREEN_WIDTH), dtype=np.uint8)
     screen = encode_mode1(logical)
     assert (decode_mode1(screen) == logical).all()
     assert encode_mode1(decode_mode1(screen)) == screen
@@ -90,7 +96,7 @@ def test_flashing_every_colour_loses_black_and_white():
 # real loader's other interrupts will eat into.
 
 LINES_PER_FRAME = 312
-BLANKING_COLUMNS = range(84, 124)      # CRTC columns (of 128, 80 displayed) safe to switch in
+BLANKING_COLUMNS = range(68, 124)      # CRTC columns (of 128, 64 displayed) safe to switch in
 FRAMES = 3
 
 
