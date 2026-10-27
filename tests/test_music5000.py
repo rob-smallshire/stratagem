@@ -189,7 +189,7 @@ def test_m5load_plays_while_the_filing_system_loads(launch_bbc, machine, game_bu
     bbc = launch_bbc(machine, extra_args=[MUSIC_5000])
     labels = boot_until_ready(bbc, game_build, "M5PLAY", command="*RUN M5LOAD")
     starts, loads = [], bbc.debugger.add_breakpoint(labels["loaded"], condition="false")
-    for _ in range(400):                # 8s: an 11.6K file takes 1-2s
+    for _ in range(400):                # 8s: a 4K file takes under a second
         bbc.debugger.run_to(labels["music_tick"], skip_current=True)
         starts.append(bbc.debugger.cycle_count)
     hits = {b.id: b.hit_count for b in bbc.debugger.list_breakpoints()}

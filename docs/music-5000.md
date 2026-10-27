@@ -102,6 +102,11 @@ details.
   swells, a withdrawn B minor, a swell and a timpani roll into the tutti, a
   bare coda, and a last full chord of D. Long notes change volume as they
   sound.
+- **Weight:** the first version sounded high and thin, so the bass,
+  cellos, trombones and timpani are louder than the file has them, the bass
+  is doubled (detuned), the timpani and the violins play an octave down
+  (the violins' ostinato reached D7), and the violins' wave is softer. That
+  moved about 6dB from above 1kHz to below 250Hz.
 - **Space:** the strings' chords spread across the stereo field; where a
   channel is free, each melody is doubled on a second channel slightly
   detuned (an ensemble), and echoed, quieter, on the other side.
@@ -139,7 +144,7 @@ before. Nothing in the interrupt changes.
 ## While a file loads: M5LOAD
 
 The music from the vertical sync event, while the idle loop loads a file
-through the OS, again and again (RENDER, 11.6K; a 20K file took 2.8s a
+through the OS, again and again (MAIN, 4K; a 20K file took 2.8s a
 load on the B+, 2.05s on the Integra-B, in Beebium).
 
 - The event keeps coming. Ticks are at most 0.3ms late on the B+ and 0.6ms

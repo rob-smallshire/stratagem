@@ -13,8 +13,10 @@ The arrangement, beyond the file:
   woodwinds' B minor a little withdrawn, a swell into the tutti at bar 25,
   a bare coda, and a last chord that opens out and dies away. A long note
   changes volume as it sounds.
-- The cellos in open fifths (their chords without the third), which is
-  clearer through the board's filter, and more open.
+- Weight at the bottom and in the middle: the bass, cellos, trombones and
+  timpani louder than the file has them, the bass doubled (detuned) where a
+  channel is free, the timpani an octave down, and the violins an octave
+  down too (their ostinato in the tutti reached D7).
 - The strings' chords spread across the stereo field.
 - A timpani roll into the tutti, and another into a last full chord of D
   (strings, cellos, bass, timpani) under the horns' and trumpets' D.
@@ -62,13 +64,16 @@ TRACKS = {
     "Flute": ("flute", 0, None, 3),
     "Oboe": ("oboe", -1, None, 3),
     "Clarinet": ("clarinet", -1, None, 3),
-    "Trombones": ("trombone", -8, None, 2),
-    "Bass": ("bass", -5, None, 2),
-    "Timpani": ("timpani", -2, None, 2),
-    "Harp": ("harp", -4, None, 1),
-    "Cellos": ("cello", -11, None, 1),
-    "Strings": ("strings", -11, None, 1),
+    "Trombones": ("trombone", -2, None, 2),
+    "Bass": ("bass", 2, None, 2),
+    "Timpani": ("timpani", 3, None, 2),
+    "Harp": ("harp", -5, None, 1),
+    "Cellos": ("cello", -4, None, 1),
+    "Strings": ("strings", -8, None, 1),
 }
+# Octaves moved, in semitones: the violins' high line down, for weight
+# (their ostinato in the tutti reached D7), and the timpani down.
+TRANSPOSE = {"Violins": -12, "Timpani": -12}
 MELODIES = ("Horn", "Trumpets", "Violins", "Flute", "Oboe", "Clarinet")
 LEGATO = ("Strings", "Cellos", "Bass", "Trombones")     # each chord on the last one's channels
 
@@ -168,12 +173,6 @@ def chords(notes: list[Placed], track: str) -> dict[int, list[int]]:
     return {start: sorted(chord, key=lambda i: notes[i].pitch) for start, chord in by_start.items()}
 
 
-def open_fifths(notes: list[Placed]) -> list[Placed]:
-    """The cellos' triads without their thirds."""
-    thirds = {chord[1] for chord in chords(notes, "Cellos").values() if len(chord) == 3}
-    return [n for i, n in enumerate(notes) if i not in thirds]
-
-
 def spread_strings(notes: list[Placed]) -> list[Placed]:
     notes = list(notes)
     for chord in chords(notes, "Strings").values():
@@ -200,7 +199,7 @@ def ending(notes: list[Placed]) -> list[Placed]:
     chord = [("Strings", p, 70) for p in ("D4", "F#4", "A4", "D5")] + \
             [("Cellos", p, 64) for p in ("D3", "A3")] + [("Bass", "D2", 70)]
     notes = spread_strings(notes + [Placed(last, held, note_number(p), track, v) for track, p, v in chord])
-    return notes + [Placed(last, last + 30, note_number("D3"), "Timpani", 80)] + roll("D3", 39.5, 40, (30, 75))
+    return notes + [Placed(last, last + 40, note_number("D2"), "Timpani", 90)] + roll("D2", 39.5, 40, (30, 80))
 
 
 def decorations(notes: list[Placed]) -> list[Placed]:
@@ -215,6 +214,8 @@ def decorations(notes: list[Placed]) -> list[Placed]:
             extra.append(replace(note, level_db=-4, detune=1, pan=other, optional=1))
             extra.append(replace(note, start=note.start + echo_ticks, end=note.end + echo_ticks, level_db=-13,
                                  pan=other, optional=2))
+        elif note.track == "Bass":
+            extra.append(replace(note, level_db=-2, detune=1, pan=other, optional=1))
         elif note.track == "Strings":
             extra.append(replace(note, level_db=-3, detune=2, pan=other, optional=3))
     return extra
@@ -222,9 +223,9 @@ def decorations(notes: list[Placed]) -> list[Placed]:
 
 def arranged(song: midi.Song) -> list[Placed]:
     notes = file_notes(song)
-    notes = open_fifths(notes)
+    notes = [replace(n, pitch=n.pitch + TRANSPOSE[n.track]) if n.track in TRANSPOSE else n for n in notes]
     notes = spread_strings(notes)
-    notes += roll("A2", 24.5, 25, (25, 70))
+    notes += roll("A1", 24.5, 25, (25, 70))
     notes = ending(notes)
     return notes + decorations(notes)
 

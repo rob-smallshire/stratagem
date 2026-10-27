@@ -106,15 +106,15 @@ WAVES = {
     "horn": harmonic_wave({1: 1.0, 2: 0.55, 3: 0.3, 4: 0.15, 5: 0.07}),
     "trumpet": harmonic_wave({1: 1.0, 2: 0.9, 3: 0.75, 4: 0.6, 5: 0.45, 6: 0.33, 7: 0.22, 8: 0.14}),
     "trombone": harmonic_wave({1: 1.0, 2: 0.8, 3: 0.6, 4: 0.4, 5: 0.25, 6: 0.15}),
-    "violin": harmonic_wave({n: 1 / n for n in range(1, 13)}),
+    "violin": harmonic_wave({n: n ** -1.4 for n in range(1, 11)}),
     "strings": harmonic_wave({n: n ** -1.3 for n in range(1, 11)}),
     "cello": harmonic_wave({n: n ** -1.2 for n in range(1, 10)}),
-    "bass": harmonic_wave({1: 1.0, 2: 0.45, 3: 0.2, 4: 0.08}),
+    "bass": harmonic_wave({1: 1.0, 2: 0.75, 3: 0.5, 4: 0.3, 5: 0.18, 6: 0.1}),
     "flute": harmonic_wave({1: 1.0, 2: 0.2, 3: 0.08}),
     "oboe": harmonic_wave({1: 0.45, 2: 0.8, 3: 1.0, 4: 0.75, 5: 0.5, 6: 0.3, 7: 0.18}),
     "clarinet": harmonic_wave({1: 1.0, 2: 0.04, 3: 0.6, 5: 0.35, 7: 0.2, 9: 0.1}),
     "harp": harmonic_wave({1: 1.0, 2: 0.35, 3: 0.15, 4: 0.05}),
-    "timpani": harmonic_wave({1: 1.0, 2: 0.25, 3: 0.08}),
+    "timpani": harmonic_wave({1: 1.0, 2: 0.5, 3: 0.3, 4: 0.12}),
 }
 WAVE_NUMBERS = {name: number for number, name in enumerate(WAVES)}
 
@@ -382,7 +382,7 @@ INSTRUMENTS = {
     "oboe": Instrument("oboe", attack=16, decay=1, sustain=0x78, release=8, stereo=13, shift=9, vibrato=8),
     "clarinet": Instrument("clarinet", attack=14, decay=1, sustain=0x78, release=8, stereo=14),
     "harp": Instrument("harp", attack=128, decay=2, sustain=0, release=6, stereo=11),
-    "timpani": Instrument("timpani", attack=128, decay=3, sustain=0, release=6, stereo=13),
+    "timpani": Instrument("timpani", attack=128, decay=2, sustain=0, release=4, stereo=13),
 }
 
 # One voice, long notes: for measuring pitch.

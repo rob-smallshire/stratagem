@@ -73,8 +73,8 @@ INCLUDE "asm/music5000.asm"
     JMP idle
 }
 
-LOAD_ADDRESS = &4C00             \ RENDER's 11.6K, below MODE 7's screen
-.load_command   EQUS "LOAD RENDER 4C00", 13
+LOAD_ADDRESS = &6C00             \ MAIN's 4K, below MODE 7's screen
+.load_command   EQUS "LOAD MAIN 6C00", 13
 
 .event
 {
