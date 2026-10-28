@@ -114,7 +114,10 @@ WAVES = {
     "oboe": harmonic_wave({1: 0.45, 2: 0.8, 3: 1.0, 4: 0.75, 5: 0.5, 6: 0.3, 7: 0.18}),
     "clarinet": harmonic_wave({1: 1.0, 2: 0.04, 3: 0.6, 5: 0.35, 7: 0.2, 9: 0.1}),
     "harp": harmonic_wave({1: 1.0, 2: 0.35, 3: 0.15, 4: 0.05}),
-    "timpani": harmonic_wave({1: 1.0, 2: 0.5, 3: 0.3, 4: 0.12}),
+    # Harmonics to the twelfth, heard on small speakers; their signs (sine
+    # phases) chosen for the lowest peak, so the fundamental stays strong.
+    "timpani": harmonic_wave({1: 1.0, 2: 0.7, 3: -0.55, 4: 0.42, 5: -0.32, 6: -0.24, 7: 0.17, 8: -0.12,
+                              10: -0.07, 12: 0.04}),
 }
 WAVE_NUMBERS = {name: number for number, name in enumerate(WAVES)}
 
