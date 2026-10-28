@@ -66,7 +66,7 @@ TRACKS = {
     "Clarinet": ("clarinet", -1, None, 3),
     "Trombones": ("trombone", -2, None, 2),
     "Bass": ("bass", 2, None, 2),
-    "Timpani": ("timpani", 3, None, 2),
+    "Timpani": ("timpani", 9, None, 2),
     "Harp": ("harp", -5, None, 1),
     "Cellos": ("cello", -4, None, 1),
     "Strings": ("strings", -8, None, 1),

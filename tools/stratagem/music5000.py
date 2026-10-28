@@ -382,7 +382,7 @@ INSTRUMENTS = {
     "oboe": Instrument("oboe", attack=16, decay=1, sustain=0x78, release=8, stereo=13, shift=9, vibrato=8),
     "clarinet": Instrument("clarinet", attack=14, decay=1, sustain=0x78, release=8, stereo=14),
     "harp": Instrument("harp", attack=128, decay=2, sustain=0, release=6, stereo=11),
-    "timpani": Instrument("timpani", attack=128, decay=2, sustain=0, release=4, stereo=13),
+    "timpani": Instrument("timpani", attack=128, decay=1, sustain=0, release=4, stereo=13),
 }
 
 # One voice, long notes: for measuring pitch.
