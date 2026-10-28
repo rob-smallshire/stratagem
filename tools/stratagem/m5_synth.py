@@ -8,9 +8,8 @@ wrap, as on the board. Its output filter is a second-order low-pass at
 
     uv run strat-m5-synth [OUTPUT_FILEPATH]
 
-renders the sequencer's overture (stratagem.sequencer) to
-build/features/overture-sequenced.wav, and the title's (stratagem.overture,
-as M5PLAY plays it) to overture-model.wav beside it, for comparison.
+renders the overture, as the sequencer's model plays it
+(stratagem.sequencer), to build/features/overture-synth.wav.
 
 Not modelled: the board's stereo, which is a channel's share of six time
 slots, here a gain each side. Its rendering of the title's overture
@@ -105,8 +104,8 @@ class Board:
 
 
 def render(player, ticks: int) -> np.ndarray:
-    """A player's ticks (music5000.Player or sequencer.SequencePlayer) as
-    audio, at the board's rate."""
+    """A player model's ticks (sequencer.SequencePlayer) as audio, at the
+    board's rate."""
     board = Board()
     blocks, owed = [], 0
     for _ in range(ticks):
@@ -133,15 +132,11 @@ def write_wav(audio: np.ndarray, filepath: Path) -> None:
 
 def main() -> None:
     from stratagem import overture, sequencer
-    from stratagem.music5000 import Player
-    features_dirpath = PROJECT_DIRPATH / "build" / "features"
-    sequenced_filepath = Path(sys.argv[1]) if len(sys.argv) > 1 else features_dirpath / "overture-sequenced.wav"
+    filepath = Path(sys.argv[1]) if len(sys.argv) > 1 else PROJECT_DIRPATH / "build" / "features" / "overture-synth.wav"
     piece = overture.sequencer_piece()
     player = sequencer.SequencePlayer(piece)
-    write_wav(render(player, player.ticks()), sequenced_filepath)
-    model_filepath = sequenced_filepath.with_name("overture-model.wav")
-    write_wav(render(Player(overture.SCORE), overture.SCORE.ticks()), model_filepath)
-    print(f"{sequenced_filepath} ({piece.size()} bytes)\n{model_filepath}")
+    write_wav(render(player, player.ticks()), filepath)
+    print(f"{filepath} ({piece.size()} bytes)")
 
 
 if __name__ == "__main__":

@@ -36,18 +36,22 @@ def started_notes(piece: sequencer.Piece, ticks: int) -> list[tuple[int, int, in
 
 
 def tick_of(step: int, steps_per_tick: int) -> int:
-    """The tick on which a step's events are read: the first that sees the
-    step reached (step 0 on the first)."""
+    """The tick on which a step's events are read: the clock starts a hair
+    short of a step, so the first tick reads step 0, and the tick that
+    passes step s + 1 reads step s."""
     tick = 0
-    while step and (tick + 1) * steps_per_tick >> 16 < step:
+    while (0xFFFF + (tick + 1) * steps_per_tick) >> 16 < step + 1:
         tick += 1
     return tick
+
+
+OLD_OVERTURE_BYTES = 9658           # as M5PLAY's first player had it, tick by tick
 
 
 def test_the_overture_is_a_sixth_of_the_size():
     _, _, piece = overture_encoded()
     assert piece.size() < 1800
-    assert sum(map(len, overture.SCORE.streams())) > 5 * piece.size()
+    assert OLD_OVERTURE_BYTES > 5 * piece.size()
 
 
 def test_the_encoding_reads_back_as_the_tokens():

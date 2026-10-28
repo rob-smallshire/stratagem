@@ -20,7 +20,8 @@ import numpy as np
 from beebium.client import Beebium
 
 from stratagem.build import PROJECT_DIRPATH, build
-from stratagem.overture import SCORE
+from stratagem.overture import sequencer_piece
+from stratagem.sequencer import SequencePlayer
 
 AUDIO_RATE = 48000
 FIELD = 2                           # the Music 5000's in the audio frames
@@ -78,7 +79,7 @@ def write_wav(audio: np.ndarray, filepath: Path) -> None:
 
 
 def main() -> None:
-    seconds = float(sys.argv[1]) if len(sys.argv) > 1 else SCORE.ticks() / TICKS_PER_SECOND + 1
+    seconds = float(sys.argv[1]) if len(sys.argv) > 1 else SequencePlayer(sequencer_piece()).ticks() / TICKS_PER_SECOND + 1
     filepath = Path(sys.argv[2]) if len(sys.argv) > 2 else PROJECT_DIRPATH / "build" / "features" / "overture.wav"
     audio = record(seconds)
     write_wav(audio, filepath)

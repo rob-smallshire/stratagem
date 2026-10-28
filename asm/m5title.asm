@@ -13,7 +13,7 @@ ORG &70
 .zp_ptr             SKIP 2
 .zp_score           SKIP 2
 
-ORG &2000
+ORG &1900
 GUARD &3000
 
 .m5title

@@ -430,3 +430,12 @@ A running log of design decisions. Add to it whenever one is made.
   board's sixteen channels (`docs/music-5000.md`). It loads MUSIC whether
   or not a board is fitted, since the board can't be detected; the game
   itself will have other music, adapted differently.
+- **Music is a compact score, interpreted: the sequencer's format
+  replaces the first player's:** notes on a musical clock (steps, a tempo
+  in steps a tick), the dynamics a conductor's level, a note a byte (an
+  interval and one of the piece's commonest lengths), and what repeats,
+  across all the voices, patterns that are called (found by Re-Pair). It
+  isn't fitted to the overture: pieces in the game, from MIDI or from
+  Python, encode the same way. The overture is 1.7K so, from 9.7K, and
+  sounds the same; MUSIC is 5.4K, from 12.7K. A step lasts a tick at
+  least, which keeps the player simple (`docs/music-5000.md`).

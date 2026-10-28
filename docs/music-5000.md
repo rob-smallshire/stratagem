@@ -6,15 +6,17 @@ game. Beebium emulates the board (`--hybrid-music-5000`, from 0.15.0); its
 own documentation is `docs/music-5000.md` and `docs/music5000/` in the
 Beebium tree, and the `beebium-music-5000` session knows it well.
 
-The code: `tools/stratagem/music5000.py` (the encodings, waves, pitches,
-score format, and a model of the player), `asm/music5000.asm` (the player),
+The code: `tools/stratagem/music5000.py` (the encodings, waves, pitches
+and instruments), `tools/stratagem/sequencer.py` (the score format, its
+encoder, and a model of the player), `asm/music5000.asm` (the player),
 `asm/m5play.asm` (`M5PLAY`, which plays a tune from the vertical sync event;
 `M5SCALE`, one voice of long notes; `M5LOAD`, the music while a file loads
 again and again), `asm/m5title.asm` (`M5TITLE`, the title screen with
 music), `tools/stratagem/overture.py` (the Stratagem Overture, from MIDI),
 `tools/stratagem/midi.py` (MIDI files, through mido),
-`tests/test_music5000.py`. `uv run strat-m5-record` records the overture
-to `build/features/overture.wav`.
+`tests/test_music5000.py`, `tests/test_sequencer.py`. `uv run
+strat-m5-record` records the overture to `build/features/overture.wav`;
+`uv run strat-m5-synth` renders it without the emulator (see below).
 
 ## What the board does, and what's left to the host
 
@@ -59,19 +61,23 @@ Integra-B.
 ## M5PLAY
 
 The player: one tick a frame, from the OS's vertical sync event (`EVNTV`,
-OSBYTE 14,4), up to sixteen voices, each a channel. A voice is a stream of
-events, two bytes each: a note (an index into a 96-note pitch table) and its
-length in ticks; HOLD (keep it on) or REST (release it) and a length; a
-change of instrument or volume. An instrument is a wave and an envelope of
-attack, decay, sustain and release, in amplitude steps a tick, and a place
-in the stereo field; a voice's volume makes it so many steps quieter. Waves
-are made from harmonics in Python.
+OSBYTE 14,4), up to sixteen voices, each a channel, and a conductor. The
+score format is the sequencer's (below): notes on a musical clock, in
+patterns. An instrument is a wave and an envelope of attack, decay,
+sustain and release, in amplitude steps a tick, and a place in the stereo
+field; a voice's level makes it so many steps quieter, and the
+conductor's makes every voice quieter. Waves are made from harmonics in
+Python.
+
+The first player read a stream of two-byte events a voice, timed in ticks;
+what's measured below of four voices and of 1100 cycles a tick was of
+that one.
 
 What we measured, on both machines (`tests/test_music5000.py`):
 
-- **It plays as the model says:** each voice's envelope, phase, ticks and
-  volume match the Python model's, tick by tick, through the whole overture
-  and into its loop.
+- **It plays as the model says:** the conductor's level, and each voice's
+  envelope, phase, steps, pitch, level and frequency, match the Python
+  model's, tick by tick, through the whole overture and into its loop.
 - **In tune:** M5SCALE's notes come out within 0.3% of their pitch.
 - **The cost to the host:** with four voices (the first tune), about 350
   cycles a tick (175us), 766 at most. With the overture's sixteen, about
@@ -96,12 +102,11 @@ details.
   a wave (a guess at its spectrum), an envelope, vibrato or none, a level,
   and a place in the stereo field. A note's velocity makes it quieter from
   the track's level (20 log10(v / 127) dB).
-- **Time:** 96 beats a minute, 31.25 ticks a quarter, each note's start and
-  end to the nearest tick.
+- **Time:** 96 beats a minute, in steps of a twentieth of a quarter (1.5625
+  ticks).
 - **Shaped dynamics,** which the file doesn't have: a quiet opening that
   swells, a withdrawn B minor, a swell and a timpani roll into the tutti, a
-  bare coda, and a last full chord of D. Long notes change volume as they
-  sound.
+  bare coda, and a last full chord of D: the conductor's.
 - **Weight:** the first version sounded high and thin, so the bass,
   cellos, trombones and timpani are louder than the file has them, the bass
   is doubled (detuned), the timpani and the violins play an octave down
@@ -110,17 +115,18 @@ details.
 - **Space:** the strings' chords spread across the stereo field; where a
   channel is free, each melody is doubled on a second channel slightly
   detuned (an ensemble), and echoed, quieter, on the other side.
-- **Sixteen channels.** The sustained parts move from chord to chord on
-  the same channels, legato; the other notes take a channel whose release
-  has finished, or cut one short. The decorations take only what's left,
-  never displacing the score: about a third of them fit, mostly in the
-  opening and the woodwinds' section (the tutti fills all sixteen).
+- **Sixteen channels,** a phrase of a part's line to each, as the
+  sequencer places them. The decorations take only what's left, never
+  displacing the score: 168 notes of 609 fit, mostly in the opening and
+  the woodwinds' section (the tutti fills all sixteen).
 - **The player's vibrato:** a triangle of eight ticks (6.25Hz), two units
   either side, the unit being the note's frequency shifted right (by 8: 6.8
   cents); it starts some ticks into a note. The same unit detunes.
-- **The cost,** with vibrato on most voices: about 2700 cycles a tick, up
-  to 12000 when many voices start notes at once. Under the title, whose
-  line interrupt takes more than half the CPU, that still fits a frame.
+- **The cost,** with vibrato on most voices: about 2550 cycles a tick
+  (6% of a frame); 13800 at most, when the piece starts again and every
+  voice reads its first events while the last chord's sixteen still
+  vibrate. Under the title, whose line interrupt takes more than half the
+  CPU, that still fits a frame.
 
 ### After the board: processing its output
 
@@ -135,7 +141,8 @@ from the recording.
 ## In STRAT's title
 
 STRAT plays the overture under the title (`asm/host_music.asm`): MUSIC, the
-player and the score (12.7K), is assembled with the host at `&3000` and
+player and the score (5.4K: 1.1K of code, 2.2K of waves and tables, 0.6K
+of variables, the overture's 1.7K), is assembled with the host at `&3000` and
 loaded into user RAM once the picture is on the shadow screen, where the
 picture was; MAIN overwrites it later. The title's wait for SPACE ticks the
 music at each vertical sync, as M5TITLE does, and SPACE silences the board
@@ -175,22 +182,25 @@ load on the B+, 2.05s on the Integra-B, in Beebium).
   line, through any filing system that leaves interrupts on most of the
   time.
 
-## A compact score: the sequencer (prototype, in Python)
+## A compact score: the sequencer
 
-M5PLAY's score is the performance, tick by tick: the overture is 9.7K, a
-third of it volume changes (the dynamics, written into every long note) and
-a quarter holds between them; and the channel each note gets scatters its
-lines, so what repeats in the music doesn't repeat in the score. For music
-in the game, where memory is short, `tools/stratagem/sequencer.py` is a
-format, an encoder and a model of the player that would run it; nothing of
-it is in 6502 yet. It isn't fitted to the overture: a piece is notes in
-parts, from MIDI or from Python.
+The first player's score was the performance, tick by tick: the overture
+was 9.7K, a third of it volume changes (the dynamics, written into every
+long note) and a quarter holds between them; and the channel each note got
+scattered its lines, so what repeats in the music didn't repeat in the
+score. For music in the game, where memory is short,
+`tools/stratagem/sequencer.py` is a format, an encoder and a model of the
+player, which `asm/music5000.asm` runs. It isn't fitted to the overture: a
+piece is notes in parts, from MIDI or from Python.
 
 - **A musical clock.** Events are in steps (the overture: a twentieth of a
-  quarter); the tempo is steps a tick (16-bit fraction), which the player
-  adds up, every voice advancing by the steps passed. At 96 bpm a quarter
-  is 31.25 ticks, so in ticks a bar of quavers is 16, 15, 16 ... and
-  repeats don't encode the same; in steps they do, at any tempo.
+  quarter); the tempo, the piece's, is steps a tick (16-bit fraction), which
+  the player adds up: a carry is a step. At 96 bpm a quarter is 31.25
+  ticks, so in ticks a bar of quavers is 16, 15, 16 ... and repeats don't
+  encode the same; in steps they do, at any tempo. A step lasts a tick at
+  least (20 steps a quarter allows 150 bpm), so a tick passes one step at
+  most. The clock starts a hair short of a step, so the first tick reads
+  step 0.
 - **A conductor.** The dynamics of the whole are a level that every voice
   follows, in straight lines (a slope a step): the overture's swells cost
   130 bytes, not 5K.
@@ -214,21 +224,31 @@ parts, from MIDI or from Python.
 The overture so is **1,662 bytes** (1,009 in the voices' streams, 40
 patterns of 435, 130 the conductor's), against 9,658. Expanded, the
 encoding gives back every voice's tokens; played by the model, every note
-starts on its tick and channel (`tests/test_sequencer.py`).
+starts on its tick and channel (`tests/test_sequencer.py`). By ear, it is
+indistinguishable from the first player's.
+
+- **The player** (`asm/music5000.asm`) reads a voice's bytes only at its
+  steps' end; a call pushes its place on the voice's stack (four deep, 128
+  bytes for all sixteen), and a note's unit for vibrato is the pitch's top
+  two bytes shifted right once at most (every instrument's shift is 8 or
+  9). Its vibrato is inline: most voices vibrate every tick.
 
 `uv run strat-m5-synth` renders a player model's writes to audio with a
 software board (`tools/stratagem/m5_synth.py`; its output filter fitted
-to Beebium's), to `build/features/overture-sequenced.wav`, and the title's
-version to `overture-model.wav`. Its rendering of the title's overture
-follows Beebium's recording (the level over time correlates at 0.98). The
-two versions' levels agree within about 1dB a section; the decorations
-differ (more violins doubled, fewer trumpets).
+to Beebium's), to `build/features/overture-synth.wav`. Its rendering of
+the first player's overture followed Beebium's recording (the level over
+time correlated at 0.98), and the sequencer's version agreed with that one
+within about 1dB a section; the decorations differ (more violins doubled,
+fewer trumpets).
 
 ## To try next
 
-- **Music in the game.** The host's frame is busy, but a tick is cheap: 1%
-  of a frame on average, 2% at worst, for four voices. The game's host
-  already has the vertical sync; the score could come from the parasite.
+- **Music in the game.** The host's frame is busy, but a tick is cheap: 6%
+  of a frame on average for sixteen voices with vibrato, less for fewer.
+  The game's host already has the vertical sync; a piece is a K or two, and
+  the player and its tables 3.3K (the waves, 1.8K of it, needed only to
+  start the board). "Play one of these patterns", chosen at random, would
+  let a few phrases vary for as long as the game is played.
 - **The overture, interpreted.** The mood (`art/music/style.md`) and the
   board's sound suggest changes (see the decisions to come).
 - **Detecting the board,** so that a machine without one needn't load

@@ -35,9 +35,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from stratagem.music5000 import (AMPLITUDE, ATTACK, CHANNELS, CONTROL, DB_PER_STEP, DECAY, FULL, INSTRUMENTS,
-                                  LOWEST_NOTE, PITCHES, RELEASE, SUSTAIN, VIBRATO_UP, WAVE_NUMBERS, WAVE_SELECT,
-                                  Player)
+from stratagem.music5000 import (AMPLITUDE, ATTACK, CHANNELS, CONTROL, DB_PER_STEP, DECAY, FREQ_HIGH, FREQ_LOW,
+                                  FREQ_MIDDLE, FULL, INSTRUMENTS, LOWEST_NOTE, MAX_VOICES, PITCHES, RELEASE, RIGHT,
+                                  SUSTAIN, VIBRATO_UP, WAVE_NUMBERS, WAVE_SELECT, note_number, tables_source)
 
 MAX_LENGTH = 255                    # steps in one event
 
@@ -291,19 +291,20 @@ def tokens(events: list[Event]) -> list[tuple]:
 #   &F6       RETURN
 #   &FF       LOOP: back to the stream's start
 # The conductor's stream, which has no channel:
-#   &F7 l h w TEMPO: steps a tick, w and a fraction (h, l in 65536ths)
 #   &F8 l h   LEVEL: amplitude steps quieter for every voice (8.8)
 #   &F9 l h   SLOPE: added to the level each step (8.8, signed)
 #   &FA n     WAIT n steps
 #   &FF       LOOP
 # A note sounds for its slot less the gap, then releases: the voice reads
 # its next event when the slot is over. All voices are as long, in steps.
+# The tempo, steps a tick in 65536ths, is the piece's: a step lasts a tick
+# at least, so the player's clock passes a step a tick at most.
 
 SHORT_INTERVALS = range(-8, 8)
 SLOTS = 8
 GAP, PAN, DETUNE, INSTRUMENT = 0x80, 0x88, 0x98, 0xA8
 NOTE, PITCH, REST, HOLD, QUIETER, CALL, RETURN = range(0xF0, 0xF7)
-TEMPO, LEVEL, SLOPE, WAIT = range(0xF7, 0xFB)
+LEVEL, SLOPE, WAIT = range(0xF8, 0xFB)
 LOOP = 0xFF
 MAX_PATTERNS = 256
 MAX_DEPTH = 4                       # calls within calls
@@ -343,10 +344,8 @@ def token_bytes(token: tuple, slots: list[int]) -> bytes:
     raise ValueError(token)
 
 
-def conductor_bytes(events: list[Event], steps_per_tick: int) -> bytes:
-    """The conductor's stream, from its events, at a tempo (steps a tick,
-    in 65536ths)."""
-    out = bytearray([TEMPO, steps_per_tick & 0xFF, steps_per_tick >> 8 & 0xFF, steps_per_tick >> 16])
+def conductor_bytes(events: list[Event]) -> bytes:
+    out = bytearray()
     for event in events:
         kind, value = event
         if kind == "wait":
@@ -463,6 +462,7 @@ class Piece:
 
 
 def encode(voices: list[list[Event]], conductor: list[Event], ticks_per_step: float) -> Piece:
+    assert len({steps_of(events) for events in voices + [conductor]}) == 1, "the voices keep different time"
     sequences = [tokens(events) for events in voices]
     counts: dict = {}
     for sequence in sequences:
@@ -476,8 +476,9 @@ def encode(voices: list[list[Event]], conductor: list[Event], ticks_per_step: fl
     def assemble(symbols: list[Symbol], end: int) -> bytes:
         return b"".join(token_bytes(s, slots) for s in symbols) + bytes([end])
 
-    return Piece(slots, round(65536 / ticks_per_step), conductor_bytes(conductor, round(65536 / ticks_per_step)),
-                 [assemble(s, LOOP) for s in sequences],
+    steps_per_tick = round(65536 / ticks_per_step)
+    assert steps_per_tick < 65536, "a step lasts a tick at least"
+    return Piece(slots, steps_per_tick, conductor_bytes(conductor), [assemble(s, LOOP) for s in sequences],
                  [assemble(rules[("call", n)], RETURN) for n in range(len(rules))])
 
 
@@ -522,15 +523,22 @@ def expand(piece: Piece, voice: int) -> list[tuple]:
     return walk(piece.voices[voice])
 
 
-# The player, as the 6502 would run it: one tick per vertical sync.
+def frequency_writes(channel: int, state: "VoiceState") -> list[tuple[int, int]]:
+    return [(FREQ_LOW + channel, state.frequency & 0xFE), (FREQ_MIDDLE + channel, state.frequency >> 8 & 0xFF),
+            (FREQ_HIGH + channel, state.frequency >> 16)]
+
+
+# The player, as the 6502 runs it (asm/music5000.asm): one tick per
+# vertical sync. Its clock starts a hair short of a step, so the first
+# tick reads every voice's first events (and the conductor's), at step 0.
 
 @dataclass
 class VoiceState:
     stream: bytes
     position: int = 0
     returns: list[tuple[bytes, int]] = field(default_factory=list)
-    count: int = 0                  # steps left of the current event; 0: read the next
-    release_at: int = -1            # release the note when count reaches this
+    count: int = 1                  # steps left of the current event
+    release_at: int = 0             # release the note when count reaches this (0: at its end)
     pitch: int = 0                  # index in the pitch table
     gap: int = 0
     level: int = 0
@@ -547,45 +555,39 @@ class VoiceState:
 @dataclass
 class SequencePlayer:
     """tick() advances the conductor and every voice and returns the
-    writes it makes to the board, (register offset, value), as
-    music5000.Player does."""
+    writes it makes to the board, (register offset, value)."""
     piece: Piece
     voices: list[VoiceState] = field(init=False)
-    clock: int = 0                  # the fraction of a step, in 65536ths
-    steps_per_tick: int = 0
+    clock: int = 0xFFFF             # the fraction of a step, in 65536ths
     conductor_position: int = 0
-    conductor_count: int = 0
+    conductor_count: int = 1
     level: int = 0                  # the conductor's (8.8)
     slope: int = 0
 
     def __post_init__(self):
         self.voices = [VoiceState(stream) for stream in self.piece.voices]
-        self.conductor(0)               # its tempo and level, before the first tick
 
-    def conductor(self, elapsed: int) -> None:
-        self.level += self.slope * elapsed
-        self.conductor_count -= elapsed
+    def conduct(self) -> None:
+        """A step passed: the conductor's level slopes, and its next events
+        are read when its wait is over."""
+        self.level = (self.level + self.slope) & 0xFFFF
+        self.conductor_count -= 1
         stream = self.piece.conductor
-        while self.conductor_count <= 0:
+        while self.conductor_count == 0:
             byte = stream[self.conductor_position]
             if byte == LOOP:
                 self.conductor_position = 0
                 continue
             if byte == WAIT:
-                self.conductor_count += stream[self.conductor_position + 1]
+                self.conductor_count = stream[self.conductor_position + 1]
                 self.conductor_position += 2
-            elif byte == TEMPO:
-                self.steps_per_tick = int.from_bytes(stream[self.conductor_position + 1:self.conductor_position + 4],
-                                                     "little")
-                self.conductor_position += 4
+                continue
+            value = stream[self.conductor_position + 1] | stream[self.conductor_position + 2] << 8
+            if byte == LEVEL:
+                self.level = value
             else:
-                value = stream[self.conductor_position + 1] | stream[self.conductor_position + 2] << 8
-                value -= 0x10000 if value & 0x8000 else 0
-                if byte == LEVEL:
-                    self.level = value
-                else:
-                    self.slope = value
-                self.conductor_position += 3
+                self.slope = value
+            self.conductor_position += 3
 
     def read(self, channel: int, state: VoiceState, writes: list) -> bool:
         """The voice's events to its next note, hold or rest; whether a
@@ -616,43 +618,46 @@ class SequencePlayer:
                 state.quieter = token[1]
             elif kind == "pitch":
                 state.pitch = token[1] - LOWEST_NOTE
-            elif kind == "rest":
-                state.count += token[1]
-                state.release_at = -1
-                state.phase = RELEASE
-                return False
-            elif kind == "hold":
-                state.count += token[1]
-                state.release_at = -1
+            elif kind in ("rest", "hold"):
+                state.count = token[1]
+                state.release_at = 0
+                if kind == "rest":
+                    state.phase = RELEASE
                 return False
             else:
                 _, interval, slot = token
                 state.pitch += interval
-                state.count += slot
+                state.count = slot
                 state.release_at = state.gap
                 pitch = PITCHES[state.pitch]
                 state.unit = pitch >> state.instrument.shift & 0xFFFF
                 state.frequency = (pitch + state.detune * state.unit) & 0xFFFFFF
-                writes += Player.frequency_writes(channel, state)
+                writes += frequency_writes(channel, state)
                 state.vibrato_count = state.instrument.vibrato
                 state.lfo = 0
                 state.phase = ATTACK
                 return True
 
+    def conducted(self) -> int:
+        """The conductor's level, in whole steps (signed)."""
+        whole = self.level >> 8
+        return whole - 256 if whole & 0x80 else whole
+
     def tick(self) -> list[tuple[int, int]]:
         writes: list[tuple[int, int]] = []
-        self.clock += self.steps_per_tick
-        elapsed, self.clock = self.clock >> 16, self.clock & 0xFFFF
-        self.conductor(elapsed)
-        conducted = self.level >> 8
+        self.clock += self.piece.steps_per_tick
+        stepped, self.clock = self.clock >> 16, self.clock & 0xFFFF
+        if stepped:
+            self.conduct()
+        conducted = self.conducted()
         for channel, state in enumerate(self.voices):
-            state.count -= elapsed
             started = False
-            while state.count <= 0:
-                started = self.read(channel, state, writes) or started
-            if state.count <= state.release_at:
-                state.phase = RELEASE
-                state.release_at = -1
+            if stepped:
+                state.count -= 1
+                if state.count == 0:
+                    started = self.read(channel, state, writes)
+                elif state.count == state.release_at:
+                    state.phase = RELEASE
             instrument = state.instrument
             if not started and instrument and instrument.vibrato:
                 if state.vibrato_count:
@@ -661,7 +666,7 @@ class SequencePlayer:
                     state.lfo = (state.lfo + 1) & 7
                     step = state.unit if VIBRATO_UP[state.lfo] else -state.unit
                     state.frequency = (state.frequency + step) & 0xFFFFFF
-                    writes += Player.frequency_writes(channel, state)
+                    writes += frequency_writes(channel, state)
             if state.phase == ATTACK:
                 state.level = min(FULL, state.level + instrument.attack)
                 if state.level == FULL:
@@ -676,7 +681,77 @@ class SequencePlayer:
         return writes
 
     def ticks(self) -> int:
-        """The piece's length in ticks, once round: the tick that sees its
+        """The piece's length in ticks, once round: the tick that passes its
         last step starts it again."""
         steps = sum(t[-1] for t in expand(self.piece, 0) if t[0] in ("note", "hold", "rest"))
-        return -(-steps * 65536 // self.piece.steps_per_tick) - 1
+        return -(-(steps * 65536 + 1) // self.piece.steps_per_tick) - 1
+
+
+# Pieces, and the player's tables, for the assembler
+
+# One voice, long notes, on the right: for measuring pitch.
+SCALE_NOTES = ["A3", "A4", "E5", "C6"]
+SCALE_STEPS = 20                    # a note's, less a step's gap
+SCALE_TICKS_PER_STEP = 1.25
+
+
+def scale_piece() -> Piece:
+    notes = [Note(i * SCALE_STEPS, (i + 1) * SCALE_STEPS - 1, note_number(name), "tone", "tone", 0, RIGHT)
+             for i, name in enumerate(SCALE_NOTES)]
+    voices, _ = allocate(notes, SCALE_TICKS_PER_STEP, SCALE_STEPS, SCALE_STEPS)
+    end = len(SCALE_NOTES) * SCALE_STEPS
+    return encode([voice_events(v, end) for v in voices], conductor_events([(0, 0)], end), SCALE_TICKS_PER_STEP)
+
+
+def pieces() -> dict[str, Piece]:
+    from stratagem import overture
+    return {"scale": scale_piece(), "overture": overture.sequencer_piece()}
+
+
+def equbs(data: bytes) -> list[str]:
+    return ["    EQUB " + ", ".join(f"&{b:02X}" for b in data[i:i + 16]) for i in range(0, len(data), 16)]
+
+
+def piece_source(name: str, piece: Piece) -> list[str]:
+    """A piece's header, in the layout of the player's piece table (its
+    voices, their streams, the conductor's, its tempo and slots), the
+    addresses of its patterns' tables; then its streams and patterns."""
+    voices = len(piece.voices)
+    assert voices <= MAX_VOICES
+    pad = ["0"] * (MAX_VOICES - voices)
+    label = f"score_{name}"
+    lines = [f".{label}",
+             f"    EQUB {voices}",
+             "    EQUB " + ", ".join([f"LO({label}_{i})" for i in range(voices)] + pad),
+             "    EQUB " + ", ".join([f"HI({label}_{i})" for i in range(voices)] + pad),
+             f"    EQUW {label}_conductor",
+             f"    EQUW {piece.steps_per_tick}",
+             "    EQUB " + ", ".join(str(slot) for slot in piece.slots),
+             f"    EQUW {label}_patterns_low, {label}_patterns_high"]
+    for index, stream in enumerate(piece.voices):
+        lines += [f".{label}_{index}"] + equbs(stream)
+    lines += [f".{label}_conductor"] + equbs(piece.conductor)
+    patterns = range(len(piece.patterns))
+    lines += [f".{label}_patterns_low"] + [f"    EQUB LO({label}_p{i})" for i in patterns]
+    lines += [f".{label}_patterns_high"] + [f"    EQUB HI({label}_p{i})" for i in patterns]
+    for index, pattern in enumerate(piece.patterns):
+        lines += [f".{label}_p{index}"] + equbs(pattern)
+    return lines
+
+
+def common_source() -> list[str]:
+    """The format's constants, and the player's tables."""
+    constants = {"SLOTS": SLOTS, "GAP": GAP, "PAN": PAN, "DETUNE": DETUNE, "INSTRUMENT": INSTRUMENT,
+                 "NOTE": NOTE, "PITCH": PITCH, "REST": REST, "HOLD": HOLD, "QUIETER": QUIETER, "CALL": CALL,
+                 "RETURN": RETURN, "LEVEL": LEVEL, "SLOPE": SLOPE, "WAIT": WAIT, "LOOP": LOOP,
+                 "MAX_DEPTH": MAX_DEPTH}
+    return [f"{name} = &{value:02X}" for name, value in constants.items()] + tables_source()
+
+
+def generate(generated_dirpath) -> None:
+    """music5000.asm, the player's constants and tables, and m5_<name>.asm,
+    each piece."""
+    header = "\\ Generated by stratagem.sequencer: do not edit."
+    (generated_dirpath / "music5000.asm").write_text("\n".join([header] + common_source()) + "\n")
+    for name, piece in pieces().items():
+        (generated_dirpath / f"m5_{name}.asm").write_text("\n".join([header] + piece_source(name, piece)) + "\n")

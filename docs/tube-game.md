@@ -96,7 +96,7 @@ Nothing loads beneath the picture: a filing system's interrupts spoil
 some of its lines (`docs/loading-screen.md`). A plainer loading screen,
 with nothing timed to the line, is to come. The music is the Stratagem
 Overture (`docs/music-5000.md`); on a machine without the board, its writes
-go nowhere, and MUSIC costs only its loading (12.7K).
+go nowhere, and MUSIC costs only its loading (5.4K).
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs

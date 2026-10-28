@@ -1,6 +1,7 @@
 """The Music 5000, driven directly by M5PLAY without AMPLE
-(stratagem.music5000, asm/m5play.asm): the encodings, the player against its
-model, tick for tick, and the sound the board makes."""
+(stratagem.music5000, stratagem.sequencer, asm/music5000.asm,
+asm/m5play.asm): the encodings, the player against its model, tick for
+tick, and the sound the board makes."""
 
 import struct
 import threading
@@ -8,10 +9,11 @@ import threading
 import numpy as np
 import pytest
 
-from stratagem.overture import SCORE as OVERTURE
-from stratagem.music5000 import (DAC_LEVELS, FULL, PITCHES, SCALE, SCALE_NOTES, SCALE_TICKS,
-                                 Player, amplitude_for, decode_sample, encode_sample, frequency_of,
-                                 frequency_register, note_hz, note_number)
+from stratagem.music5000 import (DAC_LEVELS, FULL, PITCHES, amplitude_for, decode_sample, encode_sample,
+                                 frequency_of, frequency_register, note_hz, note_number)
+from stratagem.sequencer import SCALE_NOTES, SCALE_STEPS, SCALE_TICKS_PER_STEP, SequencePlayer, pieces
+
+OVERTURE = pieces()["overture"]
 
 MUSIC_5000 = "--hybrid-music-5000"
 AUDIO_RATE = 48000
@@ -39,12 +41,12 @@ def test_pitches():
 
 
 def test_the_overture_fits_the_board_and_keeps_time():
-    from stratagem.overture import TAIL_TICKS, TICKS_PER_QUARTER, bar_tick
+    from stratagem.overture import STEPS_PER_QUARTER, TAIL_STEPS, TICKS_PER_STEP, bar_step
     assert len(OVERTURE.voices) <= 16
-    # (ticks() asserts that every voice keeps the same time.) It ends on a
+    # (encode() asserts that every voice keeps the same time.) It ends on a
     # chord held into bar 41, its echo, and a silence.
-    held = bar_tick(41.75) + TAIL_TICKS
-    assert held <= OVERTURE.ticks() <= held + TICKS_PER_QUARTER
+    held = (bar_step(41.75) + TAIL_STEPS) * TICKS_PER_STEP
+    assert held <= SequencePlayer(OVERTURE).ticks() <= held + STEPS_PER_QUARTER * TICKS_PER_STEP
 
 
 # M5PLAY in Beebium
@@ -93,7 +95,7 @@ def test_m5scale_plays_its_notes_in_tune(launch_bbc, machine, game_build):
     from conftest import boot_until_ready
     bbc = launch_bbc(machine, extra_args=[MUSIC_5000])
     boot_until_ready(bbc, game_build, "M5PLAY", command="*RUN M5SCALE")
-    note_seconds = SCALE_TICKS / 50
+    note_seconds = SCALE_STEPS * SCALE_TICKS_PER_STEP / 50
     audio = capture(bbc, 2.5 + 2 * len(SCALE_NOTES) * note_seconds)[int(2.5 * AUDIO_RATE):]
     left, right = audio[:, 0], audio[:, 1]
     assert np.abs(right).max() > 1000 and np.abs(left).max() == 0, "the tone is on the right only"
@@ -122,17 +124,20 @@ def test_m5play_plays_the_overture_as_the_model_does(launch_bbc, machine, game_b
     voices = len(OVERTURE.voices)
 
     def played():
-        return [tuple(peek[labels[name] + v] for name in ("voice_level", "voice_phase", "voice_ticks", "voice_quieter"))
-                + (peek[labels["voice_freq_low"] + v] | peek[labels["voice_freq_middle"] + v] << 8
-                   | peek[labels["voice_freq_high"] + v] << 16,)
-                for v in range(voices)]
+        conductor = peek[labels["music_level"]] | peek[labels["music_level"] + 1] << 8
+        return [conductor] + [
+            tuple(peek[labels[name] + v] for name in ("voice_level", "voice_phase", "voice_steps", "voice_pitch"))
+            + (peek[labels["voice_quieter"] + v] - (256 if peek[labels["voice_quieter"] + v] & 0x80 else 0),
+               peek[labels["voice_freq_low"] + v] | peek[labels["voice_freq_middle"] + v] << 8
+               | peek[labels["voice_freq_high"] + v] << 16)
+            for v in range(voices)]
 
     def modelled(player):
-        return [(s.level, s.phase, s.ticks, s.quieter, s.frequency) for s in player.states]
+        return [player.level] + [(s.level, s.phase, s.count, s.pitch, s.quieter, s.frequency) for s in player.voices]
 
     # Catch the model up with the ticks already played, then follow the
     # player through the whole tune and into its loop.
-    player = Player(OVERTURE)
+    player = SequencePlayer(OVERTURE)
     bbc.debugger.run_to(labels["music_tick_end"])
     for ticks in range(1, 2000):
         player.tick()
@@ -140,7 +145,7 @@ def test_m5play_plays_the_overture_as_the_model_does(launch_bbc, machine, game_b
             break
     else:
         pytest.fail("the player's state isn't one the model reaches")
-    loop_ticks = OVERTURE.ticks()
+    loop_ticks = player.ticks()
     costs = []
     for tick in range(loop_ticks + 50):
         bbc.debugger.run_to(labels["music_tick"], skip_current=True)
@@ -150,11 +155,11 @@ def test_m5play_plays_the_overture_as_the_model_does(launch_bbc, machine, game_b
         player.tick()
         assert played() == modelled(player), f"tick {ticks + tick}"
     # A frame is 40000 cycles: the tick, with vibrato on most voices, is
-    # about 7% of it on average; when many voices start notes at once
-    # (each detuned, with its vibrato's unit to work out), up to 30%. Under
-    # the title, whose line interrupt takes more than half the CPU, that
-    # still fits a frame.
-    assert np.mean(costs) < 3200 and max(costs) < 14000, (np.mean(costs), max(costs))
+    # about 6% of it on average (2550 cycles). Most when the piece starts
+    # again, every voice reading its first events while the last chord's
+    # sixteen still vibrate: 13800, 35%. Under the title, whose line
+    # interrupt takes more than half the CPU, that still fits a frame.
+    assert np.mean(costs) < 2800 and max(costs) < 15000, (np.mean(costs), max(costs))
 
     audio = capture(bbc, 3.5)[AUDIO_RATE:]   # (its opening, which is quiet)
     assert np.abs(audio).max() > 100, "it's silent"
