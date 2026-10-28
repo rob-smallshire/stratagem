@@ -175,6 +175,55 @@ load on the B+, 2.05s on the Integra-B, in Beebium).
   line, through any filing system that leaves interrupts on most of the
   time.
 
+## A compact score: the sequencer (prototype, in Python)
+
+M5PLAY's score is the performance, tick by tick: the overture is 9.7K, a
+third of it volume changes (the dynamics, written into every long note) and
+a quarter holds between them; and the channel each note gets scatters its
+lines, so what repeats in the music doesn't repeat in the score. For music
+in the game, where memory is short, `tools/stratagem/sequencer.py` is a
+format, an encoder and a model of the player that would run it; nothing of
+it is in 6502 yet. It isn't fitted to the overture: a piece is notes in
+parts, from MIDI or from Python.
+
+- **A musical clock.** Events are in steps (the overture: a twentieth of a
+  quarter); the tempo is steps a tick (16-bit fraction), which the player
+  adds up, every voice advancing by the steps passed. At 96 bpm a quarter
+  is 31.25 ticks, so in ticks a bar of quavers is 16, 15, 16 ... and
+  repeats don't encode the same; in steps they do, at any tempo.
+- **A conductor.** The dynamics of the whole are a level that every voice
+  follows, in straight lines (a slope a step): the overture's swells cost
+  130 bytes, not 5K.
+- **Phrases kept together.** Each part is split into lines, one note at a
+  time, and lines into phrases at a bar's rest; a phrase goes to one
+  channel, its line's last if free. Decorations go in whole phrases (split
+  at a beat's rest) or not at all: more fit than before (168 notes, from
+  111), and they repeat what they decorate.
+- **Tokens.** A note is a byte: an interval from the voice's last (-8 to
+  +7) and one of the piece's eight commonest slots; a short rest after it
+  is folded in as the voice's gap (MML's `q`). Intervals make a phrase
+  transposed the same bytes. Pan, detune, instrument and gap are a byte;
+  rest, hold, level, pitch and call are two.
+- **Patterns.** Re-Pair over all the voices' tokens: the commonest pair
+  becomes a pattern, again and again, then patterns that don't save bytes
+  are put back, and calls are kept four deep. A pattern costs a RETURN and
+  two bytes of address; a call, two bytes.
+- **Levels to 1.5dB.** The strings' slow swells, written into their
+  velocities chord by chord, otherwise break every pattern.
+
+The overture so is **1,662 bytes** (1,009 in the voices' streams, 40
+patterns of 435, 130 the conductor's), against 9,658. Expanded, the
+encoding gives back every voice's tokens; played by the model, every note
+starts on its tick and channel (`tests/test_sequencer.py`).
+
+`uv run strat-m5-synth` renders a player model's writes to audio with a
+software board (`tools/stratagem/m5_synth.py`; its output filter fitted
+to Beebium's), to `build/features/overture-sequenced.wav`, and the title's
+version to `overture-model.wav`. Its rendering of the title's overture
+follows Beebium's recording (the level over time correlates at 0.98). The
+two versions' levels agree within about 1dB a section; the decorations
+differ (more violins doubled, fewer trumpets).
+
 ## To try next
 
 - **Music in the game.** The host's frame is busy, but a tick is cheap: 1%

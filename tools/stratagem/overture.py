@@ -43,7 +43,7 @@ from functools import cache
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from stratagem import midi
+from stratagem import midi, sequencer
 from stratagem.music5000 import CHANNELS, DB_PER_STEP, FULL, INSTRUMENTS, Event, Score, note_number, timed
 
 MIDI_FILEPATH = Path(__file__).resolve().parents[2] / "art" / "music" / "Stratagem_Overture.mid"
@@ -86,9 +86,10 @@ DYNAMICS = [(1, -15), (4.5, -4), (5, -2), (9, 0), (12.5, 0), (13, -3), (23.5, -3
             (33, 3), (36.5, 4), (37, -5), (39.5, -5), (40, -2), (41, 4), (42, -6), (43, -20)]
 
 
-def bar_tick(bar: float) -> int:
-    """The tick at which a bar (from 1) starts, or part way into it."""
-    return round((bar - 1) * TICKS_PER_BAR)
+def bar_tick(bar: float, per_quarter: float = TICKS_PER_QUARTER) -> int:
+    """The tick at which a bar (from 1) starts, or part way into it (or the
+    step, with per_quarter steps a quarter)."""
+    return round((bar - 1) * 4 * per_quarter)
 
 
 def dynamics_db(tick: float) -> float:
@@ -145,8 +146,8 @@ def release_ticks(instrument_name: str, length: int) -> int:
     return -(-level // instrument.release)
 
 
-def file_notes(song: midi.Song) -> list[Placed]:
-    scale = TICKS_PER_QUARTER / song.division
+def file_notes(song: midi.Song, per_quarter: float = TICKS_PER_QUARTER) -> list[Placed]:
+    scale = per_quarter / song.division
     placed: list[Placed] = []
     for track in song.tracks:
         if track.name not in TRACKS:
@@ -181,31 +182,34 @@ def spread_strings(notes: list[Placed]) -> list[Placed]:
     return notes
 
 
-def roll(pitch: str, from_bar: float, to_bar: float, velocities: tuple[int, int]) -> list[Placed]:
+def roll(pitch: str, from_bar: float, to_bar: float, velocities: tuple[int, int],
+         per_quarter: float = TICKS_PER_QUARTER) -> list[Placed]:
     """A timpani roll: strokes every eighth of a beat, louder as it goes."""
-    start, end = bar_tick(from_bar), bar_tick(to_bar)
-    stroke = TICKS_PER_QUARTER / 8
+    start, end = bar_tick(from_bar, per_quarter), bar_tick(to_bar, per_quarter)
+    stroke = per_quarter / 8
     count = int((end - start) / stroke)
     return [Placed(round(start + i * stroke), round(start + (i + 1) * stroke), note_number(pitch), "Timpani",
                    round(velocities[0] + (velocities[1] - velocities[0]) * i / max(1, count - 1)))
             for i in range(count)]
 
 
-def ending(notes: list[Placed]) -> list[Placed]:
+def ending(notes: list[Placed], per_quarter: float = TICKS_PER_QUARTER) -> list[Placed]:
     """A last chord of D under the horns' and trumpets' D, held, after a
     timpani roll through the half bar before."""
-    last, held = bar_tick(40), bar_tick(41.75)
+    last, held = bar_tick(40, per_quarter), bar_tick(41.75, per_quarter)
     notes = [replace(n, end=held) if n.start >= last else n for n in notes]
     chord = [("Strings", p, 70) for p in ("D4", "F#4", "A4", "D5")] + \
             [("Cellos", p, 64) for p in ("D3", "A3")] + [("Bass", "D2", 70)]
     notes = spread_strings(notes + [Placed(last, held, note_number(p), track, v) for track, p, v in chord])
-    return notes + [Placed(last, last + 40, note_number("D2"), "Timpani", 90)] + roll("D2", 39.5, 40, (30, 80))
+    stroke = round(1.28 * per_quarter)
+    return notes + [Placed(last, last + stroke, note_number("D2"), "Timpani", 90)] + roll("D2", 39.5, 40, (30, 80),
+                                                                                        per_quarter)
 
 
-def decorations(notes: list[Placed]) -> list[Placed]:
+def decorations(notes: list[Placed], per_quarter: float = TICKS_PER_QUARTER) -> list[Placed]:
     """Each melody doubled, detuned; the strings' chords likewise; the
     melodies echoed on the other side, a dotted eighth later."""
-    echo_ticks = round(0.75 * TICKS_PER_QUARTER)
+    echo_ticks = round(0.75 * per_quarter)
     extra = []
     for note in notes:
         pan = note.pan if note.pan is not None else INSTRUMENTS[note.instrument].stereo
@@ -221,13 +225,14 @@ def decorations(notes: list[Placed]) -> list[Placed]:
     return extra
 
 
-def arranged(song: midi.Song) -> list[Placed]:
-    notes = file_notes(song)
+def arranged(song: midi.Song, per_quarter: float = TICKS_PER_QUARTER) -> list[Placed]:
+    """The notes, timed in ticks (or in steps, per_quarter a quarter)."""
+    notes = file_notes(song, per_quarter)
     notes = [replace(n, pitch=n.pitch + TRANSPOSE[n.track]) if n.track in TRANSPOSE else n for n in notes]
     notes = spread_strings(notes)
-    notes += roll("A1", 24.5, 25, (25, 70))
-    notes = ending(notes)
-    return notes + decorations(notes)
+    notes += roll("A1", 24.5, 25, (25, 70), per_quarter)
+    notes = ending(notes, per_quarter)
+    return notes + decorations(notes, per_quarter)
 
 
 @dataclass
@@ -336,6 +341,50 @@ def score(filepath: Path = MIDI_FILEPATH) -> tuple[Score, int, int]:
 
 
 SCORE, RELEASES_CUT, DECORATIONS_DROPPED = score()
+
+
+# For the sequencer (stratagem.sequencer): the same arrangement in steps,
+# a twentieth of a quarter, its dynamics the conductor's.
+
+STEPS_PER_QUARTER = 20
+TICKS_PER_STEP = TICKS_PER_QUARTER / STEPS_PER_QUARTER
+PHRASE_GAP = 4 * STEPS_PER_QUARTER      # a bar's rest ends a phrase
+DECORATION_GAP = STEPS_PER_QUARTER      # and a beat's, a decoration's
+QUIETER_QUANTUM = 4                     # amplitude steps
+
+
+def sequencer_notes(filepath: Path = MIDI_FILEPATH) -> list[sequencer.Note]:
+    notes = []
+    for placed in arranged(midi.read(filepath), STEPS_PER_QUARTER):
+        instrument, level_db, _, priority = TRACKS[placed.track]
+        db = level_db + placed.level_db + 20 * math.log10(placed.velocity / 127)
+        pan = placed.pan if placed.pan is not None else INSTRUMENTS[instrument].stereo
+        notes.append(sequencer.Note(placed.start, placed.end, placed.pitch, placed.track, instrument,
+                                    sequencer.quieter_for(db), pan, placed.detune, priority, placed.optional))
+    return notes
+
+
+def conductor_points() -> list[tuple[int, float]]:
+    """The dynamics, as (step, amplitude steps quieter): never louder than
+    full, with the headroom."""
+    return [(bar_tick(bar, STEPS_PER_QUARTER), -(db - HEADROOM_DB) / DB_PER_STEP) for bar, db in DYNAMICS]
+
+
+def sequencer_voices(filepath: Path = MIDI_FILEPATH) -> tuple[list[sequencer.Voice], int, int]:
+    """The notes on channels, the piece's length in steps, and how many
+    decorations found no channel. Levels are to the nearest 1.5dB (the
+    strings' slow swells, written note by note, otherwise change every
+    chord), and decorations are in phrases split at a beat's rest."""
+    notes = [replace(n, quieter=round(n.quieter / QUIETER_QUANTUM) * QUIETER_QUANTUM)
+             for n in sequencer_notes(filepath)]
+    voices, dropped = sequencer.allocate(notes, TICKS_PER_STEP, PHRASE_GAP, DECORATION_GAP)
+    return voices, max(n.end for n in notes) + round(TAIL_TICKS / TICKS_PER_STEP), dropped
+
+
+def sequencer_piece(filepath: Path = MIDI_FILEPATH) -> sequencer.Piece:
+    voices, end, _ = sequencer_voices(filepath)
+    return sequencer.encode([sequencer.voice_events(v, end) for v in voices],
+                            sequencer.conductor_events(conductor_points(), end), TICKS_PER_STEP)
 
 
 def main() -> None:
