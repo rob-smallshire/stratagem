@@ -16,11 +16,10 @@
 \ at &EE, written before it. music_tick leaves the register page selected;
 \ a caller at interrupt time puts back the page it found in &EE.
 \
-\ The includer declares zp_ptr and zp_score (two bytes each), and includes
-\ the pieces it plays (build/generated/m5_<name>.asm).
+\ The includer includes asm/os.asm (JIM_PAGE, JIM_COPY), declares zp_ptr
+\ and zp_score (two bytes each), and includes the pieces it plays
+\ (build/generated/m5_<name>.asm).
 
-JIM_PAGE = &FCFF                \ Write only: a read loads it from the bus
-JIM_COPY = &EE                  \ The OS's copy of it, written first
 JIM = &FD00
 FIRST_PAGE = &30                \ The board's RAM, in eight pages of two
 REGISTER_PAGE = &3E             \ The channel registers (normal bank)

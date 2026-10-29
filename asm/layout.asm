@@ -4,7 +4,8 @@ LOW_START    = &1900            \ Low RAM, always visible (OSHWM with DFS)
 LOW_END      = &3000
 USER_START   = &3000            \ User RAM: main game code and data
 USER_END     = &8000
-LOAD_BUFFER  = &3000            \ Where bank images are loaded before copying
+LOAD_BUFFER  = &3000            \ Where the title's picture is loaded before copying
+GAME_BUFFER  = &5200            \ Where RENDER and MAIN are loaded, clear of MUSIC
 SCREEN_START = &4000            \ 16K screen, shared addresses with user RAM
 SCREEN_END   = &8000
 

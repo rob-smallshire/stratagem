@@ -439,3 +439,12 @@ A running log of design decisions. Add to it whenever one is made.
   Python, encode the same way. The overture is 1.7K so, from 9.7K, and
   sounds the same; MUSIC is 5.4K, from 12.7K. A step lasts a tick at
   least, which keeps the player simple (`docs/music-5000.md`).
+- **After the title, a loading page in shadow MODE 7, with the keys:**
+  the world's keys, a bar a step a file, and the music playing on from the
+  vertical sync event while the game loads; then "Press SPACE to start",
+  so the keys can be read at leisure. MODE 7 for its text, which is
+  nearly free, rather than for memory: in a shadow mode all of user RAM is
+  free anyway. RENDER and MAIN load clear of MUSIC (`GAME_BUFFER`), and
+  MAIN is copied into place once the music stops. The event's handler is
+  in low RAM, and pages main RAM in around the tick: on the Integra-B the
+  VDU drivers' MEMSEL would otherwise show it the screen.

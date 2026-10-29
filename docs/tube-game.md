@@ -86,17 +86,26 @@ for the Music 5000, where the picture was in user RAM. Then it starts
 switching the Video ULA's flash bit every line, from a User VIA timer
 interrupt with the System VIA's interrupts off, and waits, reading the
 keyboard itself, for SPACE, ticking the music at each vertical sync (whose
-flag the System VIA still sets). Then it silences the board, gives the VIAs
-and IRQ1V back, selects the game's shadow MODE 2,
-and loads RENDER, MAIN, PWORLD, PLIGHT and PGAME, all through the OS, so
-any filing system will do. Last, it starts PGAME in the parasite itself,
-through the Tube host (`&0406`, type 4), as `*RUN` would.
+flag the System VIA still sets). Then it gives the VIAs and IRQ1V back and
+shows the loading page, a shadow MODE 7 with the keys and a bar, while the
+music plays on, ticked from the vertical sync event (`music_event`). It
+loads RENDER (copied to the render region), PWORLD, PLIGHT, PGAME and MAIN,
+all through the OS, so any filing system will do; RENDER and MAIN at
+`GAME_BUFFER` (`&5200`), clear of MUSIC. Then it waits for SPACE again,
+silences the board, copies MAIN over MUSIC to `&3000`, and selects the
+game's shadow MODE 2. Last, it starts PGAME in the parasite itself, through
+the Tube host (`&0406`, type 4), as `*RUN` would.
 
 Nothing loads beneath the picture: a filing system's interrupts spoil
-some of its lines (`docs/loading-screen.md`). A plainer loading screen,
-with nothing timed to the line, is to come. The music is the Stratagem
+some of its lines (`docs/loading-screen.md`). The music is the Stratagem
 Overture (`docs/music-5000.md`); on a machine without the board, its writes
-go nowhere, and MUSIC costs only its loading (5.4K).
+go nowhere, and MUSIC costs only its loading (6K, with the loading page).
+
+`music_event` is in STRAT, in low RAM, not with the player in user RAM: on
+the Integra-B the VDU drivers set MEMSEL while they write the shadow screen,
+and an interrupt then sees the screen at `&3000`-`&7FFF`, not user RAM. So
+the handler clears ROMSEL's bit 7 (MEMSEL; on the B+, ANDY) around the tick,
+and puts it back.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs

@@ -147,11 +147,14 @@ STRAT plays the overture under the title (`asm/host_music.asm`): MUSIC, the
 player and the score (5.4K: 1.1K of code, 2.2K of waves and tables, 0.6K
 of variables, the overture's 1.7K), is assembled with the host at `&3000` and
 loaded into user RAM once the picture is on the shadow screen, where the
-picture was; MAIN overwrites it later. The title's wait for SPACE ticks the
-music at each vertical sync, as M5TITLE does, and SPACE silences the board
-before the game loads. `tests/test_loader.py` checks, on a machine with
-the board, that it plays, that the flash bit is still switched in every
-line's blanking, and that the game is silent.
+picture was. The title's wait for SPACE ticks the music at each vertical
+sync, as M5TITLE does. After SPACE the music plays on under the loading
+page, from the vertical sync event (as M5LOAD), while the game loads and
+until SPACE is pressed again; then STRAT silences the board and copies
+MAIN over it. `tests/test_loader.py` checks, on a machine with the board,
+that it plays under the title, that the flash bit is still switched in
+every line's blanking, that it plays on while the game loads and after,
+and that the game is silent.
 
 ## Under the title screen: M5TITLE
 

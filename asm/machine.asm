@@ -6,7 +6,9 @@ MACHINE_B_PLUS    = 2
 MACHINE_MASTER    = 3
 BOOT_READY = &FF                \ zp_boot_status once a program is ready (the
                                 \ tests wait for it)
-BOOT_TITLE = &01                \ STRAT's, while it shows the title screen
+BOOT_TITLE = &01                \ STRAT's, while it shows the title screen...
+BOOT_LOADING = &02              \ ... while it loads the game...
+BOOT_LOADED = &03               \ ... and once loaded, waiting for SPACE
 
 \ Set zp_machine by looking for IBOS, then from the MOS version. IBOS must
 \ be checked first: it makes OSBYTE &00 report 2, as on a B+.

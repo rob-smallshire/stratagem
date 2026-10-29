@@ -9,9 +9,6 @@ INCLUDE "asm/os.asm"
 
 BOOT_READY = &FF                \ As asm/machine.asm
 
-EVNTV = &0220
-EVENT_VSYNC = 4
-
 ORG &70
 .zp_boot_status     SKIP 1      \ Zero while starting, BOOT_READY when playing
 .zp_ptr             SKIP 2

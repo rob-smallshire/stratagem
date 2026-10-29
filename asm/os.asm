@@ -11,9 +11,13 @@ OSCLI  = &FFF7
 \ MOS workspace
 ROMSEL_COPY = &F4               \ RAM copy of the paged ROM select register
 ROM_TYPE_TABLE = &02A1          \ One byte per sideways slot; zero if empty
+EVNTV = &0220                   \ The event vector
+EVENT_VSYNC = 4
 
 \ Hardware
 ROMSEL = &FE30                  \ Paged ROM select (write only)
+JIM_PAGE = &FCFF                \ JIM's page register: write only, a read loads it
+JIM_COPY = &EE                  \ The OS's copy of it, written first
 ACCCON = &FE34                  \ B+ ACCCON / Integra-B RAMSEL / Master ACCCON
 
 \ OSBYTE &00 identifies the MOS version in X

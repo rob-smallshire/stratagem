@@ -38,6 +38,14 @@ INCLUDE "asm/host_music.asm"
 INCLUDE "asm/render.asm"
 INCLUDE "asm/render_light.asm"
 .host_render_end
+
+\ RENDER and MAIN are loaded at GAME_BUFFER (STRAT's loader), MAIN then
+\ copied to its place.
+RENDER_PAGES = (host_render_end - render_start + 255) DIV 256
+MAIN_PAGES = (host_main_end - host_main_start + 255) DIV 256
+ASSERT GAME_BUFFER + RENDER_PAGES * 256 <= USER_END
+ASSERT GAME_BUFFER + MAIN_PAGES * 256 <= USER_END
+ASSERT USER_START + MAIN_PAGES * 256 <= GAME_BUFFER
 SAVE "RENDER", render_start, host_render_end
 PUTFILE "build/generated/loading_screen.bin", "LSCREEN", &3000
 

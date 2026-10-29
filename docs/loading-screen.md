@@ -124,18 +124,20 @@ The picture is good in its own right, so it is now a **title screen**,
 shown with nothing loading beneath it, where the switching is exact
 (LOADSCR's test sees every switch in the blanking, every line, on both
 machines), and with its full 320 pixels back. STRAT shows it until SPACE
-is pressed, then loads the game under a black MODE 2 screen. Music (the
-Music 5000, which Beebium emulates) may come with it later. After the
-title, a separate, plainer **loading screen** is to come: a MODE 2 title
-and a progress bar, say, with nothing timed to the line, so the filing
-system can do as it likes.
+is pressed, with the Stratagem Overture on the Music 5000
+(`docs/music-5000.md`). Then comes a plainer **loading page**, a shadow
+MODE 7 with nothing timed to the line, so the filing system can do as it
+likes: the keys in the world, a bar that grows a step a file, and the
+music playing on; once the game is loaded, "Press SPACE to start"
+(`asm/host_music.asm`).
 
 - With the System VIA's interrupts off, the OS doesn't scan the keyboard,
   so `wait_for_space` (`asm/host_low.asm`) reads it itself, as the game
   does. The line's interrupt doesn't touch the System VIA, so it needn't
   hold interrupts off to do so.
 - The tests boot the game through STRAT, so `boot_game` in
-  `tests/conftest.py` presses SPACE at the title.
+  `tests/conftest.py` presses SPACE at the title, and again on the loading
+  page once the game has loaded.
 - Ideas not pursued for a loading picture, should one come back: load the
   host's files first, before the picture shows; compress them, so less
   time is spent in host loads; a steady-colour margin in the dither; art

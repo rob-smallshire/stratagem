@@ -258,40 +258,64 @@ ENDMACRO
     STA zp_boot_status
     JSR wait_for_space
 
-    \ The game's screen, a shadow MODE 2 with interlace as it was, black
-    \ while the game loads.
+    \ The loading page, a shadow MODE 7 with the keys, and the music on,
+    \ ticked from the vertical sync event, while the game loads beneath it
+    \ and until SPACE is pressed again. RENDER and MAIN are loaded clear of
+    \ MUSIC, and MAIN copied into place once the music has stopped.
     JSR loading_screen_off
     LDA #144
     LDX old_tv
     LDY old_tv + 1
     JSR OSBYTE
-    LDX #vdu_setup - vdu_strings
-    LDY #vdu_setup_end - vdu_strings
-    JSR vdu_string
+    JSR show_loading
+    JSR music_event_on
+    LDA #BOOT_LOADING
+    STA zp_boot_status
 
     LDX #LO(file_render)
     LDY #HI(file_render)
-    JSR load_file
+    JSR load_game_file
     LDA zp_romsel_compose
-    LDX #HI(RENDER_REGION_END - RENDER_START)
-    LDY #HI(LOAD_BUFFER)
+    LDX #RENDER_PAGES
+    LDY #HI(GAME_BUFFER)
     JSR copy_to_paged
+    JSR show_progress
+
+    LDX #LO(command_world)      \ The parasite's files, into the parasite
+    LDY #HI(command_world)
+    JSR OSCLI
+    JSR show_progress
+    LDX #LO(command_light)
+    LDY #HI(command_light)
+    JSR OSCLI
+    JSR show_progress
+    LDX #LO(command_game)
+    LDY #HI(command_game)
+    JSR OSCLI
+    JSR show_progress
 
     LDA zp_romsel_game          \ The host's game code, in program RAM
     SELECT_ROMSEL
     LDX #LO(file_main)
     LDY #HI(file_main)
-    JSR load_file
+    JSR load_game_file
+    JSR show_progress
+    JSR show_loaded
+    LDA #BOOT_LOADED
+    STA zp_boot_status
+    JSR wait_to_start
 
-    LDX #LO(command_world)      \ The parasite's files, into the parasite
-    LDY #HI(command_world)
-    JSR OSCLI
-    LDX #LO(command_light)
-    LDY #HI(command_light)
-    JSR OSCLI
-    LDX #LO(command_game)
-    LDY #HI(command_game)
-    JSR OSCLI
+    JSR music_event_off
+    JSR music_silence
+    LDA #HI(USER_START)         \ MAIN into place, over MUSIC
+    STA copy_target + 2
+    LDA zp_romsel_game
+    LDX #MAIN_PAGES
+    LDY #HI(GAME_BUFFER)
+    JSR copy_pages
+    LDX #vdu_setup - vdu_strings    \ The game's screen, a shadow MODE 2
+    LDY #vdu_setup_end - vdu_strings
+    JSR vdu_string
 
     JSR host_init
 
@@ -424,7 +448,7 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
 
 \ Play the music until SPACE is pressed, reading the keyboard itself: the
 \ OS doesn't, with the System VIA's interrupts off. The music ticks at each
-\ vertical sync, whose flag the System VIA still sets. Then silence it.
+\ vertical sync, whose flag the System VIA still sets.
 .wait_for_space
 {
     LDA #3                      \ Stop its scanning
@@ -444,7 +468,7 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     BPL wait
     LDA #&0B                    \ Let it scan again
     STA SYSTEM_VIA_B
-    JMP music_silence
+    RTS
 }
 
 \ Copy X pages from (zp_temp) to (zp_ptr). Copied to RENDER_CODE and run
@@ -465,30 +489,39 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
 }
 .screen_copier_end
 
-\ Load the file named at YX to LOAD_BUFFER in the host. OSFILE writes the
-\ file's catalogue information back into its control block, so the block is
-\ set up afresh each time.
+\ Load the file named at YX to LOAD_BUFFER (load_file) or GAME_BUFFER
+\ (load_game_file) in the host. OSFILE writes the file's catalogue
+\ information back into its control block, so the block is set up afresh
+\ each time.
+.load_game_file
+    LDA #HI(GAME_BUFFER)
+    BNE load_file_at
 .load_file
+    LDA #HI(LOAD_BUFFER)
+.load_file_at
 {
     STX osfile_block
     STY osfile_block + 1
-    LDA #LO(LOAD_BUFFER)
-    STA osfile_block + 2
-    LDA #HI(LOAD_BUFFER)
     STA osfile_block + 3
+    LDA #0
+    STA osfile_block + 2
+    STA osfile_block + 6        \ Load to the address given, not the file's
     LDA #&FF                    \ In the I/O processor
     STA osfile_block + 4
     STA osfile_block + 5
-    LDA #0                      \ Load to the address given, not the file's
-    STA osfile_block + 6
-    LDA #&FF
     LDX #LO(osfile_block)
     LDY #HI(osfile_block)
     JMP OSFILE
 }
 
-\ Copy X pages from page Y to &8000 with ROMSEL value A paged in.
+\ Copy X pages from page Y to &8000 (copy_to_paged), or to the page at
+\ copy_target + 2 (copy_pages), with ROMSEL value A paged in.
 .copy_to_paged
+    PHA
+    LDA #HI(BANK_START)
+    STA copy_target + 2
+    PLA
+.copy_pages
 {
     STY source + 2
     PHA
@@ -496,18 +529,16 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     STA saved_romsel
     PLA
     SELECT_ROMSEL
-    LDA #HI(BANK_START)
-    STA target + 2
     LDY #0
 .loop
 .source
     LDA &FF00,Y
-.target
+.*copy_target
     STA &FF00,Y
     INY
     BNE loop
     INC source + 2
-    INC target + 2
+    INC copy_target + 2
     DEX
     BNE loop
     LDA saved_romsel
@@ -545,6 +576,52 @@ ASSERT vdu_setup_end - vdu_strings < 256
 .command_light  EQUS "LOAD PLIGHT", 13
 .command_game   EQUS "LOAD PGAME", 13
 .pgame_address  EQUD PGAME_START
+
+\ The vertical sync event, while the game loads: a tick of the music
+\ (MUSIC), with the zero page it shares with the loader kept, JIM's page
+\ put back, and main RAM paged in for it (the Integra-B's MEMSEL, which
+\ the VDU drivers set while they write the shadow screen, or the B+'s ANDY,
+\ cleared). Here, outside user RAM, so that it runs whatever is paged in.
+.music_event
+{
+    CMP #EVENT_VSYNC
+    BNE not_ours
+    PHA
+    TXA
+    PHA
+    TYA
+    PHA
+    LDA zp_ptr
+    PHA
+    LDA zp_ptr + 1
+    PHA
+    LDA JIM_COPY
+    PHA
+    LDA ROMSEL_COPY
+    PHA
+    AND #&7F
+    SELECT_ROMSEL
+    JSR music_tick
+    PLA
+    SELECT_ROMSEL
+    PLA
+    STA JIM_COPY
+    STA JIM_PAGE
+    PLA
+    STA zp_ptr + 1
+    PLA
+    STA zp_ptr
+    PLA
+    TAY
+    PLA
+    TAX
+    PLA
+.not_ours
+    JMP (music_old_evntv)
+}
+
+.music_old_evntv    EQUW 0
+ASSERT LO(music_old_evntv) <> &FF     \ JMP (indirect) on the NMOS 6502
 
 .message_tube       EQUS "Stratagem needs a 6502 second processor", 13, 0
 .message_machine    EQUS "Stratagem needs a BBC B+ 128K or an Integra-B", 13, 0

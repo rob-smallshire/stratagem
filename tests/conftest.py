@@ -18,7 +18,9 @@ from beebium.client.exceptions import ServerNotFoundError
 from stratagem.build import BuildResult, build
 
 BOOT_READY = 0xFF   # asm/machine.asm; `=` constants are not exported as labels
-BOOT_TITLE = 0x01   # STRAT's, while it shows the title screen
+BOOT_TITLE = 0x01   # STRAT's, while it shows the title screen...
+BOOT_LOADING = 0x02     # ... while it loads the game...
+BOOT_LOADED = 0x03      # ... and once loaded, waiting for SPACE
 BOOT_TIMEOUT_EMULATED_SECONDS = 20.0
 SETTLE_EMULATED_SECONDS = 0.06     # three fields, so the screen has been scanned out
 
@@ -272,10 +274,21 @@ def press_space(bbc: Beebium) -> None:
     bbc.keyboard.key_up(" ")
 
 
+def load_game(bbc: Beebium, game_build: BuildResult) -> None:
+    """From the title, press SPACE, and run until the game has loaded and
+    the loading page waits for SPACE."""
+    status_address = game_build.labels["HOST"]["zp_boot_status"]
+    press_space(bbc)
+    loaded = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[status_address] == BOOT_LOADED,
+                                      RUN_TIMEOUT_EMULATED_SECONDS)
+    assert loaded, "the game didn't load"
+
+
 def boot_game(bbc: Beebium, game_build: BuildResult) -> None:
-    """Boot the game disc, press SPACE at the title, and run until the game
-    has drawn two frames."""
+    """Boot the game disc, press SPACE at the title and again once it has
+    loaded, and run until the game has drawn two frames."""
     boot_to_title(bbc, game_build)
+    load_game(bbc, game_build)
     press_space(bbc)
     frame_count_address = game_build.labels["HOST"]["host_frame_count"]
     started = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[frame_count_address] >= 2,
