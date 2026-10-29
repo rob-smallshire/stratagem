@@ -138,6 +138,9 @@ above -20dBFS; a concert hall's reverb, 2.2s, a quarter of the mix; a
 little stereo width. It writes `build/features/overture-processed.wav`
 from the recording.
 
+`docs/auditorium.md` proposes the same chain for Beebium, in real time, on
+the emulator's whole mix.
+
 ## In STRAT's title
 
 STRAT plays the overture under the title (`asm/host_music.asm`): MUSIC, the
