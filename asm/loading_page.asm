@@ -40,6 +40,7 @@ ENDMACRO
 INCLUDE "build/generated/loading_page.asm"
 
 .loading_variables
+.loading_shown      SKIP 1      \ Non-zero once the page is drawn
 .print_end          SKIP 2
 .file_length_low    SKIP LOADING_FILES
 .file_length_high   SKIP LOADING_FILES
@@ -82,8 +83,13 @@ INCLUDE "build/generated/loading_page.asm"
     RTS
 }
 
-\ Draw the page, and measure the files for the pool.
-.show_loading
+\ Ready the page: its state cleared, MUSIC in main RAM, and the screen
+\ MODE 7, blank. The music ticks meanwhile, from the event: on the
+\ Integra-B, all of MUSIC is copied as it plays, then the pages of the
+\ player's state again, between two ticks, and from then the event's
+\ ticks are of main RAM (music_bits: MEMSEL), until MODE 7 makes it user
+\ RAM.
+.prepare_loading
 {
     LDA #0
     LDX #loading_variables_end - loading_variables - 1
@@ -95,17 +101,16 @@ INCLUDE "build/generated/loading_page.asm"
     CMP #MACHINE_INTEGRA_B
     BNE mode
     JSR palette_black           \ MUSIC (this) to main RAM, from the shadow,
-    LDA host_store_banks        \ through a bank of the store
-    LDX #MUSIC_PAGES
+    LDX #MUSIC_PAGES            \ through a bank of the store
     LDY #HI(music_start)
-    JSR copy_to_paged
-    LDA #HI(music_start)
-    STA copy_target + 2
-    LDA host_store_banks
-    ORA #&80                    \ MEMSEL
-    LDX #MUSIC_PAGES
-    LDY #HI(BANK_START)
-    JSR copy_pages
+    JSR copy_music
+    SEI
+    LDX #HI(music_state_end - 1) - HI(music_state) + 1
+    LDY #HI(music_state)
+    JSR copy_music
+    LDA #&80
+    STA music_bits
+    CLI
 .mode
     LDA #22
     JSR OSWRCH
@@ -117,11 +122,38 @@ INCLUDE "build/generated/loading_page.asm"
     JSR OSWRCH
     DEX
     BPL cursor_loop
-    WRITE_RANGE loading_page_vdu, loading_page_vdu_end
-    JMP measure_files
+    RTS
 .cursor_off
     EQUB 0, 0, 0, 0, 0, 0, 0, 0, 1, 23     \ VDU 23, 1, 0;0;0;0; backwards
 }
+
+\ Copy X pages of MUSIC from page Y in user RAM (the shadow) to main RAM,
+\ through a bank of the store, on the Integra-B.
+.copy_music
+{
+    STX pages
+    STY page
+    LDA host_store_banks
+    JSR copy_to_paged
+    LDA page
+    STA copy_target + 2
+    LDA host_store_banks
+    ORA #&80                    \ MEMSEL: main RAM
+    LDX pages
+    LDY #HI(BANK_START)
+    JMP copy_pages
+.pages
+    SKIP 1
+.page
+    SKIP 1
+}
+
+\ Draw the page, start its animation, and measure the files for the pool,
+\ the music ticking meanwhile (the filing system may spin a disc up).
+.show_loading
+    WRITE_RANGE loading_page_vdu, loading_page_vdu_end
+    DEC loading_shown
+    JMP measure_files
 
 \ The status line, once the game is loaded; and the pool may fill.
 .show_loaded
@@ -212,6 +244,10 @@ INCLUDE "build/generated/loading_page.asm"
 \ A frame of the page, from music_event: main RAM paged in, zp_ptr free.
 .animate
 {
+    LDA loading_shown
+    BNE shown
+    RTS
+.shown
     CLC                         \ The estimate, on by LOAD_RATE, to the cap
     LDA load_estimate
     ADC #LO(LOAD_RATE)

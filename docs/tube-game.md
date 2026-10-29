@@ -112,8 +112,16 @@ the Integra-B, whose user RAM in a shadow mode is the shadow, where MUSIC
 was loaded under the title: STRAT copies it to main RAM, through a bank of
 the store, with the palette black, before MODE 7; and since its shadow
 MODE 2 clears main RAM, MAIN waits in the bank. `music_event` is in STRAT,
-in low RAM, and clears ROMSEL's bit 7 around its work, whatever the loader
-had paged in.
+in low RAM, and sets ROMSEL's bit 7 for its work as `music_bits` says,
+whatever the loader had paged in.
+
+The music never stops between the title and the game. The event is on
+from SPACE at the title, before the page is drawn and the files measured
+(OSFILE 5 may spin a disc up: it stopped the music for a second and a
+half). The Integra-B copies MUSIC as it plays, then the pages of the
+player's state again between two ticks, and from then ticks main RAM's
+copy, with MEMSEL, until MODE 7 makes it user RAM. `tests/test_loader.py`
+checks, with the disc's spin-up on, that no tick is late by a frame.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs

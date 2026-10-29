@@ -120,3 +120,29 @@ def load_game_wait(bbc, labels) -> None:
     loaded = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[labels["zp_boot_status"]] == BOOT_LOADED,
                                       RUN_TIMEOUT_EMULATED_SECONDS)
     assert loaded, "the game didn't load"
+
+
+CYCLES_PER_FRAME = 40000
+
+
+def test_the_music_plays_on_through_space_at_the_title(tube_music_bbc, tube_machine, game_build):
+    """No gap in the music's ticks when SPACE leaves the title, with the
+    disc spinning up as a real one does: the loading page measures its
+    files with the music already ticking from the vertical sync event, and
+    on the Integra-B copies MUSIC to main RAM as it plays."""
+    from conftest import boot_to_title
+    bbc = tube_music_bbc
+    labels = game_build.labels["HOST"]
+    boot_to_title(bbc, game_build)
+    bbc.disc.set_spin_up_delay(True)
+    bbc.run_for_emulated_seconds(TITLE_EMULATED_SECONDS)
+    ticks = []
+    for index in range(150):            # three seconds
+        bbc.debugger.run_to(labels["music_tick"], skip_current=True)
+        ticks.append(bbc.debugger.cycle_count)
+        if index == 5:
+            bbc.keyboard.key_down(" ")
+        elif index == 10:
+            bbc.keyboard.key_up(" ")
+    gap = max(b - a for a, b in zip(ticks, ticks[1:])) / CYCLES_PER_FRAME
+    assert gap < 2, f"the music stopped for {gap:.1f} frames"

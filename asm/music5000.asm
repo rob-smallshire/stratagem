@@ -669,6 +669,8 @@ INCLUDE "build/generated/music5000.asm"
 .piece_tempo        SKIP 2      \ Steps a tick, in 65536ths
 .piece_slots        SKIP SLOTS  \ Its notes' commonest lengths, in steps
 .piece_table_end
+
+.music_state                    \ What a tick changes
 \ The clock and the conductor
 .music_clock        SKIP 2      \ The fraction of a step
 .music_stepped      SKIP 1      \ 1 if this tick is a step
@@ -707,3 +709,4 @@ INCLUDE "build/generated/music5000.asm"
 .music_argument     SKIP 1
 .music_slot         SKIP 1
 .music_unit         SKIP 3
+.music_state_end

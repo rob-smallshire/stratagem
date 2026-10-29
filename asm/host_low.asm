@@ -268,8 +268,9 @@ ENDMACRO
     LDX old_tv
     LDY old_tv + 1
     JSR OSBYTE
-    JSR show_loading
     JSR music_event_on
+    JSR prepare_loading
+    JSR show_loading
     LDA #BOOT_LOADING
     STA zp_boot_status
 
@@ -584,8 +585,8 @@ ASSERT vdu_setup_end - vdu_strings < 256
 
 \ The vertical sync event, while the game loads: a tick of the music and a
 \ frame of the loading page (MUSIC), with the zero page they share with the
-\ loader kept, JIM's page put back, and ROMSEL's bit 7 clear for them,
-\ whatever the loader has paged in. Here, outside user RAM, so that it
+\ loader kept, JIM's page put back, and ROMSEL's bit 7 as music_bits for
+\ them, whatever the loader has paged in. Here, outside user RAM, so that it
 \ runs whatever is paged in.
 .music_event
 {
@@ -605,6 +606,7 @@ ASSERT vdu_setup_end - vdu_strings < 256
     LDA ROMSEL_COPY
     PHA
     AND #&7F
+    ORA music_bits
     SELECT_ROMSEL
     JSR music_tick
     JSR animate
@@ -627,6 +629,8 @@ ASSERT vdu_setup_end - vdu_strings < 256
 }
 
 .music_old_evntv    EQUW 0
+.music_bits         EQUB 0      \ ROMSEL's bit 7 for the tick: MEMSEL, while
+                                \ the Integra-B's MUSIC is in main RAM, shadowed
 
 \ Every logical colour black.
 .palette_black
