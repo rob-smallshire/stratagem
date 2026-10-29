@@ -5,7 +5,8 @@ LOW_END      = &3000
 USER_START   = &3000            \ User RAM: main game code and data
 USER_END     = &8000
 LOAD_BUFFER  = &3000            \ Where the title's picture is loaded before copying
-GAME_BUFFER  = &5200            \ Where RENDER and MAIN are loaded, clear of MUSIC
+GAME_BUFFER  = &4E00            \ Where RENDER and MAIN are loaded, clear of MUSIC
+TELETEXT_SCREEN = &7C00         \ The loading page's (MODE 7 on the B+, in main RAM)
 SCREEN_START = &4000            \ 16K screen, shared addresses with user RAM
 SCREEN_END   = &8000
 

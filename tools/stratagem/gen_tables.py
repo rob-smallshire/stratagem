@@ -16,14 +16,15 @@ Writes into build/generated/:
   drops;
 - inventory.asm: the kinds carried, and what each material yields and
   each kind places;
-- pack.asm: the pack screen's constants, and its icons, digits and marks.
+- pack.asm: the pack screen's constants, and its icons, digits and marks;
+- loading_page.asm: the loading page, and the tables that animate it.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from stratagem import actions, loading_screen, sequencer, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
+from stratagem import actions, loading_page, loading_screen, sequencer, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
 
 
 def _bytes_lines(data: bytes | list[int], per_line: int = 16) -> list[str]:
@@ -675,6 +676,7 @@ def generate_all(generated_dirpath: Path) -> None:
     (generated_dirpath / "inventory.asm").write_text(inventory_source())
     (generated_dirpath / "pack.asm").write_text(pack_source())
     (generated_dirpath / "crafting.asm").write_text(crafting_source())
+    (generated_dirpath / "loading_page.asm").write_text(loading_page.source())
     (generated_dirpath / "smooth_flood.asm").write_text(smooth_flood_source())
     loading_screen.generate(generated_dirpath)
     sequencer.generate(generated_dirpath)

@@ -439,7 +439,7 @@ A running log of design decisions. Add to it whenever one is made.
   Python, encode the same way. The overture is 1.7K so, from 9.7K, and
   sounds the same; MUSIC is 5.4K, from 12.7K. A step lasts a tick at
   least, which keeps the player simple (`docs/music-5000.md`).
-- **After the title, a loading page in shadow MODE 7, with the keys:**
+- **After the title, a loading page in MODE 7, with the keys:**
   the world's keys, a bar a step a file, and the music playing on from the
   vertical sync event while the game loads; then "Press SPACE to start",
   so the keys can be read at leisure. MODE 7 for its text, which is
@@ -448,3 +448,11 @@ A running log of design decisions. Add to it whenever one is made.
   MAIN is copied into place once the music stops. The event's handler is
   in low RAM, and pages main RAM in around the tick: on the Integra-B the
   VDU drivers' MEMSEL would otherwise show it the screen.
+- **The loading page is a teletext cave, and its progress bar a pool**
+  that drips from a stalactite fill, a sixel each, following an estimate
+  of the bytes loaded; the title in mosaic letters banded in strata, as on
+  the cover. It is MODE 7, not shadowed, on both machines, so the
+  interrupt can write its screen directly: on the Integra-B, writing a
+  shadow screen with MEMSEL let a filing system's NMI load into the screen
+  instead of user RAM. So the Integra-B copies MUSIC to main RAM first, and
+  MAIN waits in a store bank until the game's shadow MODE 2 is on.

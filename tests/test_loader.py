@@ -7,14 +7,14 @@ import numpy as np
 
 from conftest import BOOT_LOADED, BOOT_TITLE, RUN_TIMEOUT_EMULATED_SECONDS, load_game, press_space
 from stratagem.build import GENERATED_DIRPATH
+from stratagem import loading_page
 from stratagem.loading_screen import LOADING_SCHEME, SCREEN_SIZE, SCREEN_START, palette_writes
 
 IRQ1V = 0x0204
 SYSTEM_VIA_IER = 0xFE4E
 USER_VIA_IER = 0xFE6E
 TITLE_EMULATED_SECONDS = 1.0
-TELETEXT_START = 0x7C00
-TELETEXT_COLUMNS = 40
+POOL_FILL_EMULATED_SECONDS = 10.0
 AUDIO_SECONDS_BUFFERED = 1      # a capture may start with up to a second from before
 
 
@@ -40,11 +40,19 @@ def test_loader_shows_the_title_screen_until_space_then_starts_the_game(tube_bbc
     palette = bbc.video_ula.palette
     assert [palette[index] for index in range(16)] == [p & 15 ^ 7 for p in palette_writes(LOADING_SCHEME)]
 
-    # The loading page, the keys on it, until SPACE again.
+    # The loading page, until SPACE again: as the model has it, once the
+    # pool has filled, the drips apart.
     load_game(bbc, game_build)
-    assert "STRATAGEM" in teletext_row(bbc, tube_machine, 1)
-    assert "jump" in teletext_row(bbc, tube_machine, 6)
-    assert "Press SPACE to start" in teletext_row(bbc, tube_machine, 20)
+    filled = bbc.run_until_or_timeout(lambda: peek[labels["pool_filled"]] == loading_page.POOL_SIXELS,
+                                      POOL_FILL_EMULATED_SECONDS)
+    assert filled, "the pool didn't fill"
+    shown = loading_page_shown(bbc)
+    wanted = loaded_page()
+    drips = {(row, loading_page.DRIP_X // 2) for row in loading_page.DRIP_ROWS}
+    for row in range(loading_page.ROWS):
+        for column in range(loading_page.COLUMNS):
+            if (row, column) not in drips:
+                assert shown[row][column] == wanted[row][column], f"row {row} column {column}"
     bbc.run_for_emulated_seconds(TITLE_EMULATED_SECONDS)
     assert peek[labels["zp_boot_status"]] == BOOT_LOADED, "it didn't wait for SPACE"
     press_space(bbc)
@@ -55,10 +63,23 @@ def test_loader_shows_the_title_screen_until_space_then_starts_the_game(tube_bbc
     assert started, "the game did not start"
 
 
-def teletext_row(bbc, machine, row: int) -> str:
-    screen = bbc.memory.region(machine.screen_region).peek
-    start = TELETEXT_START + row * TELETEXT_COLUMNS
-    return "".join(chr(b) if 32 <= b < 127 else " " for b in screen[start:start + TELETEXT_COLUMNS])
+def loading_page_shown(bbc) -> list[bytes]:
+    """The MODE 7 screen, in main RAM on both machines (MODE 7 on the B+,
+    shadow MODE 7 on the Integra-B, whose video reads main RAM)."""
+    screen = bbc.memory.region("main_ram").peek
+    columns = loading_page.COLUMNS
+    start = loading_page.SCREEN_START
+    return [bytes(screen[start + row * columns:start + (row + 1) * columns]) for row in range(loading_page.ROWS)]
+
+
+def loaded_page() -> list[bytearray]:
+    """The page once loaded: the status line changed, the pool full."""
+    rows = loading_page.page()
+    rows[loading_page.STATUS_ROW][loading_page.STATUS_COLUMN:] = loading_page.status_line(loading_page.STATUS_LOADED)
+    for address, value in loading_page.pool_steps():
+        offset = address - loading_page.SCREEN_START
+        rows[offset // loading_page.COLUMNS][offset % loading_page.COLUMNS] = value
+    return rows
 
 
 def test_the_overture_plays_under_the_title_and_the_loading_then_stops(tube_music_bbc, tube_machine, game_build):

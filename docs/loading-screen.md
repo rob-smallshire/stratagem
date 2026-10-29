@@ -125,11 +125,30 @@ shown with nothing loading beneath it, where the switching is exact
 (LOADSCR's test sees every switch in the blanking, every line, on both
 machines), and with its full 320 pixels back. STRAT shows it until SPACE
 is pressed, with the Stratagem Overture on the Music 5000
-(`docs/music-5000.md`). Then comes a plainer **loading page**, a shadow
-MODE 7 with nothing timed to the line, so the filing system can do as it
-likes: the keys in the world, a bar that grows a step a file, and the
-music playing on; once the game is loaded, "Press SPACE to start"
-(`asm/host_music.asm`).
+(`docs/music-5000.md`). Then comes a plainer **loading page**, in MODE 7
+teletext, with nothing timed to the line, so the filing system can do as
+it likes (`tools/stratagem/loading_page.py`, `asm/loading_page.asm`):
+
+- **The title** in mosaic graphics, as the cover has it: chunky letters in
+  strata, yellow at the top, red, and a dark (magenta) band beneath.
+  Teletext changes colour only at a control cell, so the strata are rows,
+  and with one colour a row there is no cell lost between the letters.
+- **A cave:** a yellow ceiling, with small stalactites and one large one
+  over the left, and the keys to its right, in cyan and white.
+- **The progress bar is a pool,** in the floor beneath the stalactite.
+  Drips form at its tip, fall (accelerating, with a streak when fast) and
+  fill the pool a sixel each: 48 of them. The pool follows an estimate of
+  the bytes loaded, from the files' lengths (OSFILE 5, so any filing
+  system): 140 bytes a frame, never past the end of the file loading, and
+  caught up as each file is done. Once the game is loaded, "PRESS SPACE TO
+  START", and a drip now and then.
+- **Hold graphics** on the floor's rows, so the colour changes either side
+  of the pool show the floor and the water, not black cells.
+- The animation runs from the vertical sync event, with the music, and
+  writes the screen directly; the page is MODE 7, not shadowed, for that
+  (`docs/tube-game.md` has why, and what it costs the Integra-B).
+- `tests/test_loader.py` compares the page, once the pool is full, with the
+  model's, byte for byte, the drips apart, on both machines.
 
 - With the System VIA's interrupts off, the OS doesn't scan the keyboard,
   so `wait_for_space` (`asm/host_low.asm`) reads it itself, as the game

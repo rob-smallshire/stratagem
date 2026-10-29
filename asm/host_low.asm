@@ -258,10 +258,11 @@ ENDMACRO
     STA zp_boot_status
     JSR wait_for_space
 
-    \ The loading page, a shadow MODE 7 with the keys, and the music on,
+    \ The loading page, a MODE 7 with the keys, and the music on,
     \ ticked from the vertical sync event, while the game loads beneath it
     \ and until SPACE is pressed again. RENDER and MAIN are loaded clear of
-    \ MUSIC, and MAIN copied into place once the music has stopped.
+    \ MUSIC, and MAIN copied into place, from a bank, once the music has
+    \ stopped and the game's screen is selected (asm/loading_page.asm).
     JSR loading_screen_off
     LDA #144
     LDX old_tv
@@ -272,6 +273,8 @@ ENDMACRO
     LDA #BOOT_LOADING
     STA zp_boot_status
 
+    LDX #0                      \ (Each file's number, as loading_names has it)
+    JSR file_starting
     LDX #LO(file_render)
     LDY #HI(file_render)
     JSR load_game_file
@@ -279,27 +282,39 @@ ENDMACRO
     LDX #RENDER_PAGES
     LDY #HI(GAME_BUFFER)
     JSR copy_to_paged
-    JSR show_progress
+    JSR file_loaded
 
-    LDX #LO(command_world)      \ The parasite's files, into the parasite
+    LDX #1                      \ The parasite's files, into the parasite
+    JSR file_starting
+    LDX #LO(command_world)
     LDY #HI(command_world)
     JSR OSCLI
-    JSR show_progress
+    JSR file_loaded
+    LDX #2
+    JSR file_starting
     LDX #LO(command_light)
     LDY #HI(command_light)
     JSR OSCLI
-    JSR show_progress
+    JSR file_loaded
+    LDX #3
+    JSR file_starting
     LDX #LO(command_game)
     LDY #HI(command_game)
     JSR OSCLI
-    JSR show_progress
+    JSR file_loaded
 
     LDA zp_romsel_game          \ The host's game code, in program RAM
     SELECT_ROMSEL
+    LDX #4
+    JSR file_starting
     LDX #LO(file_main)
     LDY #HI(file_main)
     JSR load_game_file
-    JSR show_progress
+    LDA host_store_banks        \ Kept in the store's bank, empty until the
+    LDX #MAIN_PAGES             \ game starts: the Integra-B's shadow MODE 2
+    LDY #HI(GAME_BUFFER)        \ clears main RAM
+    JSR copy_to_paged
+    JSR file_loaded
     JSR show_loaded
     LDA #BOOT_LOADED
     STA zp_boot_status
@@ -307,15 +322,15 @@ ENDMACRO
 
     JSR music_event_off
     JSR music_silence
-    LDA #HI(USER_START)         \ MAIN into place, over MUSIC
-    STA copy_target + 2
-    LDA zp_romsel_game
-    LDX #MAIN_PAGES
-    LDY #HI(GAME_BUFFER)
-    JSR copy_pages
     LDX #vdu_setup - vdu_strings    \ The game's screen, a shadow MODE 2
     LDY #vdu_setup_end - vdu_strings
     JSR vdu_string
+    LDA #HI(USER_START)         \ MAIN into place, over MUSIC
+    STA copy_target + 2
+    LDA host_store_banks
+    LDX #MAIN_PAGES
+    LDY #HI(BANK_START)
+    JSR copy_pages
 
     JSR host_init
 
@@ -380,17 +395,7 @@ ASSERT (SCREEN_END - LOAD_BUFFER) DIV 256 MOD BOUNCE_PAGES = 0
 ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
 .show_title
 {
-    LDX #15                     \ All black while it loads
-.black_loop
-    TXA
-    ASL A
-    ASL A
-    ASL A
-    ASL A
-    ORA #7                      \ Physical colour 0, as the ULA wants it
-    STA ULA_PALETTE
-    DEX
-    BPL black_loop
+    JSR palette_black           \ All black while it loads
     LDX #LO(file_screen)
     LDY #HI(file_screen)
     JSR load_file
@@ -577,11 +582,11 @@ ASSERT vdu_setup_end - vdu_strings < 256
 .command_game   EQUS "LOAD PGAME", 13
 .pgame_address  EQUD PGAME_START
 
-\ The vertical sync event, while the game loads: a tick of the music
-\ (MUSIC), with the zero page it shares with the loader kept, JIM's page
-\ put back, and main RAM paged in for it (the Integra-B's MEMSEL, which
-\ the VDU drivers set while they write the shadow screen, or the B+'s ANDY,
-\ cleared). Here, outside user RAM, so that it runs whatever is paged in.
+\ The vertical sync event, while the game loads: a tick of the music and a
+\ frame of the loading page (MUSIC), with the zero page they share with the
+\ loader kept, JIM's page put back, and ROMSEL's bit 7 clear for them,
+\ whatever the loader has paged in. Here, outside user RAM, so that it
+\ runs whatever is paged in.
 .music_event
 {
     CMP #EVENT_VSYNC
@@ -602,6 +607,7 @@ ASSERT vdu_setup_end - vdu_strings < 256
     AND #&7F
     SELECT_ROMSEL
     JSR music_tick
+    JSR animate
     PLA
     SELECT_ROMSEL
     PLA
@@ -621,6 +627,23 @@ ASSERT vdu_setup_end - vdu_strings < 256
 }
 
 .music_old_evntv    EQUW 0
+
+\ Every logical colour black.
+.palette_black
+{
+    LDX #15
+.loop
+    TXA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA #7                      \ Physical colour 0, as the ULA wants it
+    STA ULA_PALETTE
+    DEX
+    BPL loop
+    RTS
+}
 ASSERT LO(music_old_evntv) <> &FF     \ JMP (indirect) on the NMOS 6502
 
 .message_tube       EQUS "Stratagem needs a 6502 second processor", 13, 0

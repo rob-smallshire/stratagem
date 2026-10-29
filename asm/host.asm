@@ -43,8 +43,9 @@ INCLUDE "asm/render_light.asm"
 \ copied to its place.
 RENDER_PAGES = (host_render_end - render_start + 255) DIV 256
 MAIN_PAGES = (host_main_end - host_main_start + 255) DIV 256
-ASSERT GAME_BUFFER + RENDER_PAGES * 256 <= USER_END
-ASSERT GAME_BUFFER + MAIN_PAGES * 256 <= USER_END
+ASSERT GAME_BUFFER + RENDER_PAGES * 256 <= TELETEXT_SCREEN
+ASSERT GAME_BUFFER + MAIN_PAGES * 256 <= TELETEXT_SCREEN
+ASSERT LOADING_SCREEN_START = TELETEXT_SCREEN
 ASSERT USER_START + MAIN_PAGES * 256 <= GAME_BUFFER
 SAVE "RENDER", render_start, host_render_end
 PUTFILE "build/generated/loading_screen.bin", "LSCREEN", &3000

@@ -1,5 +1,6 @@
 \ MUSIC: the title's music on the Music 5000, the Stratagem Overture
-\ (asm/music5000.asm, tools/stratagem/overture.py), and the loading page.
+\ (asm/music5000.asm, tools/stratagem/overture.py), and the loading page
+\ (asm/loading_page.asm).
 \ STRAT loads it into user RAM once the title's picture is on the (shadow)
 \ screen, plays it while the title shows, then shows the loading page and
 \ plays on, from the vertical sync event (music_event, in STRAT), while
@@ -46,39 +47,6 @@ INCLUDE "build/generated/m5_overture.asm"
     RTS
 }
 
-\ The loading page: the keys, and a bar, a step a file.
-.show_loading
-    LDX #LO(loading_page)
-    LDY #HI(loading_page)
-    JMP page_string
-
-.show_progress
-    LDX #LO(progress_step)
-    LDY #HI(progress_step)
-    JMP page_string
-
-.show_loaded
-    LDX #LO(loaded_line)
-    LDY #HI(loaded_line)
-\ Write the bytes at YX, up to PAGE_END, to the VDU drivers.
-.page_string
-{
-    STX zp_ptr
-    STY zp_ptr + 1
-    LDY #0
-.loop
-    LDA (zp_ptr),Y
-    CMP #PAGE_END
-    BEQ done
-    JSR OSWRCH
-    INY
-    BNE loop
-    INC zp_ptr + 1
-    BNE loop
-.done
-    RTS
-}
-
 \ Wait for SPACE to be up, then down, through the OS (INKEY -99).
 .wait_to_start
 {
@@ -100,64 +68,8 @@ INCLUDE "build/generated/m5_overture.asm"
     RTS
 }
 
-TELETEXT_GREEN = &82
-TELETEXT_YELLOW = &83
-TELETEXT_MAGENTA = &85
-TELETEXT_CYAN = &86
-TELETEXT_WHITE = &87
-TELETEXT_DOUBLE = &8D
-TELETEXT_GRAPHICS_GREEN = &92
-TELETEXT_BLOCK = &FF
-KEYS_TOP = 5
-BAR_ROW = 20
-BAR_COLUMN = 11
-PROGRESS_STEPS = 5              \ RENDER, PWORLD, PLIGHT, PGAME, MAIN
-PROGRESS_BLOCKS = 5             \ A step's
-PAGE_END = &FE                  \ Ends a string: no character or VDU argument here
-
-\ A line of the keys: the key in white, what it does in cyan.
-MACRO KEY_LINE row, key, text
-    EQUB 31, 1, row, TELETEXT_WHITE
-    EQUS key
-    EQUB 31, 9, row, TELETEXT_CYAN
-    EQUS text
-ENDMACRO
-
-.loading_page
-    EQUB 22, 128 + 7            \ Shadow MODE 7
-    EQUB 23, 1, 0, 0, 0, 0, 0, 0, 0, 0     \ Cursor off
-    FOR row, 1, 2
-        EQUB 31, 13, row, TELETEXT_DOUBLE, TELETEXT_YELLOW
-        EQUS "STRATAGEM"
-    NEXT
-    KEY_LINE KEYS_TOP, "Z X", "left, right"
-    KEY_LINE KEYS_TOP + 1, "K", "jump"
-    KEY_LINE KEYS_TOP + 2, "L", "dig; with K or M, up or down;"
-    EQUB 31, 9, KEYS_TOP + 3, TELETEXT_CYAN
-    EQUS "with Z or X too, a slope"
-    KEY_LINE KEYS_TOP + 4, "SPACE", "place what's in your hand"
-    KEY_LINE KEYS_TOP + 5, "TAB", "the next thing in your hand"
-    KEY_LINE KEYS_TOP + 6, "1-9", "a tool from your belt"
-    KEY_LINE KEYS_TOP + 7, "0", "show the tool in your hand"
-    KEY_LINE KEYS_TOP + 8, "P", "open your pack"
-    EQUB 31, 1, BAR_ROW + 2, TELETEXT_MAGENTA
-    EQUS "Music: The Stratagem Overture"
-    EQUB 31, 1, BAR_ROW, TELETEXT_GREEN
-    EQUS "Loading"
-    EQUB 31, BAR_COLUMN - 1, BAR_ROW, TELETEXT_GRAPHICS_GREEN, PAGE_END
-.progress_step
-    FOR block, 1, PROGRESS_BLOCKS
-        EQUB TELETEXT_BLOCK
-    NEXT
-    EQUB PAGE_END
-.loaded_line
-    EQUB 31, 1, BAR_ROW, TELETEXT_WHITE
-    EQUS "Press SPACE to start"
-    FOR column, 22, 39
-        EQUB ' '
-    NEXT
-    EQUB PAGE_END
-ASSERT BAR_COLUMN + PROGRESS_STEPS * PROGRESS_BLOCKS <= 40
+INCLUDE "asm/loading_page.asm"
 
 .music_end
+ASSERT music_end <= music_start + MUSIC_PAGES * 256
 SAVE "MUSIC", music_start, music_end

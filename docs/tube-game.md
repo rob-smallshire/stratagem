@@ -87,25 +87,33 @@ switching the Video ULA's flash bit every line, from a User VIA timer
 interrupt with the System VIA's interrupts off, and waits, reading the
 keyboard itself, for SPACE, ticking the music at each vertical sync (whose
 flag the System VIA still sets). Then it gives the VIAs and IRQ1V back and
-shows the loading page, a shadow MODE 7 with the keys and a bar, while the
-music plays on, ticked from the vertical sync event (`music_event`). It
-loads RENDER (copied to the render region), PWORLD, PLIGHT, PGAME and MAIN,
-all through the OS, so any filing system will do; RENDER and MAIN at
-`GAME_BUFFER` (`&5200`), clear of MUSIC. Then it waits for SPACE again,
-silences the board, copies MAIN over MUSIC to `&3000`, and selects the
-game's shadow MODE 2. Last, it starts PGAME in the parasite itself, through
-the Tube host (`&0406`, type 4), as `*RUN` would.
+shows the loading page (`docs/loading-screen.md`), a MODE 7 teletext page
+with the keys, whose pool fills as the game loads, while the music plays
+on, ticked from the vertical sync event (`music_event`), which animates
+the page too. It loads RENDER (copied to the render region), PWORLD,
+PLIGHT, PGAME and MAIN, all through the OS, so any filing system will do;
+RENDER and MAIN at `GAME_BUFFER` (`&4E00`), clear of MUSIC and of the page
+at `&7C00`, and MAIN kept in a bank of the store. Then it waits for SPACE
+again, silences the board, selects the game's shadow MODE 2, and copies
+MAIN over MUSIC to `&3000`. Last, it starts PGAME in the parasite itself,
+through the Tube host (`&0406`, type 4), as `*RUN` would.
 
 Nothing loads beneath the picture: a filing system's interrupts spoil
 some of its lines (`docs/loading-screen.md`). The music is the Stratagem
 Overture (`docs/music-5000.md`); on a machine without the board, its writes
-go nowhere, and MUSIC costs only its loading (6K, with the loading page).
+go nowhere, and MUSIC costs only its loading (7.5K, with the loading page).
 
-`music_event` is in STRAT, in low RAM, not with the player in user RAM: on
-the Integra-B the VDU drivers set MEMSEL while they write the shadow screen,
-and an interrupt then sees the screen at `&3000`-`&7FFF`, not user RAM. So
-the handler clears ROMSEL's bit 7 (MEMSEL; on the B+, ANDY) around the tick,
-and puts it back.
+The loading page is MODE 7, not shadowed, on both machines, so that its
+screen is main RAM that any code can write, from the interrupt as well. In
+a shadow mode the Integra-B reaches its screen only with MEMSEL (ROMSEL's
+bit 7), and an NMI of the filing system's taken meanwhile loads into the
+screen rather than user RAM: that broke the game's files. The cost is on
+the Integra-B, whose user RAM in a shadow mode is the shadow, where MUSIC
+was loaded under the title: STRAT copies it to main RAM, through a bank of
+the store, with the palette black, before MODE 7; and since its shadow
+MODE 2 clears main RAM, MAIN waits in the bank. `music_event` is in STRAT,
+in low RAM, and clears ROMSEL's bit 7 around its work, whatever the loader
+had paged in.
 
 The parasite runs `player.asm`, `actions.asm`, `camera.asm`, `cache.asm`
 and `world.asm`, written first for the host-only game; the host runs

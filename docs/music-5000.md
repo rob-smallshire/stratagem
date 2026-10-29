@@ -145,7 +145,8 @@ the emulator's whole mix.
 
 STRAT plays the overture under the title (`asm/host_music.asm`): MUSIC, the
 player and the score (5.4K: 1.1K of code, 2.2K of waves and tables, 0.6K
-of variables, the overture's 1.7K), is assembled with the host at `&3000` and
+of variables, the overture's 1.7K; with the loading page, 7.5K), is
+assembled with the host at `&3000` and
 loaded into user RAM once the picture is on the shadow screen, where the
 picture was. The title's wait for SPACE ticks the music at each vertical
 sync, as M5TITLE does. After SPACE the music plays on under the loading
