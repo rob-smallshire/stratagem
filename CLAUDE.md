@@ -16,7 +16,9 @@ filing system resident, and is tested in the Beebium emulator.
 - `docs/loading-screen.md`: the cover shown with the flash bit switched
   every line, loading beneath it, and what we learned.
 - `docs/music-5000.md`: experiments in driving the Music 5000 directly,
-  without AMPLE (M5PLAY).
+  without AMPLE (M5PLAY), and the game's music in its bank (MBANK).
+- `docs/musical-direction.md`: the brief for the game's music, the
+  director that plays it now and then, and how each piece is arranged.
 - `docs/manual.md`: the player's manual: keys, the pack, the first shapes.
 - `docs/game-design.md`: the game design (from `docs/concept.md`, the original
   concept discussion).

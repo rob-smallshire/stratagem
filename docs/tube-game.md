@@ -591,6 +591,15 @@ gives each changed chunk's slot there, and the parasite caches 40 of them
 
 Chunks could be packed between the two, at no cost to `tile_at`.
 
+### The world's day, and the music
+
+The parasite keeps the world's clock (`asm/world_clock.asm`): 24 hours of
+2,500 frames, a 20-minute day from 5 o'clock, stopped while the pack is
+open. Each packet carries the hour and whether the player is underground
+(`PACKET_WORLD`), which the host keeps in `host_world` for the music's
+director in MBANK (`docs/musical-direction.md`). The world's light doesn't
+follow the clock yet.
+
 ## Checking it
 
 `tests/test_tube_game.py` plays on both machines (digging deep first, as
