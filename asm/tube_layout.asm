@@ -43,13 +43,29 @@ PACKET_CAMERA_Y = 5             \ 2 bytes
 PACKET_PLAYER_X = 7             \ 2 bytes, sixteenths of a pixel
 PACKET_PLAYER_Y = 9             \ 2 bytes
 PACKET_PLAYER_FRAME = 11
-PACKET_STRIPS = 12              \ Then that many strips of new tiles: down
+PACKET_WORLD = 12              \ The hour, and WORLD_UNDERGROUND (world_clock.asm)
+PACKET_STRIPS = 13              \ Then that many strips of new tiles: down
                                 \ (non-zero: a column), x, y, count, then
                                 \ count tiles of material, shape and light;
                                 \ then a count of changed tiles (up to
                                 \ CHANGES_PER_FRAME), and each: x, y,
                                 \ material, shape, light
 PACKET_REDRAW = &80
+
+\ The world's day (world_clock.asm): HOURS of HOUR_FRAMES game frames (a
+\ day of 20 minutes at 50 frames a second), from START_HOUR. Its phases,
+\ for the music's director: dawn from DAWN_HOUR, day from DAY_HOUR, dusk
+\ from DUSK_HOUR, night from NIGHT_HOUR. The player is underground with
+\ its feet UNDERGROUND_DEPTH or more tiles below its column's surface.
+HOURS = 24
+HOUR_FRAMES = 2500
+START_HOUR = 5
+DAWN_HOUR = 5
+DAY_HOUR = 7
+DUSK_HOUR = 18
+NIGHT_HOUR = 20
+UNDERGROUND_DEPTH = 3
+WORLD_UNDERGROUND = &80         \ In PACKET_WORLD, with the hour
 PACKET_PACK = &40               \ The pack's packet instead (pack.asm): then
                                 \ the count of kinds shown, the hand's place
                                 \ among them, each kind and its count, the

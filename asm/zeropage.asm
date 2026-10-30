@@ -94,4 +94,5 @@ GUARD MAILBOX_FETCHED
 .zp_place_wait      SKIP 1      \ Non-zero: the hand moved on; SPACE must be pressed again
 .zp_tool_broke      SKIP 1      \ Non-zero: a tool broke this frame (inventory.asm)
 .zp_hand_tool       SKIP 1      \ Non-zero: the tool is shown above the miner (items.asm)
+.zp_world           SKIP 1      \ The hour, and WORLD_UNDERGROUND (world_clock.asm)
 

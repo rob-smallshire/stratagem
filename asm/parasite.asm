@@ -173,6 +173,7 @@ INCLUDE "asm/inventory.asm"
 INCLUDE "asm/pack.asm"
 INCLUDE "asm/crafting.asm"
 INCLUDE "asm/place.asm"
+INCLUDE "asm/world_clock.asm"
 .plight_end
 
 \ Variables that need no starting value: after the game's
