@@ -411,7 +411,9 @@ def compress(sequences: list[list[Symbol]], slots: list[int]) -> tuple[list[list
         rules[name] = list(pair)
 
     def cost(symbols: list[Symbol]) -> int:
-        return sum(len(token_bytes(s, slots)) for s in symbols)
+        # (A CALL is two bytes; until the patterns are pruned, more than 256
+        # may be numbered.)
+        return sum(2 if s[0] == "call" else len(token_bytes(s, slots)) for s in symbols)
 
     def depth(name: Symbol) -> int:
         return 1 + max([depth(s) for s in rules[name] if s[0] == "call"], default=0)
