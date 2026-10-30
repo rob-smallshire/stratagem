@@ -148,12 +148,14 @@ INCLUDE "build/generated/loading_page.asm"
     SKIP 1
 }
 
-\ Draw the page, start its animation, and measure the files for the pool,
-\ the music ticking meanwhile (the filing system may spin a disc up).
+\ Draw the page, measure the files for the pool, the music ticking meanwhile
+\ (the filing system may spin a disc up), then start its animation: not
+\ before, or with no sixel_bytes yet the pool would be owed in full.
 .show_loading
     WRITE_RANGE loading_page_vdu, loading_page_vdu_end
+    JSR measure_files
     DEC loading_shown
-    JMP measure_files
+    RTS
 
 \ The status line, once the game is loaded; and the pool may fill.
 .show_loaded

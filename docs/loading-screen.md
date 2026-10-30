@@ -140,7 +140,10 @@ it likes (`tools/stratagem/loading_page.py`, `asm/loading_page.asm`):
   fill the pool a sixel each: 48 of them. The pool follows an estimate of
   the bytes loaded, from the files' lengths (OSFILE 5, so any filing
   system): 140 bytes a frame, never past the end of the file loading, and
-  caught up as each file is done. Once the game is loaded, "PRESS SPACE TO
+  caught up as each file is done. The animation starts only once the files
+  are measured: started before, while the disc spun up, it owed the whole
+  pool at once (no bytes to a sixel yet), and the pool was full seconds
+  before the load was done. Once the game is loaded, "PRESS SPACE TO
   START", and a drip now and then.
 - **Hold graphics** on the floor's rows, so the colour changes either side
   of the pool show the floor and the water, not black cells.

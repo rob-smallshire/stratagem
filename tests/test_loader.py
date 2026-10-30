@@ -15,6 +15,7 @@ SYSTEM_VIA_IER = 0xFE4E
 USER_VIA_IER = 0xFE6E
 TITLE_EMULATED_SECONDS = 1.0
 POOL_FILL_EMULATED_SECONDS = 10.0
+LOADING_FILES = 5               # RENDER, PWORLD, PLIGHT, PGAME, MAIN (asm/loading_page.asm)
 AUDIO_SECONDS_BUFFERED = 1      # a capture may start with up to a second from before
 
 
@@ -114,6 +115,27 @@ def test_the_overture_plays_under_the_title_and_the_loading_then_stops(tube_musi
     assert started, "the game did not start"
     audio = capture(bbc, 2.0)[AUDIO_SECONDS_BUFFERED * 48000:]
     assert np.abs(audio).max() < 50, "the music plays on in the game"
+
+
+def test_the_pool_keeps_pace_with_the_load(tube_bbc, game_build):
+    """With the disc spinning up as a real one does, the pool is never
+    ahead of the files loaded: as each file finishes, at most the sixels
+    its bytes, and those before it, stand for."""
+    from conftest import boot_to_title
+    bbc = tube_bbc
+    labels = game_build.labels["HOST"]
+    peek = bbc.memory.address.peek
+    boot_to_title(bbc, game_build)
+    bbc.disc.set_spin_up_delay(True)
+    press_space(bbc)
+    word = lambda label, index=0: peek[labels[label + "_low"] + index] | peek[labels[label + "_high"] + index] << 8
+    for _ in range(LOADING_FILES):
+        bbc.debugger.run_to(labels["file_loaded"], skip_current=True, timeout=120)
+        total = sum(word("file_length", index) for index in range(LOADING_FILES))
+        loaded = peek[labels["load_cap"]] | peek[labels["load_cap"] + 1] << 8
+        allowed = peek[labels["pool_allowed"]]
+        assert allowed <= loaded * loading_page.POOL_SIXELS // total + 1, \
+            f"{allowed} sixels with {loaded} of {total} bytes loaded"
 
 
 def load_game_wait(bbc, labels) -> None:
