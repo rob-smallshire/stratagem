@@ -165,15 +165,20 @@ the filing system is in ROM. Without it the game is silent, as before.
 
 - **MBANK** (`asm/mbank.asm`) is its own source, assembled after HOST at
   `&8000`: its own copy of the player (beebasm can't include a file twice
-  in one namespace, nor inside a braced block), its piece, and two entries
-  (`MBANK_START`, `MBANK_TICK`). It reaches STRAT through HOST's labels,
-  which the build writes as symbols (`build/generated/labels_host.asm`,
-  `HOST_<label>`). 5.6K; the piece is the overture for now, standing in
-  for the game's own.
+  in one namespace, nor inside a braced block), the musical day's five
+  pieces and the overture (`docs/musical-direction.md`), the director that
+  chooses when to play them, and two entries (`MBANK_START`,
+  `MBANK_TICK`). It reaches STRAT and MAIN through HOST's labels, which the
+  build writes as symbols (`build/generated/labels_host.asm`,
+  `HOST_<label>`). 10.7K: its code (1.5K, the player's and the director's)
+  must stay below `&A000`, since on the B+ code at `&A000`-`&AFFF` sees the
+  shadow screen where MAIN's variables are; its data runs on. It is loaded
+  through `GAME_BUFFER`, which holds 46 pages: 1K more than now, after
+  which it would load in two parts.
 - **Loaded beneath the loading page**, as a sixth file (counted in the pool
   only if there is a bank for it), into `GAME_BUFFER` and copied to the
   bank. Once the game is set up, STRAT selects the bank and calls
-  `MBANK_START`, which starts the piece and points STRAT's `music_event` at
+  `MBANK_START`, which sets the board up, silent, and points STRAT's `music_event` at
   the bank: its ROMSEL becomes the bank, its tick `mbank_event`, and the
   loading page's frame an RTS.
 - **The tick waits while the host races the beam.** The OS calls the

@@ -17,14 +17,15 @@ Writes into build/generated/:
 - inventory.asm: the kinds carried, and what each material yields and
   each kind places;
 - pack.asm: the pack screen's constants, and its icons, digits and marks;
-- loading_page.asm: the loading page, and the tables that animate it.
+- loading_page.asm: the loading page, and the tables that animate it;
+- m5_day.asm: the musical day's pieces (stratagem.day_music), for MBANK.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from stratagem import actions, loading_page, loading_screen, sequencer, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
+from stratagem import actions, day_music, loading_page, loading_screen, sequencer, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
 
 
 def _bytes_lines(data: bytes | list[int], per_line: int = 16) -> list[str]:
@@ -680,3 +681,4 @@ def generate_all(generated_dirpath: Path) -> None:
     (generated_dirpath / "smooth_flood.asm").write_text(smooth_flood_source())
     loading_screen.generate(generated_dirpath)
     sequencer.generate(generated_dirpath)
+    day_music.generate(generated_dirpath)

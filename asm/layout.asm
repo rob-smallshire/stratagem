@@ -29,4 +29,5 @@ CRTC_ADDRESS = &FE00
 CRTC_DATA    = &FE01
 SYSTEM_VIA_B = &FE40            \ Addressable latch (hardware scroll wrap size)
 SYSTEM_VIA_DDRA = &FE43         \ Port A's direction: the keyboard, the sound chip
+SYSTEM_VIA_T1_LOW = &FE44       \ Timer 1, counting down at 1MHz
 SYSTEM_VIA_A_NO_HANDSHAKE = &FE4F

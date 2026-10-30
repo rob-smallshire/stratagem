@@ -427,7 +427,38 @@ All six: 6.3K, about half the bank's room for pieces. Regularised, the
 day's five are 4.7K arranged against 3.9K plain: the decorations and the
 changes by bar cost more than the regular timing saves.
 
+## The director
+
+In MBANK (`asm/mbank.asm`), ticked as the music is: while a piece plays,
+the tick is the piece's; in the silences between, the director counts
+down, which costs almost nothing.
+
+- **The world's day:** the parasite keeps a clock (`asm/world_clock.asm`):
+  24 hours of 2,500 frames, a 20-minute day, from 5 o'clock, stopped while
+  the pack is open. Each packet carries the hour, and whether the
+  player's feet are three tiles or more below the surface
+  (`PACKET_WORLD`). The world's light doesn't follow the clock yet.
+- **The piece for the moment:** Underground, if the player is
+  underground; otherwise by the hour: Dawn from 5, Daylight from 7, Dusk
+  from 18, Night from 20 (`tube_layout.asm`).
+- **When:** 15 seconds of silence at the start, then the first piece for
+  certain (at 5 o'clock, Dawn: the world waking with the player); after
+  each piece, two minutes and up to 2:43 more of silence; then every 30
+  seconds a chance of a third of the piece for the moment, half that if
+  it was the last played. A piece plays to its end, whatever happens.
+- **The overture** is in the bank, for celebration; nothing asks for it
+  yet.
+- `tests/test_game_music.py` checks that Dawn comes first, after the quiet
+  start; that the bank's player plays it as the model does; and that the
+  director is quiet for two minutes or more after it ends.
+  `tests/test_world_clock.py` checks the clock and the underground flag.
+
 ## Not yet
+
+- **The world's light by the clock:** the night isn't dark yet, nor dawn
+  and dusk coloured.
+- **Celebration:** moments for the overture (and a great cavern's
+  discovery for the Hidden World) need the game to name them.
 
 - **Each passage playable alone,** as the notes propose: the director
   would gain variety, and the Hidden World alone could mark a great

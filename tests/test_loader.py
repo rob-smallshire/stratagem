@@ -88,8 +88,8 @@ def test_the_overture_plays_under_the_title_and_the_loading_then_the_games_music
     """With a Music 5000, the overture plays under the title, a tick a
     frame, while the flash bit is still switched in every line's blanking;
     then on under the loading page, while the game loads and after; SPACE
-    there silences it, and the game starts its own music, from its bank
-    (MBANK)."""
+    there silences it, and the game's music, from its bank (MBANK), starts
+    after a while."""
     from conftest import boot_to_title
     from test_loading_screen import BLANKING_COLUMNS, LINES_PER_FRAME
     from test_music5000 import capture
@@ -119,10 +119,14 @@ def test_the_overture_plays_under_the_title_and_the_loading_then_the_games_music
     peek = bbc.memory.address.peek
     assert peek[labels["music_event_tick"] + 1] | peek[labels["music_event_tick"] + 2] << 8 != \
         labels["music_tick"], "the game ticks the overture's player"
-    bbc.run_for_emulated_seconds(6.0)           # past the quiet opening
+    from test_game_music import music_bank
+    voice_count = game_build.labels["MBANK"]["voice_count"]
+    started = bbc.run_until_or_timeout(lambda: music_bank(bbc, labels)[voice_count] != 0, 30)
+    assert started, "the game's music didn't start"
+    bbc.run_for_emulated_seconds(10.0)          # its fade in
     bbc.debugger.run_to(tick, timeout=60)
     audio = capture(bbc, 2.0)[AUDIO_SECONDS_BUFFERED * 48000:]
-    assert np.abs(audio).max() > 150, "the game is silent"
+    assert np.abs(audio).max() > 100, "the game is silent"
 
 
 def test_the_pool_keeps_pace_with_the_load(tube_bbc, game_build):
