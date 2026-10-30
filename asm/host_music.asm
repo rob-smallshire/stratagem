@@ -12,6 +12,7 @@ CLEAR USER_START, USER_END
 ORG USER_START
 GUARD GAME_BUFFER
 .music_start
+FULL_ORCHESTRA = FALSE             \ The title's instruments only
 INCLUDE "asm/music5000.asm"
 INCLUDE "build/generated/m5_overture.asm"
 

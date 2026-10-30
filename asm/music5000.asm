@@ -47,7 +47,7 @@ SUSTAIN = 2
 RELEASE = 3
 
 \ Clear the board, load the waves, and start the piece at zp_score, all
-\ voices silent.
+\ voices silent (music_play: only start the piece).
 .music_init
 {
     \ Zero the board's RAM: every wave, and both banks of registers.
@@ -89,6 +89,7 @@ RELEASE = 3
 
     \ The piece's table, and the addresses of its patterns' tables, into
     \ the instructions that read them.
+.*music_play
     LDY #piece_table_end - piece_table - 1
 .copy
     LDA (zp_score),Y
@@ -187,6 +188,10 @@ RELEASE = 3
 \ the instrument's vibrato delay into the note.
 .music_tick
 {
+    LDA voice_count             \ A piece played once, over (END)
+    BNE playing
+    RTS
+.playing
     LDA #REGISTER_PAGE
     STA JIM_COPY
     STA JIM_PAGE
@@ -204,6 +209,9 @@ RELEASE = 3
     JSR conduct
 .conducted
     LDX voice_count
+    BNE voices
+    RTS                         \ (It ended this step)
+.voices
     DEX
 .voice
     LDA music_stepped
@@ -353,6 +361,12 @@ RELEASE = 3
     STA zp_ptr + 1
 .next
     MUSIC_BYTE
+    CMP #END
+    BNE not_end
+    LDA #0                      \ No voices: the piece is over
+    STA voice_count
+    RTS
+.not_end
     CMP #LOOP
     BNE not_loop
     LDA conductor_start
@@ -438,7 +452,7 @@ RELEASE = 3
     STA voice_detune,X
     JMP next
 .not_detune
-    CMP #INSTRUMENT + 16
+    CMP #INSTRUMENT + MAX_INSTRUMENTS
     BCS not_instrument
     SBC #INSTRUMENT - 1         \ (carry clear)
     TAY

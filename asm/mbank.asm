@@ -73,6 +73,7 @@ ASSERT mbank_entries = MBANK_START
     RTS
 }
 
+FULL_ORCHESTRA = TRUE             \ The game's instruments too
 INCLUDE "asm/music5000.asm"
 INCLUDE "build/generated/m5_overture.asm"
 

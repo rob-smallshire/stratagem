@@ -19,6 +19,7 @@ ORG &1900
 GUARD &7C00                     \ MODE 7's screen
 
 .m5play
+FULL_ORCHESTRA = FALSE             \ The title's instruments only
 INCLUDE "asm/music5000.asm"
 
 .m5load_start

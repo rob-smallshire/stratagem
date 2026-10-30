@@ -36,7 +36,8 @@ import math
 from dataclasses import dataclass, field
 
 from stratagem.music5000 import (AMPLITUDE, ATTACK, CHANNELS, CONTROL, DB_PER_STEP, DECAY, FREQ_HIGH, FREQ_LOW,
-                                  FREQ_MIDDLE, FULL, INSTRUMENTS, LOWEST_NOTE, MAX_VOICES, PITCHES, RELEASE, RIGHT,
+                                  FREQ_MIDDLE, FULL, INSTRUMENTS, LOWEST_NOTE, MAX_INSTRUMENTS, MAX_VOICES, PITCHES,
+                                  RELEASE, RIGHT,
                                   SUSTAIN, VIBRATO_UP, WAVE_NUMBERS, WAVE_SELECT, note_number, tables_source)
 
 MAX_LENGTH = 255                    # steps in one event
@@ -280,7 +281,7 @@ def tokens(events: list[Event]) -> list[tuple]:
 #             slot ends (a rest folded into them)
 #   &88-&97   PAN: a stereo position
 #   &98-&A7   DETUNE: -8 to +7 units
-#   &A8-&B7   INSTRUMENT: the orchestra's (stratagem.music5000), by number
+#   &A8-&C7   INSTRUMENT: the orchestra's (stratagem.music5000), by number
 #   &F0 i s   NOTE: an interval (signed) and a slot
 #   &F1 n     PITCH: the next note's pitch, from the interval 0 (n, its
 #             index in the pitch table)
@@ -289,11 +290,13 @@ def tokens(events: list[Event]) -> list[tuple]:
 #   &F4 q     QUIETER: amplitude steps below the conductor's level (signed)
 #   &F5 k     CALL pattern k: its events, to its RETURN
 #   &F6       RETURN
+#   &FE       END: the piece is over (its voices and conductor all end so)
 #   &FF       LOOP: back to the stream's start
 # The conductor's stream, which has no channel:
 #   &F8 l h   LEVEL: amplitude steps quieter for every voice (8.8)
 #   &F9 l h   SLOPE: added to the level each step (8.8, signed)
 #   &FA n     WAIT n steps
+#   &FE       END: the piece stops, its voices silent (a piece played once)
 #   &FF       LOOP
 # A note sounds for its slot less the gap, then releases: the voice reads
 # its next event when the slot is over. All voices are as long, in steps.
@@ -305,13 +308,13 @@ SLOTS = 8
 GAP, PAN, DETUNE, INSTRUMENT = 0x80, 0x88, 0x98, 0xA8
 NOTE, PITCH, REST, HOLD, QUIETER, CALL, RETURN = range(0xF0, 0xF7)
 LEVEL, SLOPE, WAIT = range(0xF8, 0xFB)
-LOOP = 0xFF
+END, LOOP = 0xFE, 0xFF
 MAX_PATTERNS = 256
 MAX_DEPTH = 4                       # calls within calls
 
 INSTRUMENT_NUMBERS = {name: number for number, name in enumerate(INSTRUMENTS)}
 INSTRUMENT_NAMES = list(INSTRUMENTS)
-assert len(INSTRUMENTS) <= 16
+assert len(INSTRUMENTS) <= MAX_INSTRUMENTS
 
 
 def token_bytes(token: tuple, slots: list[int]) -> bytes:
@@ -344,7 +347,7 @@ def token_bytes(token: tuple, slots: list[int]) -> bytes:
     raise ValueError(token)
 
 
-def conductor_bytes(events: list[Event]) -> bytes:
+def conductor_bytes(events: list[Event], ending: int = LOOP) -> bytes:
     out = bytearray()
     for event in events:
         kind, value = event
@@ -353,7 +356,7 @@ def conductor_bytes(events: list[Event]) -> bytes:
         else:
             value &= 0xFFFF
             out += bytes([LEVEL if kind == "level" else SLOPE, value & 0xFF, value >> 8])
-    return bytes(out + bytes([LOOP]))
+    return bytes(out + bytes([ending]))
 
 
 # Patterns, found by Re-Pair (Larsson and Moffat): the commonest pair of
@@ -463,7 +466,8 @@ class Piece:
                 + 2 * len(self.patterns) + len(self.slots))
 
 
-def encode(voices: list[list[Event]], conductor: list[Event], ticks_per_step: float) -> Piece:
+def encode(voices: list[list[Event]], conductor: list[Event], ticks_per_step: float, ending: int = LOOP) -> Piece:
+    """The piece, to play again and again (ending LOOP) or once (END)."""
     assert len({steps_of(events) for events in voices + [conductor]}) == 1, "the voices keep different time"
     sequences = [tokens(events) for events in voices]
     counts: dict = {}
@@ -480,7 +484,7 @@ def encode(voices: list[list[Event]], conductor: list[Event], ticks_per_step: fl
 
     steps_per_tick = round(65536 / ticks_per_step)
     assert steps_per_tick < 65536, "a step lasts a tick at least"
-    return Piece(slots, steps_per_tick, conductor_bytes(conductor), [assemble(s, LOOP) for s in sequences],
+    return Piece(slots, steps_per_tick, conductor_bytes(conductor, ending), [assemble(s, ending) for s in sequences],
                  [assemble(rules[("call", n)], RETURN) for n in range(len(rules))])
 
 
@@ -497,13 +501,13 @@ def read_token(stream: bytes, position: int, slots: list[int]) -> tuple[tuple, i
         return ("pan", byte - PAN), position + 1
     if byte < INSTRUMENT:
         return ("detune", (byte - DETUNE) - 16 if byte - DETUNE >= 8 else byte - DETUNE), position + 1
-    if byte < INSTRUMENT + 16:
+    if byte < INSTRUMENT + MAX_INSTRUMENTS:
         return ("instrument", INSTRUMENT_NAMES[byte - INSTRUMENT]), position + 1
     if byte == NOTE:
         interval = stream[position + 1]
         return ("note", interval - 256 if interval & 0x80 else interval, stream[position + 2]), position + 3
-    if byte in (RETURN, LOOP):
-        return ("return" if byte == RETURN else "loop",), position + 1
+    if byte in (RETURN, LOOP, END):
+        return ({RETURN: "return", LOOP: "loop", END: "end"}[byte],), position + 1
     value = stream[position + 1]
     if byte == PITCH:
         return ("pitch", value + LOWEST_NOTE), position + 2
@@ -519,7 +523,7 @@ def expand(piece: Piece, voice: int) -> list[tuple]:
         out, position = [], 0
         while True:
             token, position = read_token(stream, position, piece.slots)
-            if token[0] in ("return", "loop"):
+            if token[0] in ("return", "loop", "end"):
                 return out
             out += walk(piece.patterns[token[1]]) if token[0] == "call" else [token]
     return walk(piece.voices[voice])
@@ -577,6 +581,9 @@ class SequencePlayer:
         stream = self.piece.conductor
         while self.conductor_count == 0:
             byte = stream[self.conductor_position]
+            if byte == END:
+                self.voices = []
+                return
             if byte == LOOP:
                 self.conductor_position = 0
                 continue
@@ -645,8 +652,15 @@ class SequencePlayer:
         whole = self.level >> 8
         return whole - 256 if whole & 0x80 else whole
 
+    @property
+    def playing(self) -> bool:
+        """False once a piece played once has reached its END."""
+        return bool(self.voices)
+
     def tick(self) -> list[tuple[int, int]]:
         writes: list[tuple[int, int]] = []
+        if not self.playing:
+            return writes
         self.clock += self.piece.steps_per_tick
         stepped, self.clock = self.clock >> 16, self.clock & 0xFFFF
         if stepped:
@@ -745,7 +759,7 @@ def common_source() -> list[str]:
     """The format's constants, and the player's tables."""
     constants = {"SLOTS": SLOTS, "GAP": GAP, "PAN": PAN, "DETUNE": DETUNE, "INSTRUMENT": INSTRUMENT,
                  "NOTE": NOTE, "PITCH": PITCH, "REST": REST, "HOLD": HOLD, "QUIETER": QUIETER, "CALL": CALL,
-                 "RETURN": RETURN, "LEVEL": LEVEL, "SLOPE": SLOPE, "WAIT": WAIT, "LOOP": LOOP,
+                 "RETURN": RETURN, "LEVEL": LEVEL, "SLOPE": SLOPE, "WAIT": WAIT, "END": END, "LOOP": LOOP,
                  "MAX_DEPTH": MAX_DEPTH}
     return [f"{name} = &{value:02X}" for name, value in constants.items()] + tables_source()
 

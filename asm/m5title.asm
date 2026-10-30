@@ -18,6 +18,7 @@ GUARD &3000
 
 .m5title
 INCLUDE "asm/loading_screen.asm"
+FULL_ORCHESTRA = FALSE             \ The title's instruments only
 INCLUDE "asm/music5000.asm"
 
 .m5title_start

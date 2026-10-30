@@ -193,7 +193,26 @@ INSTRUMENTS = {
     "clarinet": Instrument("clarinet", attack=14, decay=1, sustain=0x78, release=8, stereo=14),
     "harp": Instrument("harp", attack=128, decay=2, sustain=0, release=6, stereo=11),
     "timpani": Instrument("timpani", attack=128, decay=1, sustain=0, release=4, stereo=13),
+    # The game's (docs/musical-direction.md), after the title's: the title's
+    # player has tables only for those (TITLE_INSTRUMENTS).
+    # Struck, bright and brief, its character all envelope.
+    "celesta": Instrument("trumpet", attack=128, decay=6, sustain=0, release=10, stereo=13),
+    # A reed in the low register, still, its notes short.
+    "bassoon": Instrument("oboe", attack=8, decay=1, sustain=0x74, release=10, stereo=14),
+    # Far: a slower attack, no vibrato, nearer silent sustain.
+    "far_horn": Instrument("horn", attack=4, decay=1, sustain=0x70, release=4, stereo=11, shift=9),
+    # Still: no vibrato, colder.
+    "still_strings": Instrument("strings", attack=4, decay=1, sustain=0x74, release=5, stereo=12, shift=9),
+    "still_cello": Instrument("cello", attack=4, decay=1, sustain=0x74, release=5, stereo=14, shift=9),
+    "still_oboe": Instrument("oboe", attack=16, decay=1, sustain=0x78, release=8, stereo=13, shift=9),
+    # A drone with no beginning: over 2.5s to full, and as long to fade.
+    "drone": Instrument("cello", attack=1, decay=0, sustain=FULL, release=1, stereo=13, shift=9),
+    # Glass: a pure tone, swelling and fading slowly; a pair detuned beats.
+    "glass": Instrument("sine", attack=2, decay=0, sustain=FULL, release=2, stereo=13, shift=8),
 }
+TITLE_INSTRUMENTS = 13              # the overture's orchestra, first
+MAX_INSTRUMENTS = 32
+assert len(INSTRUMENTS) <= MAX_INSTRUMENTS
 
 
 def tables_source() -> list[str]:
@@ -220,5 +239,8 @@ def tables_source() -> list[str]:
                          ("stereo", [i.stereo for i in instruments]),
                          ("shift", [i.shift - 8 for i in instruments]),      # (8 or more)
                          ("vibrato", [i.vibrato for i in instruments])):
-        lines += [f".instrument_{name}s", "    EQUB " + ", ".join(f"&{v:02X}" for v in values)]
-    return lines
+        lines += [f".instrument_{name}s", "    EQUB " + ", ".join(f"&{v:02X}" for v in values[:TITLE_INSTRUMENTS])]
+        # (The game's instruments only where the includer has them all)
+        lines += ["IF FULL_ORCHESTRA", "    EQUB " + ", ".join(f"&{v:02X}" for v in values[TITLE_INSTRUMENTS:]),
+                  "ENDIF"]
+    return [f"MAX_INSTRUMENTS = {MAX_INSTRUMENTS}"] + lines
