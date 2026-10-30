@@ -1,8 +1,8 @@
 """The loading page: a MODE 7 teletext page, shown while the game loads
 (asm/loading_page.asm, in MUSIC).
 
-- The title, STRATAGEM, in mosaic graphics, as the cover has it: chunky
-  rock letters in strata, yellow at the top to red and a dark band
+- The title, STRATAGEM, in mosaic graphics, as the cover has it: pointed
+  rock letters at staggered heights, in strata, yellow at the top to red and a dark band
   beneath. Teletext changes colour only at a control cell, so each row of
   the title is one colour, and the strata are the rows.
 - The ceiling of a cave in yellow, with a stalactite hanging over the
@@ -28,23 +28,30 @@ MOSAIC = 0xA0                   # a graphics cell with no sixels; add SIXEL_BITS
 # Sixel bits within a cell: (x % 2, y % 3) -> bit.
 SIXEL_BITS = {(0, 0): 1, (1, 0): 2, (0, 1): 4, (1, 1): 8, (0, 2): 16, (1, 2): 64}
 
-# The title: STRATAGEM, twelve sixels high, in four rows of colour.
-TITLE_ROW = 0
-TITLE_BANDS = ("yellow", "yellow", "red", "magenta")
+# The title: STRATAGEM, as the cover has it: rock letters that lean and
+# taper to points, the S sweeping down to the left, set at staggered
+# heights; sixteen sixels high from TITLE_TOP, in six rows of colour.
+TITLE_TOP = 2                   # a sixel y: clear of the screen's top
+TITLE_BANDS = ("yellow", "yellow", "yellow", "red", "magenta", "magenta")
 LETTERS = {
-    "S": [".#####.",
+    "S": ["....#####",
+          "..#######",
+          ".###...##",
+          "###.....#",
+          "###......",
+          ".#####...",
+          "..######.",
+          "....#####",
+          "......###",
+          ".......##",
+          "......###",
+          "...#####.",
+          ".######..",
+          "#####....",
+          "###......",
+          "#........"],
+    "T": ["....###",
           "#######",
-          "##...##",
-          "##.....",
-          "####...",
-          ".#####.",
-          "..#####",
-          "....###",
-          ".....##",
-          "##...##",
-          "#######",
-          ".#####."],
-    "T": ["#######",
           "#######",
           "..###..",
           "..###..",
@@ -54,76 +61,86 @@ LETTERS = {
           "..###..",
           "..###..",
           "..###..",
-          "..###..",
-          "..###.."],
-    "R": ["######.",
-          "#######",
-          "##...##",
-          "##...##",
-          "##..###",
-          "######.",
-          "#####..",
-          "##.###.",
-          "##..###",
-          "##...##",
-          "##...##",
-          "##...##"],
+          "..##...",
+          "..##...",
+          "..#...."],
+    "R": ["######..",
+          "#######.",
+          "###..###",
+          "###..###",
+          "###.###.",
+          "######..",
+          "#####...",
+          "###.##..",
+          "###.###.",
+          "###..###",
+          "##...###",
+          "##....##",
+          "#......#"],
     "A": ["...##...",
           "..####..",
           "..####..",
-          ".##..##.",
-          ".##..##.",
-          "##....##",
+          ".###.##.",
+          ".##..###",
+          ".##..###",
+          "###...##",
           "########",
           "########",
+          "###...##",
           "##....##",
           "##....##",
-          "##....##",
-          "##....##"],
-    "G": [".#####.",
-          "#######",
-          "##...##",
-          "##.....",
-          "##.....",
-          "##.####",
-          "##.####",
-          "##...##",
-          "##...##",
-          "##...##",
-          "#######",
-          ".#####."],
+          "#......#"],
+    "G": ["..######",
+          ".#######",
+          "###...##",
+          "###.....",
+          "###.....",
+          "###.####",
+          "###.####",
+          "###...##",
+          "###...##",
+          "###..###",
+          ".#######",
+          "..#####.",
+          "....##.."],
     "E": ["######",
-          "######",
-          "##....",
-          "##....",
-          "##....",
           "#####.",
+          "###...",
+          "###...",
           "#####.",
-          "##....",
-          "##....",
-          "##....",
           "######",
-          "######"],
-    "M": ["##.....##",
+          "####..",
+          "###...",
+          "###...",
+          "###..#",
+          "######",
+          "######",
+          "##...."],
+    "M": [".......##",
+          "##.....##",
           "###...###",
           "####.####",
-          "##.###.##",
-          "##..#..##",
-          "##.....##",
-          "##.....##",
-          "##.....##",
-          "##.....##",
-          "##.....##",
-          "##.....##",
-          "##.....##"],
+          "#########",
+          "###.#.###",
+          "###...###",
+          "###...###",
+          "###...###",
+          "###...###",
+          "###...###",
+          "##....###",
+          "#.....###",
+          "......###",
+          ".......##",
+          "........#"],
 }
 TITLE = "STRATAGEM"
+TITLE_DROPS = (0, 1, 2, 0, 1, 1, 1, 2, 0)    # each letter's, in sixels
 LETTER_GAP = 1
 
 # The cave.
-CEILING_ROW = 5                 # solid; the row below it jagged
-STALACTITE_TIP = (11, 44)       # its point: x, y
-STALACTITE_TOP = 18
+CEILING_ROW = 7                 # solid; the row below it jagged
+STALACTITE_TIP = (11, 47)       # its point: x, y
+STALACTITE_TOP = 24
 DRIP_X = STALACTITE_TIP[0]
 DRIP_TOP = STALACTITE_TIP[1] + 1    # where a drip forms
 FLOOR_ROW = 22                  # two rows of floor, the pool in them
@@ -136,7 +153,7 @@ DRIP_ROWS = range(DRIP_TOP // 3, FLOOR_ROW)     # the cells a drip passes throug
 assert DRIP_TOP % 3 == 0 and DRIP_X // 2 in POOL_COLUMNS
 
 # The keys, right of the stalactite.
-KEYS_ROW, KEYS_COLUMN = 8, 12
+KEYS_ROW, KEYS_COLUMN = 10, 12
 KEYS = [("Z", "LEFT"), ("X", "RIGHT"), ("K", "JUMP"), ("L", "DIG"), ("K/M + L", "UP/DOWN"),
         ("SPACE", "PLACE"), ("TAB", "NEXT"), ("1-9", "TOOLS"), ("P", "PACK")]
 STATUS_ROW, STATUS_COLUMN = 21, 12
@@ -149,11 +166,12 @@ def title_sixels() -> set[tuple[int, int]]:
     width = sum(len(LETTERS[c][0]) for c in TITLE) + LETTER_GAP * (len(TITLE) - 1)
     x0 = 2 + (2 * COLUMNS - 2 - width) // 2
     sixels = set()
-    for letter in TITLE:
+    for letter, drop in zip(TITLE, TITLE_DROPS):
         glyph = LETTERS[letter]
         for y, line in enumerate(glyph):
-            sixels |= {(x0 + x, TITLE_ROW * 3 + y) for x, c in enumerate(line) if c == "#"}
+            sixels |= {(x0 + x, TITLE_TOP + drop + y) for x, c in enumerate(line) if c == "#"}
         x0 += len(glyph[0]) + LETTER_GAP
+    assert max(y for _, y in sixels) < len(TITLE_BANDS) * 3 <= (CEILING_ROW - 1) * 3
     return sixels
 
 
@@ -199,8 +217,7 @@ def page() -> list[bytearray]:
     """The page as first shown: rows of 40 bytes, the pool empty, no drip."""
     rows = [bytearray([SPACE] * COLUMNS) for _ in range(ROWS)]
     title = title_sixels()
-    for band, colour in enumerate(TITLE_BANDS):
-        row = TITLE_ROW + band
+    for row, colour in enumerate(TITLE_BANDS):
         rows[row][0] = GRAPHICS[colour]
         rows[row][1:] = bytes(mosaic(title, c, row) for c in range(1, COLUMNS))
     cave = cave_sixels()

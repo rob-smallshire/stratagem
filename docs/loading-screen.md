@@ -129,8 +129,11 @@ is pressed, with the Stratagem Overture on the Music 5000
 teletext, with nothing timed to the line, so the filing system can do as
 it likes (`tools/stratagem/loading_page.py`, `asm/loading_page.asm`):
 
-- **The title** in mosaic graphics, as the cover has it: chunky letters in
-  strata, yellow at the top, red, and a dark (magenta) band beneath.
+- **The title** in mosaic graphics, as the cover has it: rock letters, drawn
+  after the cover's (its faces, picked out by colour and scaled down, were
+  the guide), that taper to points, the S sweeping down to the left, set at
+  staggered heights, sixteen sixels high; in strata, three rows yellow, one
+  red, and a dark (magenta) band beneath.
   Teletext changes colour only at a control cell, so the strata are rows,
   and with one colour a row there is no cell lost between the letters.
 - **A cave:** a yellow ceiling, with small stalactites and one large one
