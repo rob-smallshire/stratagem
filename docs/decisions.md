@@ -465,3 +465,14 @@ A running log of design decisions. Add to it whenever one is made.
   top; deferred, the host's timing is unchanged and no frame is dropped
   (`docs/music-5000.md`). Main RAM above MAIN (about 16K in the game) could
   hold it instead, but would cost MAIN its room to grow.
+- **The game's music is an occasional visitor, chosen by a director from
+  the world's state:** the five pieces of a musical day and the overture,
+  each played once, to its end, between long silences (two minutes and
+  more), as Minecraft does; Underground below the surface, otherwise the
+  piece for the hour of a world's day that the parasite now keeps (a
+  20-minute day; the light doesn't follow it yet). Each piece arranged as
+  data after an arranger's notes (fading in and dissolving, peaks ranked
+  below the overture's, echo only underground), Underground made
+  otherworldly. Compressed together the pieces shared almost nothing, so
+  each keeps its own patterns: all six are 6.3K
+  (`docs/musical-direction.md`).
