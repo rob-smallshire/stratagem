@@ -117,10 +117,11 @@ def render(player, ticks: int) -> np.ndarray:
     return signal.sosfilt(OUTPUT_FILTER, np.concatenate(blocks), axis=0)
 
 
-def write_wav(audio: np.ndarray, filepath: Path) -> None:
-    """At 48kHz, as Beebium records (strat-m5-master reads it), normalised."""
+def write_wav(audio: np.ndarray, filepath: Path, peak: float | None = None) -> None:
+    """At 48kHz, as Beebium records (strat-m5-master reads it), normalised:
+    to its own peak, or to a given one (to keep several at their levels)."""
     audio = signal.resample_poly(audio, WAV_RATE // 375, SAMPLE_RATE // 375, axis=0)
-    peak = np.abs(audio).max() or 1
+    peak = peak or np.abs(audio).max() or 1
     samples = np.round(audio * (0.9 * 32767 / peak)).astype("<i2")
     filepath.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(filepath), "wb") as out:
