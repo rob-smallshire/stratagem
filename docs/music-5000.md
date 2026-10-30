@@ -155,7 +155,54 @@ until SPACE is pressed again; then STRAT silences the board and copies
 MAIN over it. `tests/test_loader.py` checks, on a machine with the board,
 that it plays under the title, that the flash bit is still switched in
 every line's blanking, that it plays on while the game loads and after,
-and that the game is silent.
+and that the game then plays its own music (below).
+
+## In the game: MBANK
+
+The game's music lives in a fourth sideways RAM bank, when there is one:
+the render bank and the store's two are needed, and a fourth is free when
+the filing system is in ROM. Without it the game is silent, as before.
+
+- **MBANK** (`asm/mbank.asm`) is its own source, assembled after HOST at
+  `&8000`: its own copy of the player (beebasm can't include a file twice
+  in one namespace, nor inside a braced block), its piece, and two entries
+  (`MBANK_START`, `MBANK_TICK`). It reaches STRAT through HOST's labels,
+  which the build writes as symbols (`build/generated/labels_host.asm`,
+  `HOST_<label>`). 5.6K; the piece is the overture for now, standing in
+  for the game's own.
+- **Loaded beneath the loading page**, as a sixth file (counted in the pool
+  only if there is a bank for it), into `GAME_BUFFER` and copied to the
+  bank. Once the game is set up, STRAT selects the bank and calls
+  `MBANK_START`, which starts the piece and points STRAT's `music_event` at
+  the bank: its ROMSEL becomes the bank, its tick `mbank_event`, and the
+  loading page's frame an RTS.
+- **The tick waits while the host races the beam.** The OS calls the
+  vertical sync event inside the host's OSBYTE 19, so a tick there delays
+  everything the host draws after the flip. Ticked at vsync, the host came
+  back from its wait 3,100 cycles after vsync on average and 7,100 at most,
+  past the display's top (4,096 cycles, 32 lines, after vsync). So while
+  the host waits for vertical sync (`host_vsync_wait`), `mbank_event` only
+  counts the tick owed, and the host pays it, from the bank, once the frame
+  is drawn (`host_music_owed`); at any other time (the host idle, the
+  parasite late, the pack open) it ticks at once.
+- **Measured** (Beebium, 300 frames walking, digging and jumping, the
+  overture's sixteen voices; cycles since vsync):
+
+  | | Host back from vsync (mean / 99% / max) | Frame drawn (mean / max) | Tick (mean / max) |
+  |---|---|---|---|
+  | B+, music | 783 / 845 / 845 | 8,471 / 24,240 | 2,432 / 6,329 |
+  | B+, none | 770 / 828 / 831 | 8,637 / 24,230 | |
+  | Integra-B, music | 1,025 / 3,471 / 3,743 | 9,036 / 24,421 | 2,582 / 7,466 |
+  | Integra-B, none | 848 / 1,869 / 2,951 | 8,954 / 24,409 | |
+
+  No frame was dropped either way (300 frames in 303 vertical syncs). The
+  owed tick is paid about 8,500 cycles (4ms) after vsync on average, 12ms
+  at most: a note may sound up to a frame's half late, unevenly. A tick
+  costs 6% of the host's frame on average with sixteen voices; fewer cost
+  less.
+- `tests/test_game_music.py` checks that no tick is lost and that the host
+  is back from vertical sync before the display's top, with the music;
+  `tests/test_loader.py` that the game's music plays.
 
 ## Under the title screen: M5TITLE
 
@@ -250,11 +297,8 @@ fewer trumpets).
 
 ## To try next
 
-- **Music in the game.** The host's frame is busy, but a tick is cheap: 6%
-  of a frame on average for sixteen voices with vibrato, less for fewer.
-  The game's host already has the vertical sync; a piece is a K or two, and
-  the player and its tables 3.3K (the waves, 1.8K of it, needed only to
-  start the board). "Play one of these patterns", chosen at random, would
+- **The game's own music** in MBANK, in place of the overture: the bank
+  has 10K to spare. "Play one of these patterns", chosen at random, would
   let a few phrases vary for as long as the game is played.
 - **The overture, interpreted.** The mood (`art/music/style.md`) and the
   board's sound suggest changes (see the decisions to come).

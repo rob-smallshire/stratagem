@@ -15,7 +15,7 @@ SYSTEM_VIA_IER = 0xFE4E
 USER_VIA_IER = 0xFE6E
 TITLE_EMULATED_SECONDS = 1.0
 POOL_FILL_EMULATED_SECONDS = 10.0
-LOADING_FILES = 5               # RENDER, PWORLD, PLIGHT, PGAME, MAIN (asm/loading_page.asm)
+LOADING_FILES = 6               # RENDER, PWORLD, PLIGHT, PGAME, MAIN, MBANK (asm/loading_page.asm)
 AUDIO_SECONDS_BUFFERED = 1      # a capture may start with up to a second from before
 
 
@@ -83,11 +83,13 @@ def loaded_page() -> list[bytearray]:
     return rows
 
 
-def test_the_overture_plays_under_the_title_and_the_loading_then_stops(tube_music_bbc, tube_machine, game_build):
+def test_the_overture_plays_under_the_title_and_the_loading_then_the_games_music(tube_music_bbc, tube_machine,
+                                                                                game_build):
     """With a Music 5000, the overture plays under the title, a tick a
     frame, while the flash bit is still switched in every line's blanking;
     then on under the loading page, while the game loads and after; SPACE
-    there silences it before the game starts."""
+    there silences it, and the game starts its own music, from its bank
+    (MBANK)."""
     from conftest import boot_to_title
     from test_loading_screen import BLANKING_COLUMNS, LINES_PER_FRAME
     from test_music5000 import capture
@@ -113,8 +115,14 @@ def test_the_overture_plays_under_the_title_and_the_loading_then_stops(tube_musi
     started = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[labels["host_frame_count"]] >= 2,
                                        RUN_TIMEOUT_EMULATED_SECONDS)
     assert started, "the game did not start"
+    tick = game_build.labels["MBANK"]["music_tick"]
+    peek = bbc.memory.address.peek
+    assert peek[labels["music_event_tick"] + 1] | peek[labels["music_event_tick"] + 2] << 8 != \
+        labels["music_tick"], "the game ticks the overture's player"
+    bbc.run_for_emulated_seconds(6.0)           # past the quiet opening
+    bbc.debugger.run_to(tick, timeout=60)
     audio = capture(bbc, 2.0)[AUDIO_SECONDS_BUFFERED * 48000:]
-    assert np.abs(audio).max() < 50, "the music plays on in the game"
+    assert np.abs(audio).max() > 150, "the game is silent"
 
 
 def test_the_pool_keeps_pace_with_the_load(tube_bbc, game_build):

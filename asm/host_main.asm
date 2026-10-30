@@ -171,6 +171,8 @@ GUARD USER_END
 
 .flip
 .*host_before_vsync             \ (For timing)
+    LDA #&FF                    \ The music's tick waits for the frame to be
+    STA host_vsync_wait         \ drawn (MBANK's mbank_event)
     LDA #19                     \ Wait for vertical sync
     JSR OSBYTE
 .*host_after_vsync
@@ -201,8 +203,47 @@ GUARD USER_END
     STA zp_columns_width
     INC host_frame_count
 .*host_frame_shown              \ Tests stop here
-    RTS
+    JMP host_music_owed
 }
+
+\ Pay the music's ticks owed while the frame was drawn, from its bank
+\ (MBANK), as the event would, the event deferring still meanwhile.
+.host_music_owed
+{
+    SEI
+    LDA host_ticks_owed
+    BNE tick
+    STA host_vsync_wait
+    CLI
+    RTS
+.tick
+    DEC host_ticks_owed
+    CLI
+    LDA zp_ptr
+    PHA
+    LDA zp_ptr + 1
+    PHA
+    LDA JIM_COPY
+    PHA
+    LDA ROMSEL_COPY
+    PHA
+    LDA music_romsel
+    SELECT_ROMSEL
+    JSR MBANK_TICK
+    PLA
+    SELECT_ROMSEL
+    PLA
+    STA JIM_COPY
+    STA JIM_PAGE
+    PLA
+    STA zp_ptr + 1
+    PLA
+    STA zp_ptr
+    JMP host_music_owed
+}
+
+.host_vsync_wait    EQUB 0      \ Non-zero: the music's ticks are owed...
+.host_ticks_owed    EQUB 0      \ ... so many
 
 \ Read the input and write it to the parasite's mailbox: the belt key,
 \ the second byte of input, the input, and the count of packets read.

@@ -79,6 +79,11 @@ CHUNK_SIZE = 8
 CHUNK_TILES = CHUNK_SIZE * CHUNK_SIZE
 SLOT_BYTES = 2 * CHUNK_TILES    \ The materials, then the shapes
 STORE_BANKS = 2
+MUSIC_BANK_INDEX = 1 + STORE_BANKS  \ The game's music (MBANK), in ram_banks
+                                \ after the render bank and the store's, if any
+MBANK_START = &8000             \ MBANK: STRAT calls its start there, in its bank,
+MBANK_TICK = MBANK_START + 3    \ and MAIN its tick (host_music_owed)
+MBANK_PAGES = 32                \ ... and copies so many pages of it
 STORE_CHUNK = &FF
 STORE_TILE_BYTES = 4
 STORE_CHUNK_BYTES = 2 + SLOT_BYTES

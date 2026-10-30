@@ -456,3 +456,12 @@ A running log of design decisions. Add to it whenever one is made.
   shadow screen with MEMSEL let a filing system's NMI load into the screen
   instead of user RAM. So the Integra-B copies MUSIC to main RAM first, and
   MAIN waits in a store bank until the game's shadow MODE 2 is on.
+- **The game's music on the Music 5000, in a fourth sideways RAM bank,
+  when one is free:** the user's own ROM images (a filing system) were to
+  have it, but music is optional, so a filing system in ROM leaves it to
+  the music, and without it the game is silent. The music's tick waits
+  while the host races the beam after vertical sync, and is paid once the
+  frame is drawn: ticked at vsync it made the host late for the display's
+  top; deferred, the host's timing is unchanged and no frame is dropped
+  (`docs/music-5000.md`). Main RAM above MAIN (about 16K in the game) could
+  hold it instead, but would cost MAIN its room to grow.

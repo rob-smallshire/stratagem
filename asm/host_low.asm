@@ -316,6 +316,20 @@ ENDMACRO
     LDY #HI(GAME_BUFFER)        \ clears main RAM
     JSR copy_to_paged
     JSR file_loaded
+    LDA ram_bank_count          \ The game's music, in a fourth bank if there
+    CMP #MUSIC_BANK_INDEX + 1   \ is one (MBANK)
+    BCC no_music_bank
+    LDX #5
+    JSR file_starting
+    LDX #LO(file_mbank)
+    LDY #HI(file_mbank)
+    JSR load_game_file
+    LDA ram_banks + MUSIC_BANK_INDEX
+    LDX #MBANK_PAGES
+    LDY #HI(GAME_BUFFER)
+    JSR copy_to_paged
+    JSR file_loaded
+.no_music_bank
     JSR show_loaded
     LDA #BOOT_LOADED
     STA zp_boot_status
@@ -345,6 +359,16 @@ ENDMACRO
     LDA #HI(host_wrch)
     STA WRCHV + 1
     CLI
+
+    LDA ram_bank_count          \ The game's music, if MBANK was loaded
+    CMP #MUSIC_BANK_INDEX + 1
+    BCC no_music
+    LDA ram_banks + MUSIC_BANK_INDEX
+    SELECT_ROMSEL
+    JSR MBANK_START
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+.no_music
 
     LDA #BOOT_READY
     STA zp_boot_status
@@ -578,6 +602,7 @@ ASSERT vdu_setup_end - vdu_strings < 256
 .file_render    EQUS "RENDER", 13
 .file_music     EQUS "MUSIC", 13
 .file_main      EQUS "MAIN", 13
+.file_mbank     EQUS "MBANK", 13
 .command_world  EQUS "LOAD PWORLD", 13
 .command_light  EQUS "LOAD PLIGHT", 13
 .command_game   EQUS "LOAD PGAME", 13
@@ -585,9 +610,10 @@ ASSERT vdu_setup_end - vdu_strings < 256
 
 \ The vertical sync event, while the game loads: a tick of the music and a
 \ frame of the loading page (MUSIC), with the zero page they share with the
-\ loader kept, JIM's page put back, and ROMSEL's bit 7 as music_bits for
-\ them, whatever the loader has paged in. Here, outside user RAM, so that it
-\ runs whatever is paged in.
+\ loader kept, JIM's page put back, and ROMSEL as music_romsel for them,
+\ whatever the loader has paged in. Here, outside user RAM, so that it
+\ runs whatever is paged in. In the game, the music in its bank (MBANK)
+\ points the two calls at its own tick and an RTS.
 .music_event
 {
     CMP #EVENT_VSYNC
@@ -605,10 +631,11 @@ ASSERT vdu_setup_end - vdu_strings < 256
     PHA
     LDA ROMSEL_COPY
     PHA
-    AND #&7F
-    ORA music_bits
+    LDA music_romsel
     SELECT_ROMSEL
+.*music_event_tick
     JSR music_tick
+.*music_event_animate
     JSR animate
     PLA
     SELECT_ROMSEL
@@ -629,8 +656,9 @@ ASSERT vdu_setup_end - vdu_strings < 256
 }
 
 .music_old_evntv    EQUW 0
-.music_bits         EQUB 0      \ ROMSEL's bit 7 for the tick: MEMSEL, while
-                                \ the Integra-B's MUSIC is in main RAM, shadowed
+.music_romsel       EQUB 0      \ ROMSEL for the tick: MEMSEL, while the
+                                \ Integra-B's MUSIC is in main RAM, shadowed;
+                                \ in the game, MBANK's bank
 
 \ Every logical colour black.
 .palette_black

@@ -14,8 +14,10 @@ it relies on, and `docs/decisions.md` records decisions as they are made.
 - We use 48K of sideways RAM (three banks), leaving one bank free for the
   user's own ROM images, such as MMFS. (Since the game moved to a second
   processor (`tube-game.md`), the host uses one bank, for the render
-  region; the other two are spare. The host-only game this document was
-  written for was dropped on 2026-10-21.)
+  region; the other two hold the store of changed chunks. A fourth bank,
+  if free (the filing system in ROM), holds the game's music, MBANK. The
+  host-only game this document was written for was dropped on
+  2026-10-21.)
 - The OS and the filing system stay resident. All file access is through OS
   calls (OSFILE, OSGBPB, OSFIND), so the game runs from DFS, MMFS, ADFS or
   over Econet with NFS/ANFS. We use only the memory the OS gives to

@@ -112,8 +112,10 @@ the Integra-B, whose user RAM in a shadow mode is the shadow, where MUSIC
 was loaded under the title: STRAT copies it to main RAM, through a bank of
 the store, with the palette black, before MODE 7; and since its shadow
 MODE 2 clears main RAM, MAIN waits in the bank. `music_event` is in STRAT,
-in low RAM, and sets ROMSEL's bit 7 for its work as `music_bits` says,
-whatever the loader had paged in.
+in low RAM, and pages in ROMSEL as `music_romsel` says for its work,
+whatever the loader had paged in. In the game it ticks the game's music,
+from a fourth sideways RAM bank if there is one (MBANK,
+`docs/music-5000.md`).
 
 The music never stops between the title and the game. The event is on
 from SPACE at the title, before the page is drawn and the files measured

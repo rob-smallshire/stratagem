@@ -16,7 +16,7 @@
 \ shadow MODE 2 clears main RAM, so MAIN waits in a bank of the store.
 
 LOAD_RATE = 140                 \ Bytes a frame: DFS loads about 7K a second
-LOADING_FILES = 5               \ RENDER, PWORLD, PLIGHT, PGAME, MAIN
+LOADING_FILES = 6               \ RENDER, PWORLD, PLIGHT, PGAME, MAIN, MBANK
 DRIPS = 6                       \ Falling at once, at most
 DRIP_FORMING = 4                \ Frames a drip hangs at the tip
 DRIP_SPACING = 4                \ Frames between drips, at least
@@ -87,7 +87,7 @@ INCLUDE "build/generated/loading_page.asm"
 \ MODE 7, blank. The music ticks meanwhile, from the event: on the
 \ Integra-B, all of MUSIC is copied as it plays, then the pages of the
 \ player's state again, between two ticks, and from then the event's
-\ ticks are of main RAM (music_bits: MEMSEL), until MODE 7 makes it user
+\ ticks are of main RAM (music_romsel: MEMSEL), until MODE 7 makes it user
 \ RAM.
 .prepare_loading
 {
@@ -109,7 +109,7 @@ INCLUDE "build/generated/loading_page.asm"
     LDY #HI(music_state)
     JSR copy_music
     LDA #&80
-    STA music_bits
+    STA music_romsel
     CLI
 .mode
     LDA #22
@@ -172,6 +172,10 @@ INCLUDE "build/generated/loading_page.asm"
     STA total
     STA total + 1
     LDX #LOADING_FILES - 1
+    LDA ram_bank_count          \ (MBANK only if there's a bank for it)
+    CMP #MUSIC_BANK_INDEX + 1
+    BCS file
+    DEX
 .file
     STX index
     LDA loading_names_low,X
@@ -445,7 +449,7 @@ INCLUDE "build/generated/loading_page.asm"
 
 .loading_names_low
     EQUB LO(file_render), LO(command_world + 5), LO(command_light + 5), LO(command_game + 5)
-    EQUB LO(file_main)
+    EQUB LO(file_main), LO(file_mbank)
 .loading_names_high
     EQUB HI(file_render), HI(command_world + 5), HI(command_light + 5), HI(command_game + 5)
-    EQUB HI(file_main)
+    EQUB HI(file_main), HI(file_mbank)
