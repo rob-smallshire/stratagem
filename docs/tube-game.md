@@ -629,7 +629,11 @@ into the day. The game starts at 5 o'clock, at level 3, before dawn.
   cave page, which sky never used, by the slots' pseudo-shapes: the
   parasite sends sky in a band as (sky, the band's shape, no sky bit)
   (`para_copy_tile`); its own tile cache keeps the world's tiles. Tiles in
-  front of the sky, pieces included, show the densest band behind them.
+  front of the sky show the densest band behind them, and so do pieces,
+  but for the upper canopy, which is composed over the plain sky: a third
+  backdrop in the host's library, whose number the parasite sends
+  (`piece_backdrop`, `tiles.backdrop_number`). A tall tree's lower canopy,
+  above the bands, still shows a strip of the band.
 - **The sky is lit by the day alone:** no torch lights it
   (`torch_light`), nor the miner (`sl_block_change`), so the night sky
   has no halo.

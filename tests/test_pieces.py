@@ -12,8 +12,9 @@ from py65.memory import ObservableMemory
 from mos6502 import Machine6502
 from stratagem import gen_tables
 from stratagem.build import read_disc_file
-from stratagem.tiles import (AIR, BACKGROUND_SKY, BACKDROPS, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, PIECES,
-                             SHAPE_FULL, SKY, SLOT_COUNT, SLOT_MATERIAL, TORCH, TRUNK, compose, pair_of, slot_tile)
+from stratagem.tiles import (AIR, BACKGROUND_SKY, BACKDROPS, CANOPY_TOP, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, PIECES,
+                             SHAPE_FULL, SKY, SLOT_COUNT, SLOT_MATERIAL, TORCH, TRUNK, backdrop_number, compose, pair_of,
+                             slot_tile)
 
 NO_SLOT = 0xFF
 TUBE_R3_STATUS, TUBE_R3 = 0xFEE4, 0xFEE5
@@ -116,16 +117,17 @@ def test_host_composes_slots(game_build):
     memory.subscribe_to_read([TUBE_R3], lambda address: sent.popleft())
     cycles = []
     for slot, piece, backdrop, front in ((0, TORCH, AIR, False), (5, TORCH, SKY, False),
-                                         (SLOT_COUNT - 1, TORCH, SKY, False), (7, TRUNK, SKY, True)):
+                                         (SLOT_COUNT - 1, TORCH, SKY, False), (7, TRUNK, SKY, True),
+                                         (9, CANOPY_TOP, SKY, False)):
         pair = pair_of((piece, (BACKGROUND_SKY if backdrop == SKY else 0) | (PIECE_FRONT if front else 0)))
-        sent.extend([slot, pair >> 1, BACKDROPS.index(backdrop)])     # as the parasite sends it
+        sent.extend([slot, pair >> 1, backdrop_number(piece, backdrop)])     # as the parasite sends it
         mpu = machine.mpu
         machine.call(labels["host_compose"])
         assert not sent
         base = SLOT_GRAPHICS + slot * 64
         assert bytes(memory[base:base + 64]) == compose(piece, backdrop, front)
         assert memory[labels["host_slot_pair"] + slot] == pair
-        sent.extend([slot, pair >> 1, BACKDROPS.index(backdrop)])
+        sent.extend([slot, pair >> 1, backdrop_number(piece, backdrop)])
         before = mpu.processorCycles
         machine.call(labels["host_compose"])
         cycles.append(mpu.processorCycles - before)

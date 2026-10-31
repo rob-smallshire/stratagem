@@ -51,6 +51,7 @@ def test_the_games_music_waits_for_the_frame_and_loses_no_tick(tube_music_bbc, g
 
 
 MUSIC_BANK_INDEX = 3                # asm/tube_layout.asm
+ROMSEL_COPY = 0xF4
 PIECE_DAWN = 1                      # asm/mbank.asm
 FIRST_QUIET_SECONDS, QUIET_MIN_TICKS = 15, 120 * 50
 MODEL_TICKS = 300
@@ -71,8 +72,17 @@ def test_the_director_starts_with_dawn_plays_it_as_the_model_does_then_waits(tub
     boot_game(bbc, game_build, time=START_TIME)
     start = bbc.debugger.cycle_count
     bank = lambda: music_bank(bbc, host)
-    started = bbc.run_until_or_timeout(lambda: bank()[mbank["voice_count"]] != 0, FIRST_QUIET_SECONDS + 10)
-    assert started, "no piece started"
+    # The piece starts (music_play, in the music's bank: other ROMs run at
+    # its address too), before its first tick.
+    bank_number = bbc.memory.address.peek[host["ram_banks"] + MUSIC_BANK_INDEX]
+    bbc.debugger.add_breakpoint(mbank["music_play"])
+    for _ in range(1000):
+        bbc.debugger.run_and_wait_for_stop(timeout=60)
+        if bbc.memory.address.peek[ROMSEL_COPY] & 0x0F == bank_number:
+            break
+    else:
+        raise AssertionError("no piece started")
+    bbc.debugger.clear_breakpoints()
     seconds = (bbc.debugger.cycle_count - start) / 2e6
     assert FIRST_QUIET_SECONDS - 1 < seconds < FIRST_QUIET_SECONDS + 2, f"after {seconds:.1f}s"
     assert bank()[mbank["director_last"]] == PIECE_DAWN

@@ -167,6 +167,24 @@ INCBIN "build/generated/radial_packed.bin"
 INCLUDE "build/generated/radial_rows.asm"
 INCLUDE "asm/daylight.asm"
 INCLUDE "build/generated/daynight_tables.asm"
+.piece_sky_backdrops            \ Each piece's backdrop over the sky
+    PIECE_SKY_BACKDROPS
+
+\ The backdrop a pair is composed over (tiles.backdrop_number), in A, from
+\ its sky bit, in carry: the cave, or over the sky, the piece's (the upper
+\ canopy's the plain sky, above the glow's bands). For para_copy_tile.
+.piece_backdrop
+{
+    LDA #0
+    BCC done
+    LDA piece_pair
+    LSR A
+    AND #FRONT_PAIR / 2 - 1
+    TAX
+    LDA piece_sky_backdrops,X
+.done
+    RTS
+}
 INCLUDE "asm/torches.asm"
 INCLUDE "build/generated/support.asm"
 INCLUDE "asm/support.asm"

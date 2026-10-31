@@ -339,6 +339,24 @@ FIRST_PIECE = TORCH
 PIECE_COUNT = len(PIECES)
 assert PIECES == list(range(FIRST_PIECE, FIRST_PIECE + PIECE_COUNT))
 BACKDROPS = [AIR, SKY]                  # by the shape byte's background bit
+# The backdrops' graphics the host keeps, by the number the parasite sends
+# with a pair to compose: the cave; the sky at the hills (the glow's
+# densest band, stratagem.daynight); and the plain sky, for the upper
+# canopy, above the glow's bands.
+CAVE_BACKDROP, SKY_BACKDROP, PLAIN_SKY_BACKDROP = range(3)
+BACKDROP_COUNT = 3
+UPPER_CANOPY = (CANOPY_TOP_LEFT, CANOPY_TOP, CANOPY_TOP_RIGHT)
+
+
+def backdrop_number(material: int, backdrop: int) -> int:
+    """The backdrop graphics a piece is composed over, for its background."""
+    if backdrop != SKY:
+        return CAVE_BACKDROP
+    return PLAIN_SKY_BACKDROP if material in UPPER_CANOPY else SKY_BACKDROP
+
+
+def numbered_backdrop_pixels(number: int) -> list[list[int]]:
+    return [MATERIAL_PIXELS[AIR], backdrop_pixels(SKY), MATERIAL_PIXELS[SKY]][number]
 
 
 def piece_pixels(material: int) -> list[list[int | None]]:
@@ -362,7 +380,7 @@ def _torch_covers(x: int, y: int) -> bool:
 
 def composed_pixels(material: int, backdrop: int) -> list[list[int]]:
     """A piece drawn over a backdrop's pixels."""
-    back = backdrop_pixels(backdrop)
+    back = numbered_backdrop_pixels(backdrop_number(material, backdrop))
     return [[back[y][x] if colour is None else colour for x, colour in enumerate(row)]
             for y, row in enumerate(piece_pixels(material))]
 
@@ -376,8 +394,9 @@ def piece_graphics(material: int) -> bytes:
     return data + mask
 
 
-def backdrop_graphics(backdrop: int) -> bytes:
-    return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in backdrop_pixels(backdrop)])
+def backdrop_graphics(number: int) -> bytes:
+    """Backdrop `number`'s graphics (backdrop_number)."""
+    return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in numbered_backdrop_pixels(number)])
 
 
 FRONT_COLOURS = 0x3F        # a screen byte's bits but those of the tile colour group
@@ -386,7 +405,7 @@ FRONT_COLOURS = 0x3F        # a screen byte's bits but those of the tile colour 
 def compose(material: int, backdrop: int, front: bool = False) -> bytes:
     """What the host composes into a slot: (backdrop AND mask) OR data, the
     data in the sprite colour group (data AND FRONT_COLOURS) if in front."""
-    graphics, back = piece_graphics(material), backdrop_graphics(backdrop)
+    graphics, back = piece_graphics(material), backdrop_graphics(backdrop_number(material, backdrop))
     keep = FRONT_COLOURS if front else 0xFF
     return bytes(back[i] & graphics[64 + i] | graphics[i] & keep for i in range(64))
 

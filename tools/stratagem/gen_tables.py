@@ -102,9 +102,13 @@ def tiles_source() -> str:
         lines += _bytes_lines(tiles.piece_graphics(material))
     lines.append("ENDMACRO")
     lines.append("MACRO BACKDROP_LIBRARY")
-    for backdrop in tiles.BACKDROPS:
-        lines.append(f"    \\ {tiles.MATERIAL_NAMES[backdrop]}")
-        lines += _bytes_lines(tiles.backdrop_graphics(backdrop))
+    for number, name in enumerate(("cave", "sky", "plain sky")):
+        lines.append(f"    \\ {name}")
+        lines += _bytes_lines(tiles.backdrop_graphics(number))
+    lines.append("ENDMACRO")
+    lines.append("\\ Each piece's backdrop number over the sky.")
+    lines.append("MACRO PIECE_SKY_BACKDROPS")
+    lines += _bytes_lines([tiles.backdrop_number(material, tiles.SKY) for material in tiles.PIECES])
     lines.append("ENDMACRO")
     return "\n".join(lines) + "\n"
 

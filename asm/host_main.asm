@@ -644,6 +644,9 @@ GUARD USER_END
     STA zp_mask
     READ_BYTE                   \ The backdrop: backdrop_library + backdrop * 64
     TAX
+    BEQ cave                    \ Over the sky (1 or 2): the pair's 1
+    LDA #1
+.cave
     ASL host_compose_pair       \ The pair, for tests
     ORA host_compose_pair
     LDY host_compose_slot
@@ -831,7 +834,8 @@ INCLUDE "asm/scroll.asm"
 INCLUDE "asm/view.asm"
 
 \ The pieces' graphics (data then mask, 128 bytes each) and the backdrops'
-\ (64 each), which host_compose composes into slots.
+\ (64 each: the cave, the sky at the hills, the plain sky), which
+\ host_compose composes into slots.
 ALIGN &100
 .piece_library
     PIECE_LIBRARY

@@ -665,8 +665,7 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
     LSR A
     STA (para_write),Y          \ The piece
     INY
-    LDA #0
-    ROL A
+    JSR piece_backdrop
     STA (para_write),Y          \ The backdrop
     INY
 .slot_held
