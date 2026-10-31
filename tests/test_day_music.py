@@ -1,10 +1,11 @@
 """The musical day's pieces (stratagem.day_music), as the sequencer's model
 plays them: each once, to its END; each arriving out of silence; and all
-of them, with the overture, within the bank's room for pieces."""
+of them, with the overture, within the bank's room for pieces. And the
+scores (stratagem.day_scores) as saved, in art/music."""
 
 import pytest
 
-from stratagem import day_music, overture, sequencer
+from stratagem import day_music, day_scores, overture, sequencer
 
 PIECES_BUDGET = 10 * 1024           # of MBANK's 16K, beside the player and its tables
 
@@ -31,3 +32,10 @@ def test_a_piece_arrives_out_of_silence(arrangement):
 def test_the_pieces_fit():
     total = sum(day_music.piece(a).size() for a in day_music.ARRANGEMENTS) + overture.sequencer_piece().size()
     assert total <= PIECES_BUDGET, f"{total} bytes"
+
+
+@pytest.mark.parametrize("score", day_scores.SCORES, ids=lambda s: s.__name__)
+def test_a_score_is_saved_as_written(score, tmp_path):
+    written = score()
+    assert written.write(tmp_path).read_bytes() == (day_scores.MUSIC_DIRPATH / written.filename).read_bytes(), \
+        "art/music is stale: uv run python -m stratagem.day_scores"

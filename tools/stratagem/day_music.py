@@ -81,13 +81,17 @@ class Arrangement:
     beats_per_minute: int
     parts: dict[str, Part | list[tuple[float, Part]]]     # a track's, or from each bar on
     dynamics: list[tuple[float, float]]     # (bar from 1, dB); straight lines between
+    beats_per_bar: float = 4                # quarters
 
     def part(self, track: str, step: int) -> Part:
         """The track's part at a step."""
         parts = self.parts[track]
         if isinstance(parts, Part):
             return parts
-        return [part for bar, part in parts if bar_step(bar) <= step][-1]
+        return [part for bar, part in parts if self.bar_step(bar) <= step][-1]
+
+    def bar_step(self, bar: float) -> int:
+        return round((bar - 1) * self.beats_per_bar * STEPS_PER_QUARTER)
 
     @property
     def ticks_per_step(self) -> float:
@@ -104,10 +108,6 @@ class Placed:
     pan: int
     detune: int = 0
     optional: int = 0
-
-
-def bar_step(bar: float) -> int:
-    return round((bar - 1) * STEPS_PER_BAR)
 
 
 def regular_onsets(starts: list[float]) -> dict[float, int]:
@@ -214,7 +214,7 @@ def sequencer_notes(arrangement: Arrangement) -> list[sequencer.Note]:
 
 
 def conductor_points(arrangement: Arrangement) -> list[tuple[int, float]]:
-    return [(bar_step(bar), -(db - HEADROOM_DB) / DB_PER_STEP) for bar, db in arrangement.dynamics]
+    return [(arrangement.bar_step(bar), -(db - HEADROOM_DB) / DB_PER_STEP) for bar, db in arrangement.dynamics]
 
 
 def voices(arrangement: Arrangement) -> tuple[list[sequencer.Voice], int, int]:
@@ -246,7 +246,7 @@ STRINGS_SPREAD = (FAR_LEFT, CENTRE, NEAR_RIGHT)
 WIDE_SPREAD = (LEFT, CENTRE, RIGHT)
 OFF_THE_CLOCK = (0, 1, -0.5, 1.5, 0.5, -1, 2, 0)    # beats, onset by onset
 
-DAWN = Arrangement("dawn", "Stratagem_Dawn_Awakening.mid", 80, {
+FIRST_DAWN = Arrangement("first_dawn", "Stratagem_Dawn_Awakening.mid", 80, {
     # First Light thin, filling out into Sunrise; the violins rising in
     # slowly; the horn arriving from far to near; the end receding.
     "Solo flute": Part("flute", 2, priority=3),
@@ -262,7 +262,7 @@ DAWN = Arrangement("dawn", "Stratagem_Dawn_Awakening.mid", 80, {
     "Harp": [(1, Part("harp", -4, pan=NEAR_LEFT, keep=2)), (11, Part("harp", -3, pan=NEAR_LEFT))],
 }, [(1, -26), (3.5, -12), (10, -9), (11, -7), (18, -4), (24, -1), (27, -1), (29, -5), (30, -10), (31, -24)])
 
-DAYLIGHT = Arrangement("daylight", "Stratagem_Daylight_Open_World.mid", 96, {
+FIRST_DAYLIGHT = Arrangement("first_daylight", "Stratagem_Daylight_Open_World.mid", 96, {
     # Room: the harp halved in the Journey, the horn's motif alone in its
     # register; the strings wide rather than loud; the trumpets joining
     # under the horn; a broad diminuendo, towards the horizon.
@@ -281,7 +281,7 @@ DAYLIGHT = Arrangement("daylight", "Stratagem_Daylight_Open_World.mid", 96, {
 }, [(1, -24), (4, -6), (9, -5), (10, -3), (24, -2), (26, 0), (31, 1), (33, 1), (35.5, -4), (36.5, -9),
     (37, -24)])
 
-DUSK = Arrangement("dusk", "Stratagem_Dusk_Reflection.mid", 80, {
+FIRST_DUSK = Arrangement("first_dusk", "Stratagem_Dusk_Reflection.mid", 80, {
     # The colour drains at 0:30: the strings' doubling and vibrato go, and
     # the celesta and bassoon sound exposed; the horn's Homeward warm and
     # central again; the ending left open (no tonic added).
@@ -300,7 +300,7 @@ DUSK = Arrangement("dusk", "Stratagem_Dusk_Reflection.mid", 80, {
     "Harp": Part("harp", -3, pan=NEAR_LEFT),
 }, [(1, -22), (3, -2), (10, 0), (11, -4), (20, -5), (21, -2), (27, -1), (29, -5), (30, -9), (31, -22)])
 
-NIGHT = Arrangement("night", "Stratagem_Night_Solitude.mid", 72, {
+FIRST_NIGHT = Arrangement("first_night", "Stratagem_Night_Solitude.mid", 72, {
     # Wide, dry and far: the horn far to the left, the celesta high on the
     # right, the strings low in the middle, nothing with vibrato, nothing
     # echoed, and the isolated sounds off the clock. At the turn to D major
@@ -321,7 +321,7 @@ NIGHT = Arrangement("night", "Stratagem_Night_Solitude.mid", 72, {
 }, [(1, -20), (3, -2), (10, 0), (11, -3), (21, -3), (23, -1), (24, 2), (26, 1), (27, -3),
     (28, -20)])
 
-UNDERGROUND = Arrangement("underground", "Stratagem_Underground_Deep_Time.mid", 72, {
+FIRST_UNDERGROUND = Arrangement("first_underground", "Stratagem_Underground_Deep_Time.mid", 72, {
     # Another world. Drones with no beginning, stone-still; glass, pure
     # tones in a detuned pair an octave up, beating slowly, where the other
     # pieces have strings; the cave answering, late, quieter, on the far
@@ -345,6 +345,96 @@ UNDERGROUND = Arrangement("underground", "Stratagem_Underground_Deep_Time.mid", 
     "Trombone": Part("trombone", 0, priority=3, pan=CENTRE),
 }, [(1, -28), (4, -12), (9, -10), (10, -10), (18, -10), (19, -6), (23, 0), (25, 1), (26, -3), (27, -8),
     (28, -28)])
+
+FIRST_DAY = [FIRST_DAWN, FIRST_DAYLIGHT, FIRST_DUSK, FIRST_NIGHT, FIRST_UNDERGROUND]
+
+# The second day (stratagem.day_scores): composed for the board, each piece
+# its own metre, key, tempo, length and texture. Heard together they share
+# the orchestra, the hall's dryness above ground and its echoes below,
+# and the overture's motto.
+
+BIRDS = Part("flute", 0, priority=3, pan=NEAR_RIGHT, articulation=1)
+
+DAWN = Arrangement("dawn", "Stratagem_Dawn_Chorus.mid", 78, {
+    # Birds across the field, near and far, over the harp's ripple; the
+    # ground still until sunrise (bar 13), then warm; the horn near.
+    "Flute": BIRDS,
+    "Oboe": replace(BIRDS, instrument="oboe", level_db=-2, pan=FAR_LEFT),
+    "Clarinet": replace(BIRDS, instrument="clarinet", level_db=-2, pan=NEAR_LEFT),
+    "Harp": Part("harp", -4, pan=HALF_LEFT),
+    "Cellos": [(1, Part("still_cello", -3, pan=CENTRE)), (13, Part("cello", -3, pan=CENTRE))],
+    "Strings": [(1, Part("still_strings", -9, spread=STRINGS_SPREAD)),
+                (13, Part("strings", -7, spread=STRINGS_SPREAD, ensemble_db=-5))],
+    "Bass": Part("bass", -1, priority=2, pan=CENTRE),
+    "Horn": Part("horn", 0, priority=3, pan=CENTRE),
+    "Violins": Part("violin", -2, priority=3, ensemble_db=-4),
+}, [(1, -24), (2, -10), (5, -8), (12, -7), (13, -5), (21, -3), (25, -2), (28, -2), (30, -6), (32, -12),
+    (33, -26)], beats_per_bar=3)
+
+DAYLIGHT = Arrangement("daylight", "Stratagem_Daylight_Open_Road.mid", 98, {
+    # Plucked, bright and dry; the tune passed from horn to trumpet to all.
+    "Bass": Part("plucked_bass", 3, priority=2, pan=CENTRE),
+    "Pizzicato": Part("pizzicato", -6, spread=WIDE_SPREAD),
+    "Celesta": Part("celesta", -8, pan=NEAR_RIGHT),
+    "Strings": Part("strings", -8, spread=STRINGS_SPREAD),
+    "Horn": Part("horn", 0, priority=3),
+    "Trumpet": Part("trumpet", -2, priority=3),
+    "Oboe": Part("oboe", -3, priority=2, pan=NEAR_RIGHT),
+    "Violins": Part("violin", -1, priority=3, ensemble_db=-4),
+    "Flute": Part("flute", -4, priority=2),
+    "Trombone": Part("trombone", -4, priority=2),
+    "Timpani": Part("timpani", 3, priority=2, transpose=-12),
+}, [(1, -22), (2, -6), (3, -4), (10, -4), (11, -2), (18, -2), (19, -3), (26, -1), (27, 0), (34, 0), (35, 1),
+    (36, -2), (37, -24)])
+
+DUSK = Arrangement("dusk", "Stratagem_Dusk_Long_Shadows.mid", 66, {
+    # A song, near and central; the harp's lilt to its left; the strings
+    # still until the clarinet's song, warm at the last.
+    "Cello": Part("cello", 1, priority=3, pan=CENTRE),
+    "Clarinet": Part("clarinet", 0, priority=3, pan=NEAR_RIGHT),
+    "Violins": Part("violin", -3, priority=3),
+    "Horn": Part("horn", -4, priority=2, pan=HALF_LEFT),
+    "Harp": Part("harp", -3, pan=NEAR_LEFT),
+    "Strings": [(1, Part("still_strings", -10, spread=STRINGS_SPREAD)),
+                (17, Part("strings", -9, spread=STRINGS_SPREAD)),
+                (25, Part("strings", -7, spread=STRINGS_SPREAD, ensemble_db=-5))],
+    "Bass": Part("bass", -3, priority=2, pan=CENTRE),
+}, [(1, -22), (3, -9), (8, -8), (12, -6), (16, -9), (20, -7), (25, -5), (27, -6), (28, -10), (29, -15),
+    (30, -24)], beats_per_bar=3)
+
+NIGHT = Arrangement("night", "Stratagem_Night_Watch.mid", 54, {
+    # Wide and dry: the flute near and alone; the celesta's stars high on
+    # the right, off the clock; the harp's slow clock far left; the far
+    # horn farther; nothing doubled until the one major chord.
+    "Flute": Part("flute", 1, priority=3, pan=CENTRE),
+    "Clarinet": Part("clarinet", -1, priority=3, pan=NEAR_LEFT),
+    "Far horn": Part("far_horn", -5, priority=3, pan=LEFT),
+    "Horn": Part("horn", -3, priority=3, pan=CENTRE),
+    "Celesta": Part("celesta", -6, priority=2, pan=RIGHT, nudges=OFF_THE_CLOCK),
+    "Harp": Part("harp", -9, pan=FAR_LEFT),
+    "Strings": [(1, Part("still_strings", -11, spread=WIDE_SPREAD)),
+                (13, Part("strings", -7, spread=WIDE_SPREAD, ensemble_db=-5))],
+    "Cellos": Part("still_cello", -7, pan=CENTRE),
+    "Bass": Part("bass", -4, priority=2, pan=CENTRE),
+}, [(1, -24), (2, -14), (3, -12), (8, -11), (12, -9), (13, -6), (14, -10), (15, -14), (16, -26)], beats_per_bar=5)
+
+UNDERGROUND = Arrangement("underground", "Stratagem_Underground_Seams.mid", 84, {
+    # Another world: the pulse doubled an octave up, to be heard; drones
+    # with no beginning; glass in beating pairs; drips off the clock, the
+    # cave answering, the second a fifth above; the trombone and bassoon
+    # echoed; in the Hidden World the horns and strings wide, unechoed.
+    "Pulse": Part("plucked_bass", 2, priority=2, pan=CENTRE, octave_db=-9),
+    "Drone": Part("drone", -3, pan=CENTRE),
+    "Glass": Part("glass", -6, ensemble_db=-1, ensemble_detune=2),
+    "Drips": Part("drip", -3, pan=NEAR_RIGHT, nudges=OFF_THE_CLOCK,
+                  echoes=(Echo(1.5, -8), Echo(3, -14, transpose=7))),
+    "Trombone": Part("trombone", 0, priority=3, pan=CENTRE, echoes=(Echo(2, -12),)),
+    "Bassoon": Part("bassoon", 0, priority=3, articulation=4, echoes=(Echo(2, -12),)),
+    "Timpani": Part("timpani", 2, priority=2, transpose=-12, pan=CENTRE),
+    "Horn": Part("horn", 2, priority=3, pan=CENTRE, ensemble_db=-4),
+    "Strings": Part("strings", -4, spread=WIDE_SPREAD, ensemble_db=-4),
+}, [(1, -26), (4, -15), (9, -11), (13, -9), (16, -9), (17, -6), (21, -3), (22, -4), (23, -11), (26, -17),
+    (27, -28)], beats_per_bar=3.5)
 
 ARRANGEMENTS = [DAWN, DAYLIGHT, DUSK, NIGHT, UNDERGROUND]
 

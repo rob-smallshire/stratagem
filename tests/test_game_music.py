@@ -92,7 +92,7 @@ def test_the_director_starts_with_dawn_plays_it_as_the_model_does_then_waits(tub
     for tick in range(MODEL_TICKS):
         bbc.debugger.run_and_wait_for_stop(timeout=60)
         player.tick()
-        bbc.debugger.run_to(mbank["music_tick_end"])
+        bbc.debugger.run_to(mbank["music_tick_end"], skip_current=True)     # (stopped at music_tick's breakpoint)
         assert played(bank()) == modelled(player), f"tick {tick}"
     bbc.debugger.clear_breakpoints()
 

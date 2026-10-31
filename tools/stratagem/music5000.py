@@ -209,6 +209,11 @@ INSTRUMENTS = {
     "drone": Instrument("cello", attack=1, decay=0, sustain=FULL, release=1, stereo=13, shift=9),
     # Glass: a pure tone, swelling and fading slowly; a pair detuned beats.
     "glass": Instrument("sine", attack=2, decay=0, sustain=FULL, release=2, stereo=13, shift=8),
+    # Plucked: struck, and dying away in half a second, a bass's in a
+    # little under a second; a drip, pure, ringing a second and more.
+    "pizzicato": Instrument("strings", attack=128, decay=5, sustain=0, release=8, stereo=12),
+    "plucked_bass": Instrument("bass", attack=128, decay=3, sustain=0, release=6, stereo=13),
+    "drip": Instrument("sine", attack=128, decay=2, sustain=0, release=3, stereo=15),
 }
 TITLE_INSTRUMENTS = 13              # the overture's orchestra, first
 MAX_INSTRUMENTS = 32

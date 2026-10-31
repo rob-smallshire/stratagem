@@ -427,6 +427,45 @@ All six: 6.3K, about half the bank's room for pieces. Regularised, the
 day's five are 4.7K arranged against 3.9K plain: the decorations and the
 changes by bar cost more than the regular timing saves.
 
+## The second day
+
+Heard together, the first five were indistinct: each in 4/4, at 72 to 96
+beats a minute, each 92 seconds, all for the full orchestra, in much the
+same textures. They are kept (`FIRST_DAY` in `day_music.py`, the MIDI
+files in `art/music/`), but the game now plays a second day, composed
+for the board with more freedom (`tools/stratagem/day_scores.py`, which
+writes `art/music/Stratagem_{Dawn_Chorus,Daylight_Open_Road,
+Dusk_Long_Shadows,Night_Watch,Underground_Seams}.mid`). Each piece has
+its own metre, key, tempo and texture, and what holds them together is
+the orchestra, the hall (dry above ground, echoing below) and the
+overture's motto: its opening rise, a fourth and then two steps (A D E F#).
+
+| Piece | Metre, tempo | Key | Texture | The motto |
+|---|---|---|---|---|
+| Dawn Chorus | 6/8, 78 | G Lydian | birdsong (flute, oboe, clarinet) across the field, rippling harp, the ground still until sunrise | slow, on the horn at sunrise; high, on the violins |
+| The Open Road | 4/4, 98 | A, a shift to F | plucked strings and bass, a celesta ostinato bent to each chord, the tune passed from horn to trumpet to all | quick, opening a striding tune |
+| Long Shadows | 3/4, 66 | E flat | a cello's song over the harp's lilt; the clarinet's in C minor; ending open on the fourth chord | backwards, falling |
+| Night Watch | 5/4, 54 | B Dorian | a lone low flute; stars on the celesta, off the clock; the harp's slow clock far left | in minor; the clarinet and a far horn in canon |
+| Seams | 7/8, 84 | C Phrygian | a plucked ostinato, drips echoing (one a fifth above), drones and glass | bent a semitone on the trombone; from A flat rising into C major, the Hidden World |
+
+New instruments, on the overture's waves: pizzicato (the strings' wave,
+struck, gone in half a second), a plucked bass, and a drip (a pure tone,
+struck, ringing a second and more).
+
+Measured (the model's renders):
+
+| Piece | Length | Channels | Bytes | Loudest 3s, from the overture's |
+|---|---|---|---|---|
+| Dawn Chorus | 77s | 16 | 776 | -5.7dB |
+| The Open Road | 91s | 16 | 1,120 | -2.4dB |
+| Long Shadows | 83s | 13 | 744 | -10.2dB |
+| Night Watch | 88s | 14 | 536 | -12.5dB |
+| Seams | 68s | 16 | 896 | -4.4dB |
+
+The five: 4.1K, against the first day's 4.7K, since ostinatos and
+repeated accompaniments make patterns. Night is the sparsest, and the
+smallest.
+
 ## The director
 
 In MBANK (`asm/mbank.asm`), ticked as the music is: while a piece plays,
