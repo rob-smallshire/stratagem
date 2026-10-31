@@ -485,6 +485,15 @@ down, which costs almost nothing.
   each piece, two minutes and up to 2:43 more of silence; then every 30
   seconds a chance of a third of the piece for the moment, half that if
   it was the last played. A piece plays to its end, whatever happens.
+- **The silences, as they fall** (simulated exactly: the director's own
+  LFSR, all 128 seeds, three hours each on the surface): median 3.7
+  minutes, mean 4.7; half between 2.8 and 5.7, 5% to 95% from 2.2 to 9.5,
+  the longest 25. Music plays about a quarter of the time. Kept so:
+  continuous music tires. Two quirks, accepted for now: Dawn's and Dusk's
+  windows (100 seconds each) are shorter than the least quiet, so after
+  the first Dawn they come about a tenth of the time each, against
+  Daylight's and Night's two fifths; and the LFSR moves a bit a draw, so
+  successive chances are correlated, lengthening the tail.
 - **The overture** is in the bank, for celebration; nothing asks for it
   yet.
 - `tests/test_game_music.py` checks that Dawn comes first, after the quiet
