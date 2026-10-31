@@ -17,12 +17,15 @@ lit at the sun's level, and drawn in one of four ways:
 - horizon: as palette, brighter near the hills at dawn and dusk.
 - two-tone: as horizon, with a warm colour low and the sky's colour high,
   dithered into each other.
+- game: two-tone as the game could draw it, a tile at a time, the warm
+  pixels fixed in the sky's graphics, shown by the palette.
 - soft: blue high and a warm colour low, the warm never more than
   WARM_MOST of the lit pixels, and a smaller boost: magenta alone; yellow
   and magenta; magenta and red.
 
 Writes curve.png (the sun's level through the day), day.png (the scene at
-a series of times, the first four ways) and soft.png (the soft ways).
+a series of times, the first four ways) soft.png (the soft ways), and twilight.png (the two-tone ways, into the
+night).
 """
 
 from __future__ import annotations
@@ -51,16 +54,22 @@ HOUR = TIMES / 24
 
 @dataclass(frozen=True)
 class Curve:
-    """The sun's level by the time: night at midnight, FULL at noon, sigmoid
-    ramps centred on dawn and dusk (hours), symmetric about noon."""
-    night: int = 2              # the level at night (moonlight)
-    dawn: float = 6             # hours: the ramp's middle
-    width: float = 0.5          # hours: from a quarter of the way up to three quarters, about 2.2 widths
+    """The sun's level by the time, symmetric about noon: FULL through the
+    day; a quick sigmoid ramp at dawn and dusk (hours) down to the
+    twilight's levels; then a slow one, the twilight, on the night's side,
+    down to black around midnight. Light leaks over the horizon into the
+    night; the dark doesn't leak into the day."""
+    dawn: float = 6             # hours: the quick ramp's middle
+    width: float = 0.4          # hours: from a quarter of the way up to three quarters, about 2.2 widths
+    twilight: float = 2.5       # levels: the slow ramp's height (2, 1, then 0, rounded)
+    twilight_middle: float = 3.25
+    twilight_width: float = 0.6
 
     def level(self, time: int) -> int:
         hours = min(time, TIMES - time) / HOUR      # symmetric about noon: the morning's hour
-        rise = 1 / (1 + math.exp(-(hours - self.dawn) / self.width))
-        return round(self.night + (FULL - self.night) * rise)
+        quick = 1 / (1 + math.exp(-(hours - self.dawn) / self.width))
+        slow = 1 / (1 + math.exp(-(hours - self.twilight_middle) / self.twilight_width))
+        return min(FULL, round((FULL - self.twilight) * quick + self.twilight * slow))
 
     def table(self) -> list[int]:
         return [self.level(t) for t in range(TIMES)]
@@ -87,6 +96,14 @@ SOFT_WAYS = {
     "soft magenta, red": ((MAGENTA, RED), (MAGENTA, RED)),
 }
 
+# As the game could draw it: the sky's light and its warm pixels a tile at
+# a time, by the tile's height above its column's surface; the warm pixels
+# fixed in the sky's graphics (GAME_BANDS of them, densest at the hills),
+# shown by the palette alone: the warm colour blue, or magenta from
+# GAME_WARM_FROM warmth.
+GAME_BANDS = 4
+GAME_WARM_FROM = 0.3
+
 
 def sky_colours(time: int, curve: Curve, way: str) -> tuple[int, int]:
     """The physical colours of the sky's two logical colours at a time."""
@@ -97,6 +114,8 @@ def sky_colours(time: int, curve: Curve, way: str) -> tuple[int, int]:
     if way in SOFT_WAYS:
         edge, middle = SOFT_WAYS[way][dusk]
         return BLUE, (middle if w > 0.6 else edge)
+    if way == "game":
+        return BLUE, (MAGENTA if w >= GAME_WARM_FROM else BLUE)
     if w < 0.25:
         return BLUE, BLUE
     if way == "two-tone":
@@ -128,7 +147,11 @@ def picture(scene, tiles, light, sun: int, time: int, curve: Curve, way: str,
     if way in ("horizon", "two-tone"):
         sky_level = sky_level + HORIZON_BOOST * w * near
     thresholds = BAYER[ys % 4, xs % 4]
-    if way in SOFT_WAYS:
+    if way == "game":
+        band = np.clip(GAME_BANDS - (above - 1) // TILE_LINE_HEIGHT, 0, GAME_BANDS) / GAME_BANDS  # by tile
+        sky_level = sky_level + np.rint(HORIZON_BOOST / 2 * w * band)
+        warm = thresholds < np.rint(band * 16 * WARM_MOST)
+    elif way in SOFT_WAYS:
         sky_level = sky_level + HORIZON_BOOST / 2 * w * near
         warm = thresholds < np.rint(near * 16 * WARM_MOST * w)
     else:
@@ -181,13 +204,14 @@ def main() -> None:
     clear = _clear(tiles)
     daylight = np.maximum(lighting.shaft_sunlight(clear, surface=surface(scene, clear)), glow(scene, clear))
     others = np.maximum(torches_spread(scene, clear), player_light(scene, clear))
-    times = [round(h * HOUR) for h in (12, 16.5, 17.25, 17.75, 18, 18.25, 18.75, 0)]
+    times = [round(h * HOUR) for h in (12, 17, 17.5, 17.75, 18, 18.25, 18.5, 19, 20, 21, 22, 0)]
     curve_picture(curve, times).save(output_dirpath / "curve.png")
     window = (scene.x0 - 2, 34, 24, 26)
-    for name, ways in (("day.png", ["blue", "palette", "horizon", "two-tone"]), ("soft.png", ["blue", *SOFT_WAYS])):
+    for name, ways in (("day.png", ["blue", "palette", "horizon", "two-tone"]), ("soft.png", ["blue", *SOFT_WAYS]),
+                       ("twilight.png", ["two-tone", "soft magenta", "game"])):
         sheet(panels_for(scene, tiles, daylight, others, curve, times, window, ways), len(times)).save(
             output_dirpath / name)
-    print(f"Wrote {output_dirpath}: curve.png, day.png, soft.png; the table: {curve.table()}")
+    print(f"Wrote {output_dirpath}: curve.png, day.png, soft.png, twilight.png; the table: {curve.table()}")
 
 
 def panels_for(scene, tiles, daylight, others, curve, times, window, ways):
