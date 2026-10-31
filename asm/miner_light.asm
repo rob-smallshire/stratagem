@@ -561,6 +561,9 @@ GRID_COLUMN = 8 * GRID_RADIUS - (BLOCK_PIXELS DIV 2 + RADIAL_CENTRE)
     LDA sl_new
     CMP sl_old
     BEQ done
+    LDA (sl_map_ptr),Y          \ The miner's light doesn't show on the sky
+    CMP #TILE_SKY
+    BEQ done
     LDA (sl_shape_ptr),Y        \ The tile's graphics page
     STA sl_shape
     LDA (sl_map_ptr),Y
@@ -1110,7 +1113,8 @@ NEXT
     RTS
 }
 
-\ Reset the blocks of tile (X, Y).
+\ Reset the blocks of tile (X, Y), and force a pass if the miner's light
+\ reached them.
 .sl_reset_tile
 {
     TXA                         \ Its first block
@@ -1136,15 +1140,18 @@ NEXT
     ROR A
     STA sl_ptr
     LDY sl_tmp
+    LDA (sl_ptr),Y              \ A pass is needed only if the miner's light
+    INY                         \ reached it: a block not dark
+    ORA (sl_ptr),Y
+    ORA sl_force
+    STA sl_force
     LDA #0
     STA (sl_ptr),Y
-    INY
+    DEY
     STA (sl_ptr),Y
     INC sl_tmp + 1
     DEX
     BNE loop
-    LDA #&FF
-    STA sl_force
     RTS
 }
 

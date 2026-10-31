@@ -470,7 +470,7 @@ A running log of design decisions. Add to it whenever one is made.
   each played once, to its end, between long silences (two minutes and
   more), as Minecraft does; Underground below the surface, otherwise the
   piece for the hour of a world's day that the parasite now keeps (a
-  20-minute day; the light doesn't follow it yet). Each piece arranged as
+  20-minute day, since 21.8). Each piece arranged as
   data after an arranger's notes (fading in and dissolving, peaks ranked
   below the overture's, echo only underground), Underground made
   otherworldly. Compressed together the pieces shared almost nothing, so
@@ -483,3 +483,14 @@ A running log of design decisions. Add to it whenever one is made.
   index the light's table and to send the host (`PACKET_TIME`). Hours are
   no longer whole numbers of frames, but nothing needs them: the
   director's phases are thresholds on the time.
+- **Day and night by subtraction, with a glowing sky:** the sun's level by
+  the time, full through a long day, quick sigmoid ramps at dawn and dusk,
+  a long shallow twilight on the night's side and a black midnight (light
+  leaks over the horizon into the night; the dark doesn't leak into the
+  day); daylight dimmed by subtracting from it, so shafts and caves go
+  dark first; the sky dithered by the same masks, its lowest four rows in
+  bands of a warm colour that the palette makes magenta at dawn and dusk.
+  The warm colour takes the tile group's cyan: gems became green and
+  magenta, water's highlights white. Chosen from the day and night lab
+  (`strat-daynight-lab`), as the game could draw it: bands a tile high,
+  warm pixels fixed in the sky's graphics and shown by the palette.

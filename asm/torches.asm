@@ -246,6 +246,13 @@
 \ The gathered torches' light at tile (zp_fill_x, zp_fill_y), scaled, in A.
 .torch_light
 {
+    JSR sun_cache_point         \ No torch lights the sky
+    LDA (sun_ptr),Y
+    CMP #TILE_SKY
+    BNE lit
+    LDA #0
+    RTS
+.lit
     LDA #0
     STA torch_best
     LDY #0

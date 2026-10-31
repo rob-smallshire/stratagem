@@ -324,7 +324,10 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
 \ The daylight of tile (zp_fill_x, zp_fill_y), in the tile cache, scaled, in
 \ A: the brighter of its sunlight, a level less for each SHAFT_TAPER tiles
 \ it is below its column's surface, and the glow (LIGHT_FULL - GLOW_LOSS
-\ down to the surface, then a level less a tile deeper).
+\ down to the surface, then a level less a tile deeper); dimmed by the
+\ time of day, sun_dim levels less; and sky in the glow's bands, the
+\ DAYNIGHT_BANDS rows above its column's surface, brighter by the glow's
+\ boost (stratagem.daynight.level).
 .sun_daylight
 {
     JSR sun_tile
@@ -359,6 +362,40 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
     BCS brighter
     LDA sun_level
 .brighter
+    SEC                         \ Dimmed
+    SBC sun_dim
+    BCS dimmed
+    LDA #0
+.dimmed
+    STA sun_level
+    LDX zp_fill_x               \ Sky in a band?
+    LDA world_heights,X
+    SEC
+    SBC zp_fill_y               \ Rows above the surface
+    BCC lit
+    CMP #DAYNIGHT_BANDS + 1
+    BCS lit
+    SBC #0                      \ (Carry clear: less 1) The band: 0 for rows 0 and 1
+    BCS band_set
+    LDA #0
+.band_set
+    ORA sun_boost
+    STA sun_tmp
+    JSR sun_cache_point
+    LDA (sun_ptr),Y
+    CMP #TILE_SKY
+    BNE lit
+    LDX sun_tmp
+    LDA sun_level
+    CLC
+    ADC daynight_band_boosts,X
+    CMP #LIGHT_FULL + 1
+    BCC boosted
+    LDA #LIGHT_FULL
+.boosted
+    STA sun_level
+.lit
+    LDA sun_level
     ASSERT LIGHT_SCALE = 16
     ASL A
     ASL A
@@ -366,6 +403,133 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
     ASL A
     RTS
 }
+ASSERT DAYNIGHT_BANDS = 4
+
+\ The time of day (zp_time's high byte), through daynight_table: the sun's
+\ level, as sun_dim, and the glow's boost; when they change, the tile
+\ cache is relit (sun_sweep).
+.sun_time
+{
+    LDX zp_time + 1
+    LDA daynight_table,X
+    CMP sun_applied
+    BEQ done
+    STA sun_applied
+    AND #&0F
+    EOR #LIGHT_FULL             \ LIGHT_FULL less the level
+    STA sun_dim
+    LDA sun_applied
+    LSR A
+    LSR A
+    AND #&0C                    \ The boost, times 4
+    STA sun_boost
+    LDA #TILE_CACHE_SIZE
+    STA sweep_rows
+    LDA view_top
+    STA sweep_row
+    LDA cached_left
+    STA sweep_x
+.done
+    RTS
+}
+ASSERT LIGHT_FULL = &0F
+
+\ Relight SWEEP_TILES tiles of the tile cache, a row at a time from the
+\ view's top, its tiles from the left, wrapping from the cache's bottom to
+\ its top, until sweep_rows are done: each tile's daylight, or the torches'
+\ light where brighter, queued to be sent where it changes, as the
+\ torches' are (torch_relight), and only while the queue has room.
+SWEEP_TILES = 4
+.sun_sweep
+{
+    LDA sweep_rows
+    BNE sweeping
+.idle
+    RTS
+.sweeping
+    LDA torch_queue_head        \ Room: (head - tail - 1) MOD TORCH_QUEUE
+    CLC
+    SBC torch_queue_tail
+    AND #TORCH_QUEUE - 1
+    CMP #SWEEP_TILES
+    BCC idle
+    LDA #SWEEP_TILES
+    STA sweep_tiles
+.row
+    LDA sweep_row               \ In the tile cache? (Else on to the next.)
+    CMP cached_top
+    BCC next_row
+    CMP cached_bottom
+    BEQ inside
+    BCS next_row
+.inside
+    STA zp_temp                 \ The torches whose light reaches the row
+    TAY
+    LDA cached_left
+    LDX cached_right
+    JSR torch_gather_around
+.tile
+    LDA sweep_x
+    CMP cached_left
+    BCC next_row
+    CMP cached_right
+    BEQ in_row
+    BCS next_row
+.in_row
+    STA zp_fill_x
+    LDA sweep_row
+    STA zp_fill_y
+    JSR sun_daylight            \ Daylight, or the torches' light
+    STA torch_new
+    JSR torch_light
+    CMP torch_new
+    BCC lit
+    STA torch_new
+.lit
+    JSR para_cache_pointer      \ Changed?
+    LDA para_cache + 1
+    CLC
+    ADC #HI(tile_cache_light - tile_cache)
+    STA para_cache + 1
+    LDY #0
+    LDA torch_new
+    CMP (para_cache),Y
+    BEQ next_tile
+    LDX torch_queue_tail        \ Queued (the room was seen to)
+    STA torch_queue_light,X
+    LDA zp_fill_x
+    STA torch_queue_x,X
+    LDA zp_fill_y
+    STA torch_queue_y,X
+    INX
+    TXA
+    AND #TORCH_QUEUE - 1
+    STA torch_queue_tail
+.next_tile
+    INC sweep_x
+    DEC sweep_tiles
+    BNE tile
+    RTS
+.next_row
+    LDA cached_left
+    STA sweep_x
+    DEC sweep_rows
+    BEQ done
+    LDX sweep_row
+    INX
+    CPX cached_bottom
+    BEQ row_set
+    BCC row_set
+    LDX cached_top
+.row_set
+    STX sweep_row
+    DEC sweep_tiles
+    BEQ done
+    JMP row
+.done
+    RTS
+}
+ASSERT TORCH_QUEUE > SWEEP_TILES
 
 \ Light the tiles just filled into the tile cache (a strip from
 \ (para_strip_x, para_strip_y), para_count long, down if para_strip_down)

@@ -284,11 +284,23 @@ def load_game(bbc: Beebium, game_build: BuildResult) -> None:
     assert loaded, "the game didn't load"
 
 
-def boot_game(bbc: Beebium, game_build: BuildResult) -> None:
+NOON = 0x8000                       # world_start_time for the game's tests: full daylight
+
+
+def set_start_time(bbc: Beebium, game_build: BuildResult, time: int) -> None:
+    """Set the parasite's world_start_time, before the game starts."""
+    parasite = bbc.connect_coprocessor().memory.address
+    address = game_build.labels["PARASITE"]["world_start_time"]
+    parasite.bus[address], parasite.bus[address + 1] = time & 0xFF, time >> 8
+
+
+def boot_game(bbc: Beebium, game_build: BuildResult, time: int = NOON) -> None:
     """Boot the game disc, press SPACE at the title and again once it has
-    loaded, and run until the game has drawn two frames."""
+    loaded, and run until the game has drawn two frames: from `time`, by
+    default noon (the game itself starts at dawn)."""
     boot_to_title(bbc, game_build)
     load_game(bbc, game_build)
+    set_start_time(bbc, game_build, time)
     press_space(bbc)
     frame_count_address = game_build.labels["HOST"]["host_frame_count"]
     started = bbc.run_until_or_timeout(lambda: bbc.memory.address.peek[frame_count_address] >= 2,

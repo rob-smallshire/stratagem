@@ -30,9 +30,7 @@ night).
 
 from __future__ import annotations
 
-import math
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +38,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from stratagem import lighting
 from stratagem.daylight_lab import glow, surface
+from stratagem.daynight import Curve
 from stratagem.lighting import BAYER, FULL
 from stratagem.lighting_lab import (RGB, TORCH_ART, _clear, _solid_pixels, art_rows, draw_sprite, mine_scene,
                                     player_light, region_pixels, sheet, tile_levels, torches_spread)
@@ -52,33 +51,8 @@ NOON = TIMES // 2
 HOUR = TIMES / 24
 
 
-@dataclass(frozen=True)
-class Curve:
-    """The sun's level by the time, symmetric about noon: FULL through the
-    day; a quick sigmoid ramp at dawn and dusk (hours) down to the
-    twilight's levels; then a slow one, the twilight, on the night's side,
-    down to black around midnight. Light leaks over the horizon into the
-    night; the dark doesn't leak into the day."""
-    dawn: float = 6             # hours: the quick ramp's middle
-    width: float = 0.4          # hours: from a quarter of the way up to three quarters, about 2.2 widths
-    twilight: float = 2.5       # levels: the slow ramp's height (2, 1, then 0, rounded)
-    twilight_middle: float = 3.25
-    twilight_width: float = 0.6
-
-    def level(self, time: int) -> int:
-        hours = min(time, TIMES - time) / HOUR      # symmetric about noon: the morning's hour
-        quick = 1 / (1 + math.exp(-(hours - self.dawn) / self.width))
-        slow = 1 / (1 + math.exp(-(hours - self.twilight_middle) / self.twilight_width))
-        return min(FULL, round((FULL - self.twilight) * quick + self.twilight * slow))
-
-    def table(self) -> list[int]:
-        return [self.level(t) for t in range(TIMES)]
-
-
 def warmth(time: int, curve: Curve) -> float:
-    """How far into dawn or dusk: 1 in the ramp's middle, falling away either side."""
-    hours = min(time, TIMES - time) / HOUR
-    return math.exp(-((hours - curve.dawn) / (2.5 * curve.width)) ** 2)
+    return curve.warmth(time)
 
 
 # Pseudo logical colours for the sky: its colour, and the warm colour low.

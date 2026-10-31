@@ -193,6 +193,7 @@
     JSR support_step            \ Pieces no longer held fall, sent as changed
 .*para_daylight
     JSR sun_step                \ Relighting by daylight, queueing changes
+    JSR sun_sweep               \ And by the time of day
 .*para_daylit
 .queued
     LDA para_changes
@@ -676,6 +677,25 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
     STX para_shape
 .plain
     LDA para_material
+    CMP #TILE_SKY               \ Sky in a band of the glow: as the band's
+    BNE sent                    \ graphics (stratagem.daynight.drawn)
+    LDX zp_fill_x
+    LDA world_heights,X
+    SEC
+    SBC zp_fill_y               \ Rows above the surface
+    BCC sky
+    CMP #DAYNIGHT_BANDS + 1
+    BCS sky
+    SBC #0                      \ (Carry clear: less 1) Rows 0 and 1: band 0
+    BCS band_set
+    LDA #0
+.band_set
+    TAX
+    LDA daynight_band_shapes,X
+    STA para_shape
+.sky
+    LDA para_material
+.sent
     STA (para_write),Y
     INY
     LDA para_shape

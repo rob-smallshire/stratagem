@@ -187,6 +187,7 @@ GUARD USER_END
     \ as not to delay the columns (they are never drawn where new columns
     \ or rows go: items.asm).
     JSR set_crtc_start
+    JSR host_glow
     JSR sprite_split_row
     LDA #0
     LDX zp_split_row
@@ -247,7 +248,37 @@ GUARD USER_END
 }
 
 .host_time          EQUB 0      \ PACKET_TIME: the time of day, in 256ths
+.host_glow_colour   EQUB &FF    \ The glow's physical colour, once set
 .host_world         EQUB 0      \ PACKET_WORLD: WORLD_UNDERGROUND, or 0
+
+\ The sky's glow (stratagem.daynight): GLOW_LOGICAL's physical colour,
+\ magenta at dawn and dusk, otherwise blue, set when it changes.
+.host_glow
+{
+    LDA host_time
+    CMP #GLOW_DAWN_FROM
+    BCC blue
+    CMP #GLOW_DAWN_UNTIL
+    BCC magenta
+    CMP #GLOW_DUSK_FROM
+    BCC blue
+    CMP #GLOW_DUSK_UNTIL
+    BCS blue
+.magenta
+    LDA #GLOW_MAGENTA
+    BNE set                     \ (Always)
+.blue
+    LDA #GLOW_BLUE
+.set
+    CMP host_glow_colour
+    BEQ done
+    STA host_glow_colour
+    EOR #7                      \ As the ULA wants it
+    ORA #GLOW_LOGICAL << 4
+    STA ULA_PALETTE
+.done
+    RTS
+}
 .host_vsync_wait    EQUB 0      \ Non-zero: the music's ticks are owed...
 .host_ticks_owed    EQUB 0      \ ... so many
 

@@ -42,6 +42,9 @@ from functools import cache
 from stratagem.screen import TILE_HEIGHT_LINES, TILE_WIDTH_PIXELS, encode_tile
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
+# The tile group's cyan is the sky's glow (stratagem.daynight): blue, or
+# magenta at dawn and dusk, by the host's palette. No tile is cyan.
+GLOW = CYAN
 
 TILE_COLOUR_BASE = 8
 
@@ -279,20 +282,37 @@ MATERIAL_PIXELS = {
     SOIL: _pixels(_soil),
     STONE: _pixels(_stone),
     ORE: _pixels(lambda x, y: YELLOW if 2 <= x <= 5 and 5 <= y <= 10 and _speckle(x, y, 4) < 170 else _stone(x, y)),
-    GEM: _pixels(lambda x, y: (MAGENTA if (x + y) % 2 else CYAN) if abs(x - 3.5) + abs(y - 7.5) / 2 < 3 else _stone(x, y)),
+    GEM: _pixels(lambda x, y: (MAGENTA if (x + y) % 2 else GREEN) if abs(x - 3.5) + abs(y - 7.5) / 2 < 3 else _stone(x, y)),
     BEDROCK: _pixels(lambda x, y: BLACK if y % 8 == 7 or (x == (0 if y // 8 % 2 else 4)) else MAGENTA),
-    WATER: _pixels(lambda x, y: CYAN if y == (x // 2) % 2 else BLUE),
+    WATER: _pixels(lambda x, y: WHITE if y == (x // 2) % 2 else BLUE),
     SKY: _pixels(lambda x, y: BLUE),
 }
 
 
+def backdrop_pixels(behind: int) -> list[list[int]]:
+    """What shows through a tile's open parts: the cave, or the sky as at
+    the hills, its glow's densest band (stratagem.daynight)."""
+    if behind == SKY:
+        from stratagem.daynight import band_pixels
+        return band_pixels(0)
+    return MATERIAL_PIXELS[behind]
+
+
 def _variant_pixels(material: int, variant: int, behind: int) -> list[list[int]]:
     """A whole tile of one variant of the material's cells: within each
-    cell, lines 0-3 and 4-7 are the material's or the background's."""
+    cell, lines 0-3 and 4-7 are the material's or the background's. Sky's
+    variants against the cave are instead the glow's bands, by number
+    (stratagem.daynight.drawn): no sky is drawn against the cave."""
+    if material == SKY:
+        if behind == AIR:
+            from stratagem.daynight import band_pixels
+            return band_pixels(variant)
+        return MATERIAL_PIXELS[SKY]
     keep_top = variant in (VARIANT_FULL, VARIANT_TOP)
     keep_bottom = variant in (VARIANT_FULL, VARIANT_BOTTOM)
+    back = backdrop_pixels(behind)
     return [
-        [MATERIAL_PIXELS[material][y][x] if (keep_top if y % 8 < 4 else keep_bottom) else MATERIAL_PIXELS[behind][y][x]
+        [MATERIAL_PIXELS[material][y][x] if (keep_top if y % 8 < 4 else keep_bottom) else back[y][x]
          for x in range(TILE_WIDTH_PIXELS)]
         for y in range(TILE_HEIGHT_LINES)
     ]
@@ -342,7 +362,8 @@ def _torch_covers(x: int, y: int) -> bool:
 
 def composed_pixels(material: int, backdrop: int) -> list[list[int]]:
     """A piece drawn over a backdrop's pixels."""
-    return [[MATERIAL_PIXELS[backdrop][y][x] if colour is None else colour for x, colour in enumerate(row)]
+    back = backdrop_pixels(backdrop)
+    return [[back[y][x] if colour is None else colour for x, colour in enumerate(row)]
             for y, row in enumerate(piece_pixels(material))]
 
 
@@ -356,7 +377,7 @@ def piece_graphics(material: int) -> bytes:
 
 
 def backdrop_graphics(backdrop: int) -> bytes:
-    return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in MATERIAL_PIXELS[backdrop]])
+    return encode_tile([[TILE_COLOUR_BASE + colour for colour in row] for row in backdrop_pixels(backdrop)])
 
 
 FRONT_COLOURS = 0x3F        # a screen byte's bits but those of the tile colour group
@@ -414,13 +435,16 @@ def tile_pixels(material: int, shape: int) -> list[list[int]]:
     """A tile's pixels (in the tile colour group, without the base)."""
     if material in PIECES:
         return composed_pixels(material, background(shape))
+    if material == SKY and not shape & BACKGROUND_SKY:
+        from stratagem.daynight import band_pixels
+        return band_pixels(SLOT_SHAPES.index(shape & SHAPE_BITS))
     if material in PASSABLE:
         return MATERIAL_PIXELS[material]
     cells = set(solid_quarter_cells(material, shape))
-    behind = background(shape)
+    behind = backdrop_pixels(background(shape))
     return [
         [MATERIAL_PIXELS[material][y][x] if (y // QUARTER_LINES, x // QUARTER_PIXELS) in cells
-         else MATERIAL_PIXELS[behind][y][x]
+         else behind[y][x]
          for x in range(TILE_WIDTH_PIXELS)]
         for y in range(TILE_HEIGHT_LINES)
     ]

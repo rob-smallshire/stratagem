@@ -11,7 +11,7 @@ from stratagem import camera, inventory, items, lighting, player, sprites
 from stratagem.inventory import KIND_TORCH
 from stratagem.player import Player
 from stratagem.screen import CELL_BYTES, SCREEN_END, SCREEN_START, render_view, wrap
-from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, SHAPE_FULL, SLOT_COUNT, TORCH,
+from stratagem.tiles import (BACKGROUND_SKY, FIRST_PIECE, FRONT_PAIR, PIECE_FRONT, SHAPE_FULL, SKY, SLOT_COUNT, TORCH,
                              slot_of, tile_bytes)
 
 TILE_CACHE_SIZE = 32       # asm/layout.asm
@@ -80,8 +80,10 @@ def expected_screen(bbc, labels):
                    else set(range(0, -plan_dx)))
 
     def level(u, v):
-        day = tiles(u // 4, v // 2)[1]
+        tile, day = tiles(u // 4, v // 2)
         if u - camera_x in new_columns:         # drawn after the light's list, as daylight
+            return day
+        if tile[0] == SKY:                      # the miner's light doesn't show on the sky
             return day
         return max(day, miner.get((u, v), 0))
 

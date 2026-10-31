@@ -477,8 +477,8 @@ down, which costs almost nothing.
   &8000), from 5 o'clock, stopped while the pack is open. Each packet
   carries the time, the clock's high byte, in 256ths of a day
   (`PACKET_TIME`), and whether the player's feet are three tiles or more
-  below the surface (`PACKET_WORLD`). The world's light doesn't follow
-  the clock yet.
+  below the surface (`PACKET_WORLD`). The world's light follows it
+  (`docs/tube-game.md`, Day and night).
 - **The piece for the moment:** Underground, if the player is
   underground; otherwise by the time: Dawn from 5 o'clock, Daylight from
   7, Dusk from 18, Night from 20 (`tube_layout.asm`, as times: &35, &4A,
@@ -506,8 +506,6 @@ down, which costs almost nothing.
 
 ## Not yet
 
-- **The world's light by the clock:** the night isn't dark yet, nor dawn
-  and dusk coloured.
 - **Celebration:** moments for the overture (and a great cavern's
   discovery for the Hidden World) need the game to name them.
 

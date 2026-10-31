@@ -7,11 +7,12 @@ parasite's frames cost."""
 
 import numpy as np
 
-from conftest import FakeHost
+from conftest import NOON, FakeHost
 from mos6502 import Machine6502
-from stratagem import lighting
+from stratagem import daynight, lighting
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
+from stratagem.tiles import SKY
 from stratagem.world import HEIGHTS
 
 TILE_CACHE_SIZE = 32
@@ -37,6 +38,8 @@ class ParasiteGame:
         self.memory = self.mpu.memory
         self.host = FakeHost(self.machine, self.labels)
         self.machine.hooks[self.labels["para_send"]] = self.take_packet
+        start = self.labels["world_start_time"]        # noon: full daylight
+        self.memory[start], self.memory[start + 1] = NOON & 0xFF, NOON >> 8
         self.mpu.pc = self.labels["pgame_start"]
         self.run_to(self.labels["para_loop"])
 
@@ -92,10 +95,11 @@ class ParasiteGame:
         return self.memory[self.labels["tile_cache_light"] + index]
 
 
-def check_daylight(game: ParasiteGame) -> tuple[int, int]:
-    """Compare the cache's tiles with the model; returns how many are lit by
-    sunlight beyond the glow, and how many of those are tapered (dimmed
-    with depth below the surface)."""
+def check_daylight(game: ParasiteGame, time: int = NOON >> 8) -> tuple[int, int]:
+    """Compare the cache's tiles with the model, at the time of day (the
+    clock's high byte); returns how many are lit by sunlight beyond the
+    glow, and how many of those are tapered (dimmed with depth below the
+    surface)."""
     left, right = game.byte("cached_left"), game.byte("cached_right")
     top, bottom = game.byte("cached_top"), game.byte("cached_bottom")
 
@@ -111,7 +115,9 @@ def check_daylight(game: ParasiteGame) -> tuple[int, int]:
         for x in range(left, right + 1):
             sun = lighting.shaft_sun(depth, clear_at(x, y), x, y, clear_above=y > 0 and clear_at(x, y - 1))
             day = max(sun, lighting.glow(x, y))
-            assert game.cache_light(x, y) == day * lighting.LIGHT_SCALE, f"tile ({x}, {y}): light"
+            band = daynight.band_of(x, y) if game.tile_at(x, y)[0] == SKY else None
+            expected = daynight.level(day, time, band)
+            assert game.cache_light(x, y) == expected * lighting.LIGHT_SCALE, f"tile ({x}, {y}) at {time}: light"
             beyond += sun > lighting.glow(x, y)
             tapered += sun > lighting.glow(x, y) and y - HEIGHTS[x] >= lighting.SHAFT_TAPER
     return beyond, tapered
@@ -133,3 +139,24 @@ def test_daylight_matches_the_model(game_build):
     assert lit > 0, "no sunlight beyond the glow: the shaft isn't lit"
     assert tapered > 0, "no sunlight deep enough down the shaft to be tapered"
     print(f"\nthe parasite's frames: mean {np.mean(cycles):.0f} cycles, max {max(cycles)}")
+
+
+def test_daylight_follows_the_time_of_day(game_build):
+    """Through dusk, the night and dawn, once each change of the sun's level
+    has been swept through the tile cache, its light is the model's: dimmed,
+    and the sky in the glow's bands boosted."""
+    game = ParasiteGame(game_build)
+    for _ in range(10):
+        game.frame(0)
+    clock = game.labels["zp_time"]
+    for hours in (17.0, 17.75, 18.25, 19.0, 21.0, 0.0, 5.75):
+        time = round(hours * 0x10000 / 24)
+        game.memory[clock], game.memory[clock + 1] = time & 0xFF, time >> 8
+        for frame in range(400):
+            game.frame(0)
+            if not game.byte("sweep_rows") and game.byte("torch_queue_head") == game.byte("torch_queue_tail"):
+                break
+        else:
+            raise AssertionError(f"the light didn't settle at {hours}h")
+        check_daylight(game, game.memory[clock + 1])
+        game.host.check_cache()

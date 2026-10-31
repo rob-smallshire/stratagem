@@ -600,8 +600,51 @@ o'clock, stopped while the pack is open. Each packet carries the time, the
 clock's high byte (256ths of a day, about 5 seconds each:
 `PACKET_TIME`), and whether the player is underground (`PACKET_WORLD`),
 which the host keeps in `host_time` and `host_world` for the music's
-director in MBANK (`docs/musical-direction.md`). The world's light doesn't
-follow the clock yet.
+director in MBANK (`docs/musical-direction.md`), and the host's palette.
+
+### Day and night
+
+The world's light follows the clock (`stratagem.daynight`, drawn from the
+day and night lab, `uv run strat-daynight-lab`). The sun's level, by the
+time, is full from about 7:20 to 16:45; a quick sigmoid ramp at dusk falls
+to level 3 by about 19:00; then a long, shallow twilight (2, then 1) on
+the night's side; black from about 21:40 to 2:25; and the dawn mirrors it.
+Light leaks over the horizon into the night, but the dark doesn't leak
+into the day. The game starts at 5 o'clock, at level 3, before dawn.
+
+- **Daylight dimmed by subtraction:** `sun_daylight` takes LIGHT_FULL less
+  the sun's level (`sun_dim`) from every tile's daylight, the glow
+  included, so shafts and caves darken first and the caves go black;
+  torches and the miner's light carry the night as before. One table by
+  the time (`daynight_table`, 256 bytes in PLIGHT) holds the sun's level
+  and the glow's boost.
+- **The sky's glow at dawn and dusk:** sky in the four rows above its
+  column's surface is drawn as one of four bands, warm pixels among the
+  blue (10, 7, 5 and 2 in 16, by the Bayer matrix, densest at the hills),
+  and lit up to 3 levels brighter than the sun's, by the time and the
+  band. The warm pixels are the tile group's cyan (`GLOW`), which no tile
+  uses now (gems are green and magenta, water's highlights white): the
+  host sets it blue, or magenta from about 16:58 to 19:07 and 4:58 to
+  7:07 (`host_glow`, at vertical sync). The bands are drawn from sky's
+  cave page, which sky never used, by the slots' pseudo-shapes: the
+  parasite sends sky in a band as (sky, the band's shape, no sky bit)
+  (`para_copy_tile`); its own tile cache keeps the world's tiles. Tiles in
+  front of the sky, pieces included, show the densest band behind them.
+- **The sky is lit by the day alone:** no torch lights it
+  (`torch_light`), nor the miner (`sl_block_change`), so the night sky
+  has no halo.
+- **When the level changes,** about every 5 to 10 seconds through a ramp,
+  `sun_sweep` relights the tile cache, 4 tiles a frame from the view's
+  top, queueing those whose light changes as the torches' are: about 3
+  seconds for a sweep. It costs the parasite about 5,500 cycles a frame on
+  average while it runs (10,200 against 4,800 standing still, py65), at
+  worst 34,500, when a relit tile is in the miner's pool. A changed tile
+  forces the miner's light a pass only if its light reached the tile
+  (`sl_reset_tile`): before, every change did, and a sweep cost 20,000 a
+  frame.
+- Tests start the game at noon (`world_start_time`, set by `boot_game`),
+  except the music's and the clock's; `test_daylight` checks the light
+  against the model through dusk, the night and dawn.
 
 ## Checking it
 

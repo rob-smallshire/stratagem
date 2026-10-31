@@ -36,6 +36,7 @@ INCLUDE "build/generated/pack.asm"
 INCLUDE "build/generated/crafting.asm"
 INCLUDE "asm/variables.asm"
 INCLUDE "build/generated/tiles.asm"
+INCLUDE "build/generated/daynight.asm"
 INCLUDE "build/generated/world.asm"
 INCLUDE "build/generated/camera.asm"
 INCLUDE "build/generated/player.asm"
@@ -165,6 +166,7 @@ INCBIN "build/generated/radial_packed.bin"
 .sl_radial_end
 INCLUDE "build/generated/radial_rows.asm"
 INCLUDE "asm/daylight.asm"
+INCLUDE "build/generated/daynight_tables.asm"
 INCLUDE "asm/torches.asm"
 INCLUDE "build/generated/support.asm"
 INCLUDE "asm/support.asm"
@@ -182,6 +184,13 @@ GUARD &0800
 .torch_queue_x      SKIP TORCH_QUEUE    \ Torches (torches.asm)
 .torch_queue_y      SKIP TORCH_QUEUE
 .torch_queue_light  SKIP TORCH_QUEUE
+.sun_applied        SKIP 1      \ The day (daylight.asm): daynight_table's entry, applied
+.sun_dim            SKIP 1      \ ... daylight's dimming: LIGHT_FULL less the sun's level
+.sun_boost          SKIP 1      \ ... the glow's boost, times 4 (daynight_band_boosts)
+.sweep_rows         SKIP 1      \ ... rows of the tile cache left to relight
+.sweep_row          SKIP 1      \ ... the next
+.sweep_x            SKIP 1      \ ... and its next tile
+.sweep_tiles        SKIP 1
 .sun_busy           SKIP 1      \ Daylight (daylight.asm): tiles to relight
 .sun_l              SKIP 1      \ ... a rectangle, inclusive
 .sun_r              SKIP 1

@@ -18,7 +18,7 @@ def frames(bbc, labels, count):
 def test_the_day_starts_at_dawn_turns_and_knows_underground(tube_bbc, game_build):
     bbc = tube_bbc
     host, parasite_labels = game_build.labels["HOST"], game_build.labels["PARASITE"]
-    boot_game(bbc, game_build)
+    boot_game(bbc, game_build, time=START_TIME)
     peek = bbc.memory.address.peek
     frames(bbc, host, 2)
     assert peek[host["host_time"]] == START_TIME >> 8, "not dawn"
@@ -48,3 +48,12 @@ def test_the_day_starts_at_dawn_turns_and_knows_underground(tube_bbc, game_build
     bbc.keyboard.key_up("L")
     frames(bbc, host, 2)
     assert peek[host["host_world"]] == WORLD_UNDERGROUND, "not underground, dug down"
+
+
+def test_a_test_can_start_the_day_at_noon(tube_bbc, game_build):
+    """boot_game's time (world_start_time) is set before the game starts."""
+    bbc = tube_bbc
+    boot_game(bbc, game_build, time=0x8000)
+    host = game_build.labels["HOST"]
+    frames(bbc, host, 2)
+    assert bbc.memory.address.peek[host["host_time"]] == 0x80
