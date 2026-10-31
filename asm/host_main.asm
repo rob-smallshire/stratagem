@@ -72,8 +72,10 @@ GUARD USER_END
     STA zp_player_y + 1
     READ_BYTE
     STA zp_player_frame
-    READ_BYTE                   \ The hour, and whether underground (the
-    STA host_world              \ music's director, MBANK)
+    READ_BYTE                   \ The time, and whether underground (the
+    STA host_time               \ music's director, MBANK)
+    READ_BYTE
+    STA host_world
     READ_BYTE                   \ New tiles, in strips
     STA host_strips
     BEQ strips_done
@@ -244,7 +246,8 @@ GUARD USER_END
     JMP host_music_owed
 }
 
-.host_world         EQUB 0      \ PACKET_WORLD: the hour, WORLD_UNDERGROUND
+.host_time          EQUB 0      \ PACKET_TIME: the time of day, in 256ths
+.host_world         EQUB 0      \ PACKET_WORLD: WORLD_UNDERGROUND, or 0
 .host_vsync_wait    EQUB 0      \ Non-zero: the music's ticks are owed...
 .host_ticks_owed    EQUB 0      \ ... so many
 

@@ -39,7 +39,7 @@ PIECE_UNDERGROUND = 5
 \ The director: silence, mostly. FIRST_QUIET ticks before the first piece,
 \ which plays for certain; after each, QUIET_MIN and up to 255 QUIET_UNITs
 \ more; then every CONSIDER_TICKS a chance of PLAY_CHANCE in 256 of the
-\ piece for the world as it is (the hour, or underground: PACKET_WORLD),
+\ piece for the world as it is (the time, or underground: PACKET_WORLD),
 \ half that if it was the last played. A piece, once started, plays to
 \ its end.
 TICKS_PER_SECOND = 50
@@ -191,23 +191,24 @@ PLAY_CHANCE = 85                \ (a third)
     RTS
 }
 
-\ X: the piece for the world as it is (HOST_host_world).
+\ X: the piece for the world as it is (HOST_host_world, HOST_host_time).
 .occasion
 {
     LDX #PIECE_UNDERGROUND
     LDA HOST_host_world
     BMI done                    \ (WORLD_UNDERGROUND)
     LDX #PIECE_NIGHT
-    CMP #DAWN_HOUR
+    LDA HOST_host_time
+    CMP #DAWN_TIME
     BCC done
     LDX #PIECE_DAWN
-    CMP #DAY_HOUR
+    CMP #DAY_TIME
     BCC done
     LDX #PIECE_DAYLIGHT
-    CMP #DUSK_HOUR
+    CMP #DUSK_TIME
     BCC done
     LDX #PIECE_DUSK
-    CMP #NIGHT_HOUR
+    CMP #NIGHT_TIME
     BCC done
     LDX #PIECE_NIGHT
 .done

@@ -108,7 +108,4 @@ ASSERT belt_slot = belt + BELT_SLOTS
 \ Light (asm/miner_light.asm)
 .light_dirty     SKIP 1      \ Non-zero if tiles changed since the last pass
 
-\ The world's day (asm/world_clock.asm)
-.world_frames    SKIP 2      \ Frames into the hour
-.world_hour      SKIP 1
 .variables_end

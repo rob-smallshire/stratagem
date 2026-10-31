@@ -1,18 +1,19 @@
-\ The world's day: a clock of HOURS hours, each HOUR_FRAMES game frames,
-\ stopped while the pack is open (the game paused); and zp_world, sent to
-\ the host in each packet (PACKET_WORLD) for the music's director: the
-\ hour, with WORLD_UNDERGROUND if the player's feet are UNDERGROUND_DEPTH
-\ or more tiles below its column's surface. The world's light doesn't
-\ follow the clock yet.
+\ The world's day: a 16-bit clock of game frames, zp_time, midnight at 0
+\ and noon at &8000, wrapping at midnight; stopped while the pack is open
+\ (the game paused). Its high byte, the time in 256ths of a day, is sent
+\ to the host in each packet (PACKET_TIME), and zp_world (PACKET_WORLD):
+\ WORLD_UNDERGROUND if the player's feet are UNDERGROUND_DEPTH or more
+\ tiles below its column's surface. Both are for the music's director; the
+\ world's light doesn't follow the clock yet.
 
 \ The clock at the start of the game.
 .world_clock_start
 {
+    LDA #LO(START_TIME)
+    STA zp_time
+    LDA #HI(START_TIME)
+    STA zp_time + 1
     LDA #0
-    STA world_frames
-    STA world_frames + 1
-    LDA #START_HOUR
-    STA world_hour
     STA zp_world
     RTS
 }
@@ -20,27 +21,10 @@
 \ A frame on, and zp_world.
 .world_clock
 {
-    INC world_frames
+    INC zp_time
     BNE counted
-    INC world_frames + 1
+    INC zp_time + 1
 .counted
-    LDA world_frames
-    CMP #LO(HOUR_FRAMES)
-    BNE hour_kept
-    LDA world_frames + 1
-    CMP #HI(HOUR_FRAMES)
-    BNE hour_kept
-    LDA #0
-    STA world_frames
-    STA world_frames + 1
-    LDX world_hour
-    INX
-    CPX #HOURS
-    BNE hour_set
-    LDX #0
-.hour_set
-    STX world_hour
-.hour_kept
     CLC                         \ The player's middle column (as middle_column,
     LDA zp_box_x                \ keeping target_x)
     ADC #PLAYER_WIDTH / 2
@@ -60,7 +44,6 @@
 .above
     LDA #0
 .world
-    ORA world_hour
     STA zp_world
     RTS
 }

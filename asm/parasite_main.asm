@@ -472,9 +472,9 @@
 .header_sources
     EQUB zp_camera_x, zp_camera_x + 1, zp_camera_y, zp_camera_y + 1
     EQUB zp_player_x, zp_player_x + 1, zp_player_y, zp_player_y + 1
-    EQUB zp_player_frame, zp_world
+    EQUB zp_player_frame, zp_time + 1, zp_world
 .header_sources_end
-ASSERT PACKET_WORLD + 1 = PACKET_STRIPS
+ASSERT PACKET_TIME + 1 = PACKET_WORLD AND PACKET_WORLD + 1 = PACKET_STRIPS
 ASSERT header_sources_end - header_sources = PACKET_STRIPS - PACKET_CAMERA_X
 
 \ &FF if the window of the last flood (the tiles within MINER_RADIUS of its

@@ -476,3 +476,10 @@ A running log of design decisions. Add to it whenever one is made.
   otherworldly. Compressed together the pieces shared almost nothing, so
   each keeps its own patterns: all six are 6.3K
   (`docs/musical-direction.md`).
+- **The world's day is a 16-bit count of frames:** 65,536 frames, 21.8
+  minutes at 50 a second, wrapping at midnight with no comparison; noon at
+  &8000, so a curve symmetric about midnight and noon reads alike either
+  side; the high byte the time, in 256ths of a day (about 5 seconds), to
+  index the light's table and to send the host (`PACKET_TIME`). Hours are
+  no longer whole numbers of frames, but nothing needs them: the
+  director's phases are thresholds on the time.

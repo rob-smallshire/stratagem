@@ -593,10 +593,13 @@ Chunks could be packed between the two, at no cost to `tile_at`.
 
 ### The world's day, and the music
 
-The parasite keeps the world's clock (`asm/world_clock.asm`): 24 hours of
-2,500 frames, a 20-minute day from 5 o'clock, stopped while the pack is
-open. Each packet carries the hour and whether the player is underground
-(`PACKET_WORLD`), which the host keeps in `host_world` for the music's
+The parasite keeps the world's clock (`asm/world_clock.asm`): a 16-bit
+count of frames, `zp_time`, a day of 21.8 minutes at 50 frames a second,
+midnight at 0 and noon at &8000, wrapping at midnight for free; from 5
+o'clock, stopped while the pack is open. Each packet carries the time, the
+clock's high byte (256ths of a day, about 5 seconds each:
+`PACKET_TIME`), and whether the player is underground (`PACKET_WORLD`),
+which the host keeps in `host_time` and `host_world` for the music's
 director in MBANK (`docs/musical-direction.md`). The world's light doesn't
 follow the clock yet.
 
