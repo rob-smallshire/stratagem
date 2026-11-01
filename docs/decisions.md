@@ -541,3 +541,7 @@ A running log of design decisions. Add to it whenever one is made.
   put, as terrain; stone still puts down only soil, and soil dug is
   nothing. Supersedes the subsidence entries above. The sky floor and the
   night palette stay (soil put down in the sky moves the floor).
+- **Nothing is put down in mid-air:** but for a torch (which may go on a
+  wall), what is placed needs a floor, the tile beneath it solid and not
+  passable; checked once, at placing, with nothing checked after. So soil
+  can't bridge a drop, with no subsidence to bring it down.

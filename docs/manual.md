@@ -132,7 +132,8 @@ Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.
 
 Dug, soil is gone: there's nothing in it to carry. Stone you carry can be
-put down again, but only as soil.
+put down again, but only as soil, and only on something solid: nothing
+you put down hangs in the air, but a torch, which can go on a wall.
 
 Tools wear out. When one breaks it's gone from your belt, and a blue
 outline, your bare hands, shows above you: hang another there from your

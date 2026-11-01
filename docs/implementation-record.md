@@ -245,7 +245,9 @@ A 6 x 24 pixel box. Positions are in sixteenths of a pixel and line, 16-bit.
   - **Ahead:** the column holding the pixel just ahead. Digging takes the
     tile with the most solid left (the lowest, of equals), so a wall as high
     as the player is cut back evenly. Placing takes the lowest empty tile.
-- **Placing:** whole soil into air or sky, never overlapping the player.
+- **Placing:** whole soil into air or sky, never overlapping the player,
+  and, but for a torch, only on a floor: the tile beneath it solid, not
+  passable (`place`, `actions.floored`; since 2026-11-01).
 - **Diagonal digging** makes a 45 degree sloping tunnel, a step at a time:
   - **The path** of a step. Going down: across at the player's height, then
     a tile down (to a tile boundary). Going up: a tile up.

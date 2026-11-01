@@ -59,7 +59,9 @@ and gems can't be put down: too valuable to dump.
 - **Put down** with SPACE, from stone in hand, where a block can go now:
   an empty tile (air or sky), ahead, above or below, clear of the miner
   (placing ahead takes the first column wholly ahead of the miner, since
-  2026-11-01).
+  2026-11-01), and only on a floor: the tile beneath it solid, not
+  passable. Nothing but a torch is put down in mid-air (the workbench
+  too needs a floor).
 - **It stays where it's put,** as the world's own soil does: digging is
   tidy, and nothing comes down on its own.
 
@@ -74,9 +76,9 @@ play to set against that. The ladder of entropy above stays. The
 experiments, the model and the game's code are in the history (commits
 `73b14a1` to `74dcfa6`; `stratagem.subsidence`, `asm/subsidence.asm`).
 
-So soil put down is terrain again, and a bridge of it stands: the
-principle that nothing put down spans is, for soil, not kept. Built pieces
-keep their rules below.
+So soil put down is terrain again; it may only be put down on a floor, so
+it can't be built out over a drop a tile at a time. (Digging out from
+under it later leaves it standing, as the world's own soil does.)
 
 ## Built pieces
 
@@ -110,10 +112,6 @@ shaft that doesn't need digging steps.
 
 ## Open questions
 
-- **Soil put down over a drop:** it stays, so soil bridges the chasms
-  that the built pieces' spans are meant to make hard. A rule at placing
-  (soil only onto something solid beneath it) would keep it tidy without
-  anything coming down later.
 - **Soil on built pieces:** may a platform hold soil, and a ladder stand
   on it?
 - **The workbench and torches** keep their own rules (the bench from

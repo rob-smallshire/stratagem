@@ -5,9 +5,11 @@
 \ player, unless it can be walked through. If none of that kind is left,
 \ the hand moves to the first kind held that places something, and nothing
 \ is placed until SPACE is pressed again (zp_place_wait); if there is none,
-\ or the hand places nothing, nothing is placed. A torch is added to the torches (torches.asm), unless there
-\ are TORCH_MAX already; with no empty tile to aim at, it goes in the
-\ miner's own tile, if that is empty.
+\ or the hand places nothing, nothing is placed. Anything but a torch
+\ goes only on a floor: the tile beneath it solid (not passable), so
+\ nothing is put down in mid-air. A torch is added to the torches
+\ (torches.asm), unless there are TORCH_MAX already; with no empty tile to
+\ aim at, it goes in the miner's own tile, if that is empty.
 .place
 {
     LDA zp_place_wait
@@ -49,7 +51,19 @@
     BCC aimed
     JSR torch_own_tile          \ None: a torch goes in the miner's own
     BCS done                    \ tile, if that is empty
+    BCC floored
 .aimed
+    LDX hand
+    LDA kind_places,X
+    CMP #TILE_TORCH
+    BEQ floored
+    INC target_y                \ Anything else on a floor
+    JSR target_tile
+    DEC target_y
+    TAX
+    LDA material_passable,X
+    BNE done
+.floored
     JSR target_background
     STA zp_world_new_shape      \ SHAPE_FULL with the background
     LDX hand

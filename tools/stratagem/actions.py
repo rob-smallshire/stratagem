@@ -34,7 +34,8 @@ passes through trees, as walking does. In aiming, a tree's part counts as
 whole, so beside a tree the root, the lowest, goes first, and the tree
 falls. Each dig starts a cooldown. Placing puts a whole block of the kind
 in hand (inventory.py) in an empty tile (AIR or SKY), clear of the player
-unless it can be walked through (a torch, a workbench); with none of the
+unless it can be walked through (a torch, a workbench), and, but for a
+torch, only on a floor: the tile beneath it solid, not passable; with none of the
 hand's kind left, the hand moves on to the first kind held that places
 something, and nothing is placed until SPACE is pressed again. A torch is
 placed the same way, or, with no such tile, in the miner's own tile (the one
@@ -311,7 +312,9 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
         passable = inventory.PLACES[hand] in PASSABLE      # may overlap the player
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
                      and (passable or not overlaps_player(player, x, y)), placing=True)
-        if target is None and torch:            # the miner's own tile, if empty
+        if target is not None and not torch and not floored(world, *target):
+            target = None                       # anything but a torch only on a floor
+        elif target is None and torch:          # the miner's own tile, if empty
             own = ((player.px + PLAYER_WIDTH // 2) // TILE_WIDTH, (player.py + PLAYER_HEIGHT // 2) // TILE_HEIGHT)
             target = own if world.tile_at(*own)[0] in EMPTY else None
         if target is not None and world.set_tile(*target, (inventory.PLACES[hand],
@@ -319,6 +322,13 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             return (replace(hands, counts=inventory.spend(hands.counts, hand), cooldown=PLACE_FRAMES, hand=hand,
                             torches=hands.torches + torch), PLACE, target)
     return hands, NONE, None
+
+
+def floored(world, x: int, y: int) -> bool:
+    """Whether the tile beneath (x, y) is a floor: solid, not passable.
+    (The 6502 reads row y + 1 wrapping, from the tile cache; the last row
+    is bedrock, never empty.)"""
+    return world.tile_at(x, (y + 1) & 0xFF)[0] not in PASSABLE
 
 
 def _dug(hands: Hands, material: int, left: int | None) -> Hands:
