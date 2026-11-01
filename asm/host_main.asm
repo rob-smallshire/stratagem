@@ -254,7 +254,8 @@ GUARD USER_END
 
 \ The sky's colours (stratagem.daynight.sky_colours), set when they change:
 \ GLOW_LOGICAL's physical colour, magenta at dawn and dusk, otherwise
-\ blue; and at night, while the sun is low, it and the sky's blue (the tile
+\ blue; in dusk's middle, the sky's blue magenta and the glow red (unless
+\ the view may reach water); and at night, while the sun is low, it and the sky's blue (the tile
 \ group's) black, unless the view may reach water, which is blue too.
 .host_glow
 {
@@ -270,6 +271,16 @@ GUARD USER_END
     LDX #SKY_BLACK
     BEQ set                     \ (Always)
 .light
+    LDY zp_camera_y + 1         \ Dusk's middle, warmer, unless water may show
+    BNE plain
+    CMP #DUSK_DEEP_FROM
+    BCC plain
+    CMP #DUSK_DEEP_UNTIL
+    BCS plain
+    LDA #GLOW_RED
+    LDX #SKY_DUSK
+    BNE set                     \ (Always)
+.plain
     LDX #SKY_BLUE
     CMP #GLOW_DAWN_FROM
     BCC blue

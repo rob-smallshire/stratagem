@@ -545,3 +545,8 @@ A running log of design decisions. Add to it whenever one is made.
   wall), what is placed needs a floor, the tile beneath it solid and not
   passable; checked once, at placing, with nothing checked after. So soil
   can't bridge a drop, with no subsidence to bring it down.
+- **Dusk is warmer than dawn:** in dusk's middle (warmth from 0.7) the
+  sky is magenta and the glow's pixels red, by the host's palette alone,
+  the brightness curve unchanged; dawn keeps blue and magenta. The two
+  sequences meet at blue by day and black by night, and tell evening from
+  morning at a glance (the day/night lab's two-tone way).

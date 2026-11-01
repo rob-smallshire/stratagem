@@ -634,7 +634,11 @@ first day is a whole one, and its first dusk comes as a surprise.
   band. The warm pixels are the tile group's cyan (`GLOW`), which no tile
   uses now (gems are green and magenta, water's highlights white): the
   host sets it blue, or magenta from about 16:58 to 19:07 and 4:58 to
-  7:07 (`host_glow`, at vertical sync). The bands are drawn from sky's
+  7:07 (`host_glow`, at vertical sync). Dusk is warmer than dawn: in its
+  middle, from about 17:26 to 18:40 (`daynight.deep_dusk`), the host makes
+  the sky's blue magenta and the glow red, so dusk runs blue, blue and
+  magenta, magenta and red, dark blue and dark magenta, into the night;
+  dawn stays blue and magenta (from the lab's two-tone way). The bands are drawn from sky's
   cave page, which sky never used, by the slots' pseudo-shapes: the
   parasite sends sky in a band as (sky, the band's shape, no sky bit)
   (`para_copy_tile`); its own tile cache keeps the world's tiles. Tiles in
