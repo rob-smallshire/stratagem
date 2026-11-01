@@ -2,10 +2,13 @@
 items.asm keep it: a count of each kind of thing carried, a binary byte up
 to COUNT_MAX, and the kind in hand, which placing puts down.
 
-A tile dug away entirely gives one of the kind its material YIELDS (dug
-grass is soil); the hand stays as it was. A tree's part gives nothing
+A tile dug away entirely gives one of the kind its material YIELDS, if
+any: stone, ore and gems are carried; grass and soil are nothing, where
+the ladder of entropy ends (docs/building.md: rock dug is stone, stone put
+down is soil, soil dug is nothing). The hand stays as it was. A tree's part gives nothing
 directly: its wood is thrown out as items (items.py), each gathered in
-adding one WOOD. Placing puts down the material the kind in hand PLACES;
+adding one WOOD. Placing puts down the material the kind in hand PLACES
+(stone puts down soil; ore and gems put down nothing);
 if none of that kind is left, the hand moves first to the first kind held
 that places something, in kind order. A kind in hand that places nothing
 (wood, chosen in the pack: pack.py) places nothing. In play, TAB cycles
@@ -30,9 +33,9 @@ COUNT_MAX = 99
 STARTING_TORCHES = 8
 TORCH_MAX = 24                      # torches in the world at once
 
-YIELDS = {GRASS: KIND_SOIL, SOIL: KIND_SOIL, STONE: KIND_STONE, ORE: KIND_ORE, GEM: KIND_GEM}
-PLACES = {KIND_SOIL: SOIL, KIND_STONE: STONE, KIND_ORE: ORE, KIND_GEM: GEM, KIND_TORCH: TORCH, KIND_BENCH: BENCH}
-assert set(YIELDS.values()) <= set(PLACES)
+YIELDS = {STONE: KIND_STONE, ORE: KIND_ORE, GEM: KIND_GEM}
+PLACES = {KIND_STONE: SOIL, KIND_TORCH: TORCH, KIND_BENCH: BENCH}
+DUG_TO_NOTHING = (GRASS, SOIL)      # (KIND_SOIL is never carried now)
 assert KIND_COUNT < 0x80 and max(PLACES.values()) < 0x80     # &FF means none in the tables
 
 EMPTY = (0,) * KIND_COUNT

@@ -22,7 +22,7 @@
     DEX
     BPL each_slot
     STA tool_last
-    LDA #KIND_SOIL
+    LDA #KIND_TORCH
     STA hand_kind
     LDA #RECIPE_COUNT - 1
     STA craft_copied

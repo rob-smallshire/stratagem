@@ -77,15 +77,18 @@ def test_planks_made_in_the_pack():
 
 
 def test_tab_cycles_the_hand_through_kinds_placed():
-    counts = (7, 3, 0, 2) + (0,) * (KIND_COUNT - 4)     # wood, soil, no stone, ore, nothing else
-    assert inventory.cycle(counts, inventory.KIND_SOIL) == inventory.KIND_ORE
-    assert inventory.cycle(counts, inventory.KIND_ORE) == inventory.KIND_SOIL      # round again, past the wood
-    assert inventory.cycle(counts, inventory.KIND_WOOD) == inventory.KIND_SOIL
-    assert inventory.cycle((7,) + (0,) * (KIND_COUNT - 1), inventory.KIND_SOIL) == inventory.KIND_SOIL    # nothing to place
-    state, counts, hand = pack.step(Pack(), counts, inventory.KIND_SOIL, 0, KEY_CYCLE)
-    assert hand == inventory.KIND_ORE
+    counts = [0] * KIND_COUNT
+    counts[inventory.KIND_WOOD], counts[inventory.KIND_STONE], counts[inventory.KIND_ORE] = 7, 3, 2
+    counts[inventory.KIND_TORCH] = 4
+    counts = tuple(counts)                              # wood, stone, ore (placing nothing), torches
+    assert inventory.cycle(counts, inventory.KIND_STONE) == inventory.KIND_TORCH
+    assert inventory.cycle(counts, inventory.KIND_TORCH) == inventory.KIND_STONE    # round again, past the wood
+    assert inventory.cycle(counts, inventory.KIND_WOOD) == inventory.KIND_STONE
+    assert inventory.cycle((7,) + (0,) * (KIND_COUNT - 1), inventory.KIND_STONE) == inventory.KIND_STONE  # nothing to place
+    state, counts, hand = pack.step(Pack(), counts, inventory.KIND_STONE, 0, KEY_CYCLE)
+    assert hand == inventory.KIND_TORCH
     state, counts, hand = pack.step(state, counts, hand, 0, KEY_CYCLE)      # held, not pressed again
-    assert hand == inventory.KIND_ORE
+    assert hand == inventory.KIND_TORCH
 
 
 def send(game, inputs: int, keys: int = 0, tools: int = 0) -> list[int]:
@@ -311,8 +314,8 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     """Fell the tree beside the start and dig down, open the pack: the panel
     is drawn over the view, which is otherwise left as it was; choose the
     wood; close it: the view is redrawn whole, as the models say. Then,
-    given some stone, TAB cycles the hand from the wood to the soil and the
-    stone."""
+    given some stone, TAB cycles the hand from the wood to the stone and the
+    torches."""
     from test_tube_game import expected_screen
     bbc = tube_bbc
     labels, plabels = game_build.labels["HOST"], game_build.labels["PARASITE"]
@@ -324,7 +327,7 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     parasite = bbc.connect_coprocessor().memory.address.peek
     counts = tuple(parasite[plabels["inventory"] + kind] for kind in range(KIND_COUNT))
     hand = parasite[plabels["hand"]]
-    assert counts[inventory.KIND_WOOD] and hand == inventory.KIND_SOIL, (counts, hand)
+    assert counts[inventory.KIND_WOOD] and hand == inventory.KIND_TORCH, (counts, hand)
     screen = bbc.memory.region(tube_machine.screen_region).peek
     before = screen[SCREEN_START:SCREEN_END]
 
@@ -370,7 +373,7 @@ def test_pack_in_the_game(tube_bbc, tube_machine, game_build):
     assert differences[:8] == [], f"{len(differences)} screen bytes differ after closing"
 
     bbc.connect_coprocessor().memory.address.bus[plabels["inventory"] + inventory.KIND_STONE] = 4
-    for kind in (inventory.KIND_SOIL, inventory.KIND_STONE):
+    for kind in (inventory.KIND_STONE, inventory.KIND_TORCH):
         bbc.keyboard.matrix_down(*TAB_KEY)
         frames(bbc, labels, 2)
         bbc.keyboard.matrix_up(*TAB_KEY)

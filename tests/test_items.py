@@ -176,12 +176,12 @@ def test_felled_wood_is_thrown_out_and_gathered_in():
 
 
 def test_the_hand_is_shown_above_the_miner_when_it_changes():
-    """TAB cycles the hand from the soil to the stone: it is shown above the
+    """TAB cycles the hand from the torches to the stone: it is shown above the
     miner for HAND_FRAMES frames, as items.py says, and then not."""
     from stratagem.build import build
     game = ParasiteGame(build())
     labels = game.labels
-    game.memory[labels["inventory"] + KIND_SOIL] = 5
+    game.memory[labels["inventory"] + KIND_SOIL] = 5          # (carried soil places nothing)
     game.memory[labels["inventory"] + KIND_STONE] = 3
     check_packet = PacketCheck(game)
     for frame in range(items.HAND_FRAMES + 20):

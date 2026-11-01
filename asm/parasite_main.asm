@@ -51,7 +51,7 @@
     STA support_lost
     LDA #STARTING_ABILITIES
     STA zp_abilities
-    LDA #KIND_SOIL
+    LDA #KIND_TORCH             \ The one kind carried at the start that places
     STA hand
     STA hand_last
     LDA #1

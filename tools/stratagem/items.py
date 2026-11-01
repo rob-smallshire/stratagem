@@ -42,7 +42,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from stratagem.camera import MAX_STEP_X
-from stratagem.inventory import KIND_BENCH, KIND_COUNT, KIND_SOIL, KIND_WOOD
+from stratagem.inventory import KIND_BENCH, KIND_COUNT, KIND_TORCH, KIND_WOOD
 from stratagem.player import GRAVITY, PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
 from stratagem.screen import VIEW_COLUMNS, VIEW_ROWS
 from stratagem.tiles import BENCH, CANOPY_LEFT, QUARTER_LINES, QUARTER_PIXELS, QUARTERS, ROOT, TRUNK, TRUNK_KNOT, solid_quarter_cells
@@ -209,10 +209,10 @@ class HandShown:
     outline, like an empty cell in the pack. If both change in a frame, the
     hand is shown. A tool is shown with its belt slot's number beside it;
     the 0 key shows the tool in use again."""
-    last: int = KIND_SOIL       # the hand as last seen
+    last: int = KIND_TORCH      # the hand as last seen
     timer: int = 0              # frames left to show it
     tool: int = NO_TOOL         # the tool as last seen
-    kind: int = KIND_SOIL       # what's shown...
+    kind: int = KIND_TORCH      # what's shown...
     is_tool: bool = False       # ... and whether it's the tool
 
 

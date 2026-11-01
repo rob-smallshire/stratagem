@@ -67,7 +67,7 @@ TOOL_QUARTERS = {
 DURABILITY = {inventory.KIND_WOOD_PICK: 60, inventory.KIND_STONE_PICK: 130}    # digs before it breaks
 assert set(TOOL_QUARTERS) == {NO_TOOL, *inventory.TOOLS} and set(DURABILITY) == set(inventory.TOOLS)
 assert all(set(q) <= set(DIGGABLE) for q in TOOL_QUARTERS.values())
-assert set(TOOL_QUARTERS[inventory.KIND_WOOD_PICK]) == set(DIGGABLE) == set(inventory.YIELDS)
+assert set(TOOL_QUARTERS[inventory.KIND_WOOD_PICK]) == set(DIGGABLE) == set(inventory.YIELDS) | set(inventory.DUG_TO_NOTHING)
 assert max(DURABILITY.values()) < 0x100
 DIG_FRAMES = 8
 PLACE_FRAMES = 6
@@ -81,7 +81,7 @@ NONE, DIG, PLACE = 0, 1, 2
 class Hands:
     counts: tuple[int, ...] = inventory.STARTING    # of each kind (inventory.py)
     cooldown: int = 0
-    hand: int = inventory.KIND_SOIL             # the kind placing puts down
+    hand: int = inventory.KIND_TORCH            # the kind placing puts down
     torches: int = 0                            # placed in the world (asm/torches.asm)
     tool: int = NO_TOOL                         # the tool in the tool hand: its kind (a belt slot's, pack.py)
     wear: int = 0                               # ... and the digs it has done
@@ -331,6 +331,6 @@ def _dug(hands: Hands, material: int, left: int | None) -> Hands:
     if tool != NO_TOOL:
         wear = hands.wear + 1
         hands = replace(hands, wear=wear) if wear < DURABILITY[tool] else replace(hands, tool=NO_TOOL, wear=0)
-    if left is not None:
+    if left is not None or material not in inventory.YIELDS:
         return hands
     return replace(hands, counts=inventory.gain(hands.counts, inventory.YIELDS[material]))
