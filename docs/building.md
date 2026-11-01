@@ -98,8 +98,9 @@ a pillar every 10):
 | Rope | fibre (vines, later) | from above; climbable; lengthens downwards when placed |
 | Brick block | bricks (stone, at a furnace, later) | from below, or from the side within the span |
 
-Planks place nothing today (`inventory.PLACES`); they would place the
-plank block, or the platform, by recipe or by choice. Ladders are the
+The first wood comes from felling trees. Planks place nothing today
+(`inventory.PLACES`); they would place the plank block, or the platform,
+by recipe or by choice. Ladders are the
 first way out of a hole that doesn't spend earth, and the first way down a
 shaft that doesn't need digging steps.
 
@@ -125,12 +126,8 @@ When it's built:
 ## Open questions
 
 - **Spoil's yield:** soil or nothing (above).
-- **What soil is for**, if not for building: recipes (a furnace's clay?
-  growing things?), or only spoil. If it has no use, should grass and soil
-  yield anything when dug?
-- **The first wood:** felling trees is the only source; ladders depend on
-  it, and so does the way down. How soon, and how much, matters more once
-  earth can't bridge.
+- **What soil is for**, beyond spoil: no answer yet. If it has no use,
+  should grass and soil yield anything when dug?
 - **Spoil on built pieces:** may a platform hold spoil, and a ladder stand
   on it? The rule above says yes (a solid built piece holds it; spoil holds
   what is held from below); a platform holding heavy earth might rather
