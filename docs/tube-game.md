@@ -603,6 +603,15 @@ clock's high byte (256ths of a day, about 5 seconds each:
 which the host keeps in `host_time` and `host_world` for the music's
 director in MBANK (`docs/musical-direction.md`), and the host's palette.
 
+### Subsidence
+
+Soil is held from below only, and subsides slowly, from below upwards, by
+chance: `asm/subsidence.asm`, as `stratagem.subsidence`; the design and
+its experiments are in `docs/building.md`. Stone put down is soil; grass
+and soil dug are nothing. It reads only the tile cache, so it happens
+around the miner, about 2,500 parasite cycles a frame while soil is at
+risk.
+
 ### Day and night
 
 The world's light follows the clock (`stratagem.daynight`, drawn from the

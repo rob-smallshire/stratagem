@@ -145,27 +145,49 @@ by recipe or by choice. Ladders are the
 first way out of a hole that doesn't spend earth, and the first way down a
 shaft that doesn't need digging steps.
 
-## What changes in the game
+## In the game (built 2026-11-01)
 
-When it's built:
+With option 2: all soil is loose, the world's too.
 
 - **Inventory:** no carried soil; grass and soil yield nothing; stone
-  places soil; ore and gems place nothing; planks (and then ladders,
-  platforms) place their pieces.
-- **Subsidence on the parasite:** a list of tiles at risk, a few rolled for
-  each frame from a random source, failures sent as changed tiles; with
-  option 1, a bit marking soil put down (the shape byte has room).
-- **The decision** that dug materials can be placed back as blocks is
-  superseded (`docs/decisions.md`).
-- **Tests:** the 6502 against `stratagem.subsidence`, from the same random
-  sequence; the actions model placing soil.
+  places soil; ore and gems place nothing (`inventory.YIELDS`, `PLACES`).
+  The miner starts with the torches in hand. Planks place nothing yet.
+- **Subsidence** (`asm/subsidence.asm`, in PLIGHT, as `stratagem.subsidence`
+  exactly): every change by `change_target` (a dig, a placing, a tile
+  subsiding), once the tile cache has it, notes the tiles it may have put
+  at risk into a queue of 64, each once. Each frame, after the player's
+  action, 2 are taken from its head and rolled for, by MBANK's LFSR
+  stepped 8 times, against 16-bit thresholds (1 in 64, 1 in 192 or 1 in
+  320 by wedging sides; 1 in 512 for a face). One that fails is gone as if
+  dug (`change_target`: relit, sent, and noted in turn), at most one a
+  frame, and only when the player hasn't changed a tile that frame.
+- **Only in the tile cache:** every tile it reads is read from the cache
+  (`subside_material`), a quick look; outside it a tile is solid and not
+  loose, isn't noted, and if queued waits, unread, until the miner comes
+  back. So subsidence happens around the miner. (Read through the world's
+  store, `tile_at`, a check cost about 1,200 cycles and a failure frame
+  over 100,000.)
+- **Costs** (py65, a tunnel three wide dug through the soil beside the
+  miner): `subsidence_step` about 2,500 cycles a frame while soil is at
+  risk (2,900 at most), against an idle frame's 4,800; noting a changed
+  tile about 4,300; a frame in which a tile fails costs as a dig does
+  (about 70,000, the light's flood and relighting most of it).
+- **Tests:** `tests/test_subsidence.py`: the model's scenes (a tunnel in
+  the soil subsides to the sky; one in the rock stands, and the hills
+  stay; soil put down over a drop falls; the queue's limit), and the
+  parasite frame by frame as the model, in py65: its queue, its random
+  generator and the tiles that fail (10 over about 1,260 frames).
+- **In the emulator:** a cutting dug into the hillside beside the start
+  opens over about 90 seconds into a stepped slope to the sky
+  (build/subsidence/subsidence-game.png).
 
 ## Open questions
 
-- **Natural soil:** anchored, or loose (above). The experiments favour
-  loose: it costs little, and the world reads truer for it.
-- **The chances:** 1 in 64 or 1 in 256, and slumping's 1 in 512, are first
-  guesses, to tune by playing: slow enough to see coming and get out of,
+- **Natural soil:** loose, as built; anchored remains possible (a bit in
+  the tile for soil put down).
+- **The chances:** 1 in 64, and slumping's 1 in 512, with 2 rolls a frame,
+  are first guesses, to tune by playing: slow enough to see coming and get
+  out of,
   quick enough to matter.
 - **Soil on built pieces:** may a platform hold soil, and a ladder stand
   on it? The rule above says yes (a solid built piece holds it); a

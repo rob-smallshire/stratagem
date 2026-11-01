@@ -510,4 +510,5 @@ A running log of design decisions. Add to it whenever one is made.
   below upwards, by chance, the work spread over frames; whether the
   world's own soil is loose too, or stays anchored, is open, with the
   subsidence lab's experiments (`docs/building.md`, Subsidence) favouring
-  loose. Not yet built.
+  loose. Built 2026-11-01 with all soil loose, subsidence only in the tile
+  cache (around the miner).

@@ -131,6 +131,11 @@ so does the one pointing at what the grid makes, when it makes a tool.
 Bare hands dig soil slowly and can't dig stone at all; a pickaxe can. A
 tree, though, comes down to bare hands: start there.
 
+Soil is loose ground. Dug, it's gone: there's nothing in it to carry. Dig
+under it and, in time, it comes down, from below, a little at a time;
+tunnels belong in rock. Stone you carry can be put down again, but only as
+soil, held up by nothing but what's beneath it.
+
 Tools wear out. When one breaks it's gone from your belt, and a blue
 outline, your bare hands, shows above you: hang another there from your
 pack. A tool put back in your pack doesn't mend; the worn ones come out
