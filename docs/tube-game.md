@@ -605,11 +605,11 @@ director in MBANK (`docs/musical-direction.md`), and the host's palette.
 
 ### Subsidence
 
-Soil is held from below only, and subsides slowly, from below upwards, by
-chance: `asm/subsidence.asm`, as `stratagem.subsidence`; the design and
+Soil is held from below only, with no strength sideways, and subsides
+slowly, from below upwards, by chance: only what's directly undermined; `asm/subsidence.asm`, as `stratagem.subsidence`; the design and
 its experiments are in `docs/building.md`. Stone put down is soil; grass
 and soil dug are nothing. It reads only the tile cache, so it happens
-around the miner, about 2,500 parasite cycles a frame while soil is at
+around the miner, about 1,200 parasite cycles a frame while soil is at
 risk.
 
 ### Day and night

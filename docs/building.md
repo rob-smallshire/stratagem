@@ -99,7 +99,8 @@ ground can stand undermined for a long while. So:
   most 2 tiles fail in a frame (each is a changed tile to send).
 - A tile that fails is **gone**, which puts the tile above it at risk; a
   tree standing on it comes down, as the support rules already have it.
-- **Slumping:** a face with an open drop beside it deeper than any step
+- **Slumping** (tried, and not in the game: soil has no strength
+  sideways, so needs none of this): a face with an open drop beside it deeper than any step
   the hills are generated with (4 tiles or more: their steepest is 3) also
   fails, at a much smaller chance (1 in 512), until no drop beside it is
   so deep. So a soil wall left by digging wears back to a stepped slope,
@@ -147,7 +148,11 @@ shaft that doesn't need digging steps.
 
 ## In the game (built 2026-11-01)
 
-With option 2: all soil is loose, the world's too.
+With option 2: all soil is loose, the world's too. And soil has **no
+strength sideways** (decided 2026-11-01, after the first build): no arch,
+no slumping. Only a tile directly undermined is at risk, so a cut into a
+hillside stands as dug, and a small excavation stays small; with slumping,
+small digs grew into craters that cut back into the hills.
 
 - **Inventory:** no carried soil; grass and soil yield nothing; stone
   places soil; ore and gems place nothing (`inventory.YIELDS`, `PLACES`).
@@ -155,10 +160,10 @@ With option 2: all soil is loose, the world's too.
 - **Subsidence** (`asm/subsidence.asm`, in PLIGHT, as `stratagem.subsidence`
   exactly): every change by `change_target` (a dig, a placing, a tile
   subsiding), once the tile cache has it, notes the tiles it may have put
-  at risk into a queue of 64, each once. Each frame, after the player's
-  action, 2 are taken from its head and rolled for, by MBANK's LFSR
-  stepped 8 times, against 16-bit thresholds (1 in 64, 1 in 192 or 1 in
-  320 by wedging sides; 1 in 512 for a face). One that fails is gone as if
+  at risk (itself, and the tile above it) into a queue of 64, each once.
+  Each frame, after the player's action, 2 are taken from its head and
+  rolled for, by MBANK's LFSR stepped 8 times, against a 16-bit threshold
+  (1 in 64). One that fails is gone as if
   dug (`change_target`: relit, sent, and noted in turn), at most one a
   frame, and only when the player hasn't changed a tile that frame.
 - **Only in the tile cache:** every tile it reads is read from the cache
@@ -168,27 +173,27 @@ With option 2: all soil is loose, the world's too.
   store, `tile_at`, a check cost about 1,200 cycles and a failure frame
   over 100,000.)
 - **Costs** (py65, a tunnel three wide dug through the soil beside the
-  miner): `subsidence_step` about 2,500 cycles a frame while soil is at
-  risk (2,900 at most), against an idle frame's 4,800; noting a changed
-  tile about 4,300; a frame in which a tile fails costs as a dig does
-  (about 70,000, the light's flood and relighting most of it).
+  miner): `subsidence_step` about 1,200 cycles a frame while soil is at
+  risk (1,300 at most), against an idle frame's 4,800; noting a changed
+  tile about 600; a frame in which a tile fails costs as a dig does
+  (about 65,000, the light's flood and relighting most of it). With
+  slumping, these were 2,500 and 4,300.
 - **Tests:** `tests/test_subsidence.py`: the model's scenes (a tunnel in
   the soil subsides to the sky; one in the rock stands, and the hills
-  stay; soil put down over a drop falls; the queue's limit), and the
-  parasite frame by frame as the model, in py65: its queue, its random
-  generator and the tiles that fail (10 over about 1,260 frames).
-- **In the emulator:** a cutting dug into the hillside beside the start
-  opens over about 90 seconds into a stepped slope to the sky
-  (build/subsidence/subsidence-game.png).
+  stay; a cut into a hillside stands; soil put down over a drop falls; the
+  queue's limit), and the parasite frame by frame as the model, in py65:
+  its queue, its random generator and the tiles that fail.
+- **In the emulator:** a cutting dug into the hillside beside the start:
+  within about 5 seconds the soil over the digging is gone, to the sky,
+  and the cut's face stands (build/subsidence/subsidence-game.png).
 
 ## Open questions
 
 - **Natural soil:** loose, as built; anchored remains possible (a bit in
   the tile for soil put down).
-- **The chances:** 1 in 64, and slumping's 1 in 512, with 2 rolls a frame,
-  are first guesses, to tune by playing: slow enough to see coming and get
-  out of,
-  quick enough to matter.
+- **The chance:** 1 in 64, with 2 rolls a frame, is a first guess, to tune
+  by playing: slow enough to see coming and get out of, quick enough to
+  matter.
 - **Soil on built pieces:** may a platform hold soil, and a ladder stand
   on it? The rule above says yes (a solid built piece holds it); a
   platform holding heavy earth might rather break.

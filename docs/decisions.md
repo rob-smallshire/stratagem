@@ -512,3 +512,7 @@ A running log of design decisions. Add to it whenever one is made.
   subsidence lab's experiments (`docs/building.md`, Subsidence) favouring
   loose. Built 2026-11-01 with all soil loose, subsidence only in the tile
   cache (around the miner).
+- **Soil has no strength sideways:** only a tile directly undermined is
+  at risk of subsiding; no arch, no slumping of faces. A cut into a
+  hillside stands as dug, and a small excavation stays small (with
+  slumping, small digs grew into craters cutting back into the hills).

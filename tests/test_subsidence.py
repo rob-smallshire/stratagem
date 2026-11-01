@@ -44,11 +44,22 @@ def test_a_tunnel_in_the_rock_stands_and_the_hills_stay():
         model.dig(x, rock + 2)
         model.dig(x, rock + 1)
     settle(model)
-    assert all(model.world.tile_at(x, rock_row(World(), x))[0] == STONE for x in range(64, 76))
-    # (Near the hill's top, at 65-68, the tunnel opens on a natural cave
-    # under thin soil, which slumps a little.)
     assert all(model.world.tile_at(x, y) == World().tile_at(x, y)
-               for x in range(70, 76) for y in range(HEIGHTS[x], rock_row(World(), x)))
+               for x in range(60, 80) for y in range(HEIGHTS[x] - 4, rock_row(World(), x) + 1))
+
+
+def test_a_cut_into_a_hillside_stands():
+    """Soil has no strength sideways, and needs none: a face dug into it
+    stands, and only what's undermined falls."""
+    model = Subsidence(World())
+    x = 74
+    for y in range(HEIGHTS[x], rock_row(model.world, x)):
+        model.dig(x, y)
+    for y in range(HEIGHTS[x + 1], rock_row(model.world, x + 1)):
+        model.dig(x + 1, y)
+    settle(model)
+    assert all(model.world.tile_at(c, y) == World().tile_at(c, y)
+               for c in (x - 2, x - 1, x + 2, x + 3) for y in range(HEIGHTS[c], rock_row(World(), c)))
 
 
 def test_soil_put_down_over_a_drop_falls():

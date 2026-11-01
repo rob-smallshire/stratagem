@@ -1,15 +1,15 @@
 \ Subsidence (stratagem.subsidence, docs/building.md): soil, grass
-\ included, is held from below only, and fails slowly and by chance, from
-\ below upwards. A loose tile is at risk while the tile under it is open,
-\ or while it is a face (open beside it for SUBSIDE_DROP tiles down). Tiles
-\ at risk wait in a queue, each once; every changed tile notes those it may
-\ have put at risk (subsidence_target, from change_target, once the tile
-\ cache has the change: support's falls are of pieces, passable already). Each frame a few
-\ are taken from the queue's head and rolled for (subsidence_step); one
-\ that fails is gone, as if dug (change_target), at most one a frame, and
-\ only when the frame has no other changed tile. It happens only in the
-\ tile cache, whose tiles are quick to read (subside_material): a tile
-\ outside it is solid and not loose, isn't noted, and if queued waits.
+\ included, is held from below only, with no strength sideways, and fails
+\ slowly and by chance, from below upwards. A loose tile is at risk while
+\ the tile under it is open. Tiles at risk wait in a queue, each once;
+\ every changed tile notes those it may have put at risk (subsidence_target,
+\ from change_target, once the tile cache has the change: support's falls
+\ are of pieces, passable already). Each frame a few are taken from the
+\ queue's head and rolled for (subsidence_step); one that fails is gone, as
+\ if dug (change_target), at most one a frame, and only when the frame has
+\ no other changed tile. It happens only in the tile cache, whose tiles are
+\ quick to read (subside_material): a tile outside it is solid and not
+\ loose, isn't noted, and if queued waits.
 
 \ The queue, and the random generator, empty and seeded.
 .subsidence_init
@@ -34,56 +34,16 @@
 }
 
 \ Tile (X, Y) changed: the tiles it may have put at risk join the queue
-\ (stratagem.subsidence.noted): itself, above it, beside it, and beside it
-\ up to a face's height above. Preserves A, X, Y and the flags.
+\ (stratagem.subsidence.noted): itself (put down over a drop), and the tile
+\ above it (undermined). Preserves A, X, Y and the flags.
 .subsidence_note
 {
     PHP
     PHA
-    TXA
-    PHA
-    TYA
-    PHA
-    STX subside_cx
-    STY subside_cy
     JSR subside_candidate       \ Itself
     DEY
     JSR subside_candidate       \ Above
     INY
-    DEX
-    JSR subside_candidate       \ Left
-    INX
-    INX
-    JSR subside_candidate       \ Right
-    LDA #&FF                    \ Beside, from below up a face's height
-    STA subside_d
-.side
-    LDA subside_cx
-    CLC
-    ADC subside_d
-    TAX
-    LDY subside_cy
-    INY
-    JSR subside_candidate
-    DEY                         \ (Beside, at the row itself: noted already)
-    DEY
-    LDA #SUBSIDE_DROP - 1
-    STA subside_k
-.up
-    JSR subside_candidate
-    DEY
-    DEC subside_k
-    BNE up
-    LDA subside_d
-    BPL done
-    LDA #1
-    STA subside_d
-    BNE side                    \ (Always)
-.done
-    PLA
-    TAY
-    PLA
-    TAX
     PLA
     PLP
     RTS
@@ -145,7 +105,7 @@
 }
 
 \ Carry set if tile (X, Y) is at risk: soil or grass, with the tile under it
-\ open, or a face. Preserves X and Y.
+\ open. Preserves X and Y.
 .subside_at_risk
 {
     JSR subside_material
@@ -157,18 +117,9 @@
     INY                         \ Open below
     JSR subside_open
     DEY
-    BCS risky
-    DEX                         \ A face on the left
-    JSR subside_drop
-    INX
-    BCS risky
-    INX                         \ Or on the right
-    JSR subside_drop
-    DEX
-    BCS risky
+    RTS
 .held
     CLC
-.risky
     RTS
 }
 
@@ -181,24 +132,6 @@
     LDA material_passable,X
     LDX subside_t
     CMP #1                      \ Carry: passable (non-zero)
-    RTS
-}
-
-\ Carry set if tiles (X, Y) and SUBSIDE_DROP - 1 below it are all open: a
-\ face's drop. Preserves X and Y.
-.subside_drop
-{
-    STY subside_t2
-    LDA #SUBSIDE_DROP
-    STA subside_k2
-.loop
-    JSR subside_open
-    BCC done
-    INY
-    DEC subside_k2
-    BNE loop
-.done
-    LDY subside_t2
     RTS
 }
 
@@ -238,7 +171,6 @@
     BCC next                    \ Held again, or gone: dropped
     LDA redraw_tile             \ It can fail only if the frame's changed tile
     BNE back                    \ is free
-    JSR subside_threshold
     JSR subside_roll
     BCC fail
 .back
@@ -265,42 +197,11 @@
 }
 ASSERT SHAPE_FULL = 0
 
-\ The threshold's index for tile (X, Y), in A: by how many solid sides
-\ wedge it (0, 1, 2) if the tile under it is open, otherwise 3 (a face).
-\ Preserves X and Y.
-.subside_threshold
-{
-    INY
-    JSR subside_open
-    DEY
-    BCC face
-    LDA #0
-    STA subside_sides
-    DEX
-    JSR subside_open
-    BCS left_open
-    INC subside_sides
-.left_open
-    INX
-    INX
-    JSR subside_open
-    BCS right_open
-    INC subside_sides
-.right_open
-    DEX
-    LDA subside_sides
-    RTS
-.face
-    LDA #3
-    RTS
-}
-
-\ Roll, against threshold A: the random generator (MBANK's LFSR) stepped
-\ SUBSIDE_ROLL_STEPS times; carry clear if its 16 bits are under the
-\ threshold: the tile fails.
+\ Roll: the random generator (MBANK's LFSR) stepped SUBSIDE_ROLL_STEPS
+\ times; carry clear if its 16 bits are under SUBSIDE_THRESHOLD: the tile
+\ fails.
 .subside_roll
 {
-    TAX
     LDY #SUBSIDE_ROLL_STEPS
 .step
     LSR subside_random + 1
@@ -313,9 +214,9 @@ ASSERT SHAPE_FULL = 0
     DEY
     BNE step
     LDA subside_random
-    CMP subside_thresholds_low,X
+    CMP #LO(SUBSIDE_THRESHOLD)
     LDA subside_random + 1
-    SBC subside_thresholds_high,X
+    SBC #HI(SUBSIDE_THRESHOLD)
     RTS
 }
 
@@ -364,8 +265,3 @@ ASSERT SHAPE_FULL = 0
     RTS
 }
 ASSERT TILE_CACHE_SIZE = 32 AND LO(tile_cache) = 0
-
-.subside_thresholds_low
-    SUBSIDE_THRESHOLDS_LOW
-.subside_thresholds_high
-    SUBSIDE_THRESHOLDS_HIGH

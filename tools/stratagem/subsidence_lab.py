@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 
 from stratagem.lighting_lab import RGB, sheet
-from stratagem.subsidence import ALL_SOIL, PLACED_SOIL, Rules, Subsidence
+from stratagem.subsidence import ALL_SOIL, GAME_RULES, PLACED_SOIL, Rules, Subsidence
 from stratagem.tiles import STONE, tile_pixels
 from stratagem.world import HEIGHTS, World
 
@@ -114,7 +114,8 @@ SCENES = [("a tunnel through the soil", tunnel_in_soil),
 RULES = [("all soil loose, 1/64", Rules(ALL_SOIL, slump=0)),
          ("all soil loose, 1/256", Rules(ALL_SOIL, chance=1 / 256, slump=0)),
          ("only soil put down, 1/64", Rules(PLACED_SOIL, slump=0)),
-         ("all soil, 1/64, slumping 1/512: the game's", Rules(ALL_SOIL))]
+         ("all soil, 1/64, slumping 1/512", Rules(ALL_SOIL)),
+         ("the game's: no strength sideways, 1/64", GAME_RULES)]
 WINDOW = (24, 18)
 
 

@@ -371,14 +371,7 @@ GUARD &F800
 .subside_i          SKIP 1
 .subside_x          SKIP 1
 .subside_y          SKIP 1
-.subside_cx         SKIP 1
-.subside_cy         SKIP 1
-.subside_d          SKIP 1
-.subside_k          SKIP 1
-.subside_k2         SKIP 1
 .subside_t          SKIP 1
-.subside_t2         SKIP 1
 .subside_t3         SKIP 1
-.subside_sides      SKIP 1
 
 SAVE "PLIGHT", sl_radial, plight_end, sl_radial
