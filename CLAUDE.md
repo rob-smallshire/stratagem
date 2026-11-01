@@ -11,6 +11,8 @@ filing system resident, and is tested in the Beebium emulator.
   `docs/tube-prototypes.md`, how we got there.
 - `docs/tile-set.md`: the planned tile set (pieces, objects, back walls) and
   how the format and renderer could carry it.
+- `docs/building.md`: building, spoil and support: what may be put down,
+  what holds it up, and materials degrading as they're processed.
 - `docs/inventory-and-crafting.md`: how other games hold, show and craft
   things, and the proposed design for Stratagem.
 - `docs/loading-screen.md`: the cover shown with the flash bit switched

@@ -494,3 +494,13 @@ A running log of design decisions. Add to it whenever one is made.
   magenta, water's highlights white. Chosen from the day and night lab
   (`strat-daynight-lab`), as the game could draw it: bands a tile high,
   warm pixels fixed in the sky's graphics and shown by the palette.
+- **Only undisturbed rock spans; placed raw material is spoil:** the world
+  as generated holds itself up, so tunnels stand; nothing put down does.
+  Soil and stone stay distinct when carried (recipes need stone), but put
+  down either becomes spoil, one material, held from below only, falling
+  when unheld; ore and gems can't be placed. Materials degrade as they are
+  processed, and crafting is the way up: building is with made things
+  (planks, ladders, ropes, platforms) under the span rules. Digging a hole
+  you can't climb out of is allowed. Spoil's yield when dug again (soil,
+  or nothing) is open (`docs/building.md`). Not yet built: placing is as
+  before until then.
