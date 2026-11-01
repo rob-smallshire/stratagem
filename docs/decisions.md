@@ -504,3 +504,10 @@ A running log of design decisions. Add to it whenever one is made.
   you can't climb out of is allowed. Spoil's yield when dug again (soil,
   or nothing) is open (`docs/building.md`). Not yet built: placing is as
   before until then.
+- **Soil is where entropy ends; spoil is soil:** rock dug is carried as
+  stone; stone put down is soil; grass and soil dug are nothing. No carried
+  soil. Soil put down is held from below only and subsides slowly, from
+  below upwards, by chance, the work spread over frames; whether the
+  world's own soil is loose too, or stays anchored, is open, with the
+  subsidence lab's experiments (`docs/building.md`, Subsidence) favouring
+  loose. Not yet built.

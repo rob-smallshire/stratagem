@@ -1,4 +1,4 @@
-# Building, spoil and support
+# Building, soil and support
 
 How the player changes the world by adding to it: what can be put down,
 what holds it up, and what becomes of materials as they pass through the
@@ -25,65 +25,106 @@ the game: an explorer in an indifferent world, not its engineer.
   further.
 - **Materials degrade as they're processed.** Each pass through the
   player's hands loses something, as entropy would have it: rock dug out
-  is carried as loose stone; stone put back is spoil, not rock; spoil dug
-  again is less still. Crafting is the one way up: work and a tool turn
-  wood into planks, stone into a pickaxe's head, and later ore into bars
-  and stone into bricks.
+  is carried as loose stone; stone put back is soil, not rock; soil dug is
+  nothing at all. Crafting is the one way up: work and a tool turn wood
+  into planks, stone into a pickaxe's head, and later ore into bars and
+  stone into bricks.
 - **Building is a craft.** Structures are made of refined, made things:
   planks, ladders, ropes, platforms, later bricks, each held up by the
   rules for its kind. Raw material can be dumped, not built with.
 - **The world can trap you.** Digging a hole you can't climb out of is
   allowed (decided 2026-11-01). A careful explorer carries a way out:
-  spoil to heap a step at a time, or a ladder.
+  stone to heap as soil a step at a time, or a ladder.
 
-## The states of a material
+## The ladder of entropy
+
+**Rock → stone (carried) → soil (put down) → nothing (dug).**
 
 | State | What it is | Becomes |
 |---|---|---|
-| Undisturbed | the world as generated: grass, soil, stone, ore, gems, bedrock | dug: carried, as its kind |
-| Carried | a kind in the pack: soil, stone, ore, gem, wood | crafted: something made; placed (soil, stone): spoil |
+| Undisturbed | the world as generated: grass, soil, stone, ore, gems, bedrock | dug: stone, ore and gems are carried; grass and soil are nothing |
+| Carried | a kind in the pack: stone, ore, gem, wood | crafted: something made; stone placed: soil |
 | Made | planks, torches, the workbench, pickaxes; later ladders, ropes, platforms, bricks | placed: a built piece, held by its rule |
-| Spoil | soil or stone put down in the world | dug: soil, or nothing (below) |
+| Soil | the world's soil, and stone put down | dug: nothing |
 
-Soil and stone stay distinct as carried kinds, because recipes tell them
-apart (the stone pickaxe's head is stone). In the world there is only one
-kind of fill: spoil, whatever it was made from. Ore and gems are never
-spoil: they are too valuable to dump, and can't be placed at all.
+Soil and spoil are one: there is no carried soil, and no second kind of
+fill. Digging grass or soil yields nothing (so the pack no longer fills
+with earth faster than anything uses it); stone put down is soil, the
+lesser material, in the world's own soil's look; soil dug is gone. Soil
+has no use beyond this, and that is its place: where entropy ends. Ore
+and gems can't be put down: too valuable to dump.
 
-## Spoil
+## Soil
 
-- **Placed** with SPACE, from soil or stone in hand, where a block can go
-  now: an empty tile (air or sky), ahead, above or below, clear of the
-  miner (the aim was fixed on 2026-11-01: placing ahead takes the first
-  column wholly ahead of the miner).
-- **Held from below only**: by undisturbed ground, by spoil, or by a solid
-  built piece beneath it. Nothing from the side, so no bridge, no ledge,
-  no overhang: the trunk's rule in the support table (`support.py`,
-  BELOW). Strength is the holder's, as for a trunk, so a column of spoil
-  on rock stands to any height, and one on a plank platform stands as long
-  as the platform does.
-- **Unheld, it falls** as pieces fall today: removed, and thrown out as an
-  item to be gathered again. Earth put in the sky drops at once. A shaft
-  can't be filled from its top (what's dropped down it falls as items to
-  the bottom); it is filled from the bottom up, which is also how a hole
-  is climbed out of: stand, place below while jumping, stand on it, again.
-  Spoil that slides and heaps into what's below it is later, if wanted:
-  it would need the support queue to move pieces, not only remove them.
-- **One material, one look:** a piece, broken whole, dug quickly with any
-  tool or none, opaque to light as rock is. Its graphics show at a glance
-  that it isn't the world's own: looser, darker, without the strata or the
-  speckle of what it came from.
-- **Dug again, it yields** one of:
-  - **soil:** a stone put back and dug again comes back as soil, the lesser
-    material. Spoil is then a store of soil, and stone degrades through it.
-  - **nothing (dust):** spoil is a sink; what's put down is gone when it's
-    taken up. The stronger statement of entropy, and it relieves the pack
-    (digging fills it with soil faster than anything uses it), but a heap
-    built to climb out of a hole is spent once it's dug away.
+- **Put down** with SPACE, from stone in hand, where a block can go now:
+  an empty tile (air or sky), ahead, above or below, clear of the miner
+  (placing ahead takes the first column wholly ahead of the miner, since
+  2026-11-01).
+- **Held from below only**: by undisturbed rock, by soil that is held, or
+  by a solid built piece beneath it. Nothing from the side, so no bridge,
+  no ledge, no overhang. Put down in the sky, or out over a drop, it
+  doesn't stay.
+- **It subsides, slowly:** not at once, as a felled tree does, but from
+  below, upwards, by chance (Subsidence, below). Soil can stand unheld for
+  a while; what fails is gone (dust, nothing gathered), and the soil above
+  is then at risk in turn. A shaft can't be filled from its top; it is
+  filled from the bottom up, which is also how a hole is climbed out of:
+  place below while jumping, stand on it, again.
 
-  The choice is open. Dust is the purer rule; soil the kinder one. Either
-  is a single entry in `inventory.YIELDS`.
+### Natural soil: two options, both open
 
+Soil put down must be held from below, or a bridge of it is the stone
+bridge again. The world's own soil is terrain today, held without limit.
+
+1. **Natural soil stays anchored**; only soil put down is held from below
+   and subsides. Cheap, and the world stays as it is; but two tiles alike
+   to look at behave differently (a soil ceiling over a tunnel stands;
+   soil put down can't overhang), told apart by a bit in the tile that the
+   player never sees.
+2. **All soil is loose**, the world's too (grass is soil with grass on
+   it). Soil is loose ground: tunnels belong in rock, and undermining the
+   soil brings it down, grass, trees and all, slowly. More truthful, and
+   it gives soil a character; and it costs little, as the experiments
+   below show.
+
+### Subsidence
+
+Real subsidence is slow: it starts from below and works upwards, and
+ground can stand undermined for a long while. So:
+
+- A loose tile is **at risk** while the tile under it is open.
+- Each frame a few tiles at risk (4) are **rolled for**; each fails with a
+  small chance (1 in 64, or 1 in 256), less when it's wedged between solid
+  sides (an arch: the chance divided by 1 + 2 for each solid side). At
+  most 2 tiles fail in a frame (each is a changed tile to send).
+- A tile that fails is **gone**, which puts the tile above it at risk; a
+  tree standing on it comes down, as the support rules already have it.
+- **Slumping:** a face with an open drop beside it deeper than any step
+  the hills are generated with (4 tiles or more: their steepest is 3) also
+  fails, at a much smaller chance (1 in 512), until no drop beside it is
+  so deep. So a soil wall left by digging wears back to a stepped slope,
+  and a free-standing heap of soil to 3 high; the hills as generated never
+  move.
+
+The experiments (`uv run strat-subsidence-lab`, the model
+`stratagem.subsidence`; build/features/subsidence.png), on scenes dug into
+the real world:
+
+| Scene | All soil loose, 1/64, slumping | Only soil put down |
+|---|---|---|
+| A tunnel through the soil, under the grass | its roof goes over about 25s; a trench open to the sky | stands |
+| A room 5 wide and a pocket 1 wide at the soil's base | the collapse climbs to the surface and widens: a crater, about 2 minutes | stands |
+| A tunnel under a tree | a trench in about 25s; the tree comes down | stands |
+| A tunnel in the rock, under the soil | stands (a little soil slumps where its end comes out under the hillside) | stands |
+| A shaft through the soil into the rock | slumps to a funnel over about 40s | stands |
+| Soil put down: a column, and a bridge over a shaft | the bridge falls within 5s; the column slumps to 3 high, or into the crater beside it | the bridge falls; the column stands |
+
+At 1 in 256 the same happens about three times as slowly. The work is
+fixed and small: 4 rolls a frame, at most 2 failures, never more than
+about 30 tiles at risk at once in these scenes (a list of them, as the
+torches' queue is); the generated hills put nothing at risk.
+
+## Built pieces
 ## Built pieces
 
 As `docs/tile-set.md` plans them, held by their kinds, with a span of 5
@@ -108,32 +149,29 @@ shaft that doesn't need digging steps.
 
 When it's built:
 
-- **Inventory:** soil and stone place SPOIL; ore and gems place nothing;
-  SPOIL yields soil or nothing; planks (and then ladders, platforms) place
-  their pieces.
-- **A spoil material:** a piece, with the BELOW rule and a drop of its
-  yield, and its graphics; opaque, so placing or losing it changes the sky
-  depth as any block does.
-- **Support** already runs a queue of changed tiles and lets pieces fall;
-  spoil needs no new mechanism, only its row in the rules. Placed blocks
-  stop being terrain.
+- **Inventory:** no carried soil; grass and soil yield nothing; stone
+  places soil; ore and gems place nothing; planks (and then ladders,
+  platforms) place their pieces.
+- **Subsidence on the parasite:** a list of tiles at risk, a few rolled for
+  each frame from a random source, failures sent as changed tiles; with
+  option 1, a bit marking soil put down (the shape byte has room).
 - **The decision** that dug materials can be placed back as blocks is
   superseded (`docs/decisions.md`).
-- **Tests:** the actions model places SPOIL; the support model holds and
-  drops it; the feature and support lab (`uv run strat-feature-lab`) gains
-  spoil, to see heaps, columns and falls before the game changes.
+- **Tests:** the 6502 against `stratagem.subsidence`, from the same random
+  sequence; the actions model placing soil.
 
 ## Open questions
 
-- **Spoil's yield:** soil or nothing (above).
-- **What soil is for**, beyond spoil: no answer yet. If it has no use,
-  should grass and soil yield anything when dug?
-- **Spoil on built pieces:** may a platform hold spoil, and a ladder stand
-  on it? The rule above says yes (a solid built piece holds it; spoil holds
-  what is held from below); a platform holding heavy earth might rather
-  break.
-- **Falls into the miner:** spoil falling as an item can't hurt; heaps that
-  slide, later, would have to be stopped from burying the miner, or not.
+- **Natural soil:** anchored, or loose (above). The experiments favour
+  loose: it costs little, and the world reads truer for it.
+- **The chances:** 1 in 64 or 1 in 256, and slumping's 1 in 512, are first
+  guesses, to tune by playing: slow enough to see coming and get out of,
+  quick enough to matter.
+- **Soil on built pieces:** may a platform hold soil, and a ladder stand
+  on it? The rule above says yes (a solid built piece holds it); a
+  platform holding heavy earth might rather break.
+- **The miner under subsidence:** what fails is gone, so it can't bury or
+  hurt; the miner standing on soil that fails drops with it.
 - **The workbench and torches** keep their own rules (the bench from
-  below, torches by any solid neighbour); placed on spoil, they're held as
-  on anything solid.
+  below, torches by any solid neighbour); on soil, they're held as on
+  anything solid, and fall when it fails.
