@@ -154,6 +154,16 @@ no slumping. Only a tile directly undermined is at risk, so a cut into a
 hillside stands as dug, and a small excavation stays small; with slumping,
 small digs grew into craters that cut back into the hills.
 
+And soil that fails **drops a tile**, into the empty tile below, rather
+than vanishing (decided 2026-11-01): as sand does in some games, but
+slowly and by chance. Soil is kept until it is mined (where entropy takes
+it); a tunnel through soil fills from above, and the ground over it sinks
+into a hollow. It drops only into air or sky (a torch, a tree's part or
+water holds it), as soil (disturbed grass is soil), and never onto the
+miner (it waits). The tile it leaves is sky if the tile above it is sky,
+so sinking ground shows the sky behind it, not a black cave in the shape
+of the hill that was.
+
 - **Inventory:** no carried soil; grass and soil yield nothing; stone
   places soil; ore and gems place nothing (`inventory.YIELDS`, `PLACES`).
   The miner starts with the torches in hand. Planks place nothing yet.
@@ -163,9 +173,12 @@ small digs grew into craters that cut back into the hills.
   at risk (itself, and the tile above it) into a queue of 64, each once.
   Each frame, after the player's action, 2 are taken from its head and
   rolled for, by MBANK's LFSR stepped 8 times, against a 16-bit threshold
-  (1 in 64). One that fails is gone as if
-  dug (`change_target`: relit, sent, and noted in turn), at most one a
-  frame, and only when the player hasn't changed a tile that frame.
+  (1 in 64). One that fails drops: over two frames, as the game changes
+  one tile a frame through `change_target` (relit, sent, and noted in
+  turn), the tile below becomes soil, then the tile itself empties
+  (`subside_pending`); nothing else is rolled for meanwhile. At most one
+  a frame, only when the player hasn't changed a tile that frame, and
+  never into a tile the miner is in (`subside_miner`, `subside_clear`).
 - **Only in the tile cache:** every tile it reads is read from the cache
   (`subside_material`), a quick look; outside it a tile is solid and not
   loose, isn't noted, and if queued waits, unread, until the miner comes
@@ -173,19 +186,22 @@ small digs grew into craters that cut back into the hills.
   store, `tile_at`, a check cost about 1,200 cycles and a failure frame
   over 100,000.)
 - **Costs** (py65, a tunnel three wide dug through the soil beside the
-  miner): `subsidence_step` about 1,200 cycles a frame while soil is at
-  risk (1,300 at most), against an idle frame's 4,800; noting a changed
-  tile about 600; a frame in which a tile fails costs as a dig does
-  (about 65,000, the light's flood and relighting most of it). With
-  slumping, these were 2,500 and 4,300.
+  miner): `subsidence_step` about 1,500 cycles a frame while soil is at
+  risk (1,700 at most), against an idle frame's 4,800; noting a changed
+  tile about 600; each of a drop's two frames costs as a dig does (about
+  65,000, the light's flood and relighting most of it). With slumping,
+  these were 2,500 and 4,300.
 - **Tests:** `tests/test_subsidence.py`: the model's scenes (a tunnel in
   the soil subsides to the sky; one in the rock stands, and the hills
   stay; a cut into a hillside stands; soil put down over a drop falls; the
   queue's limit), and the parasite frame by frame as the model, in py65:
   its queue, its random generator and the tiles that fail.
 - **In the emulator:** a cutting dug into the hillside beside the start:
-  within about 5 seconds the soil over the digging is gone, to the sky,
-  and the cut's face stands (build/subsidence/subsidence-game.png).
+  over about 20 seconds the soil over it drops in and fills it, the
+  hillside settling in steps, sky behind; the tile over the miner waits
+  above him (build/subsidence/subsidence-game.png). A shaft the miner
+  digs still takes its background from the surface as generated (cave,
+  black, below it): digging could follow subsidence's rule.
 
 ## Open questions
 

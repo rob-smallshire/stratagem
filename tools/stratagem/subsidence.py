@@ -7,9 +7,21 @@ bridge or overhang. Which soil is loose is a rule: all of it, grass
 included (grass is soil with grass on it), as the game has it; or, for the
 lab, only soil put down.
 
-A loose tile is at risk while the tile under it is open (passable). Soil
-has no strength sideways: only a tile directly undermined is at risk, and
-a cut into a hillside stands, its face as it was dug. (For the lab, rules
+A loose tile is at risk while the tile under it is empty (air or sky: a
+torch, a tree's part or water under it holds it). Soil has no strength
+sideways: only a tile directly undermined is at risk, and a cut into a
+hillside stands, its face as it was dug.
+
+A tile that fails drops a tile, into the empty one below, as sand does in
+some games but slowly and by chance: the soil is kept until it is mined,
+and a tunnel through soil fills from above while the ground over it sinks.
+It drops as soil (disturbed grass is soil), never onto the miner (it waits
+while the tile below overlaps him: `blocked`), and takes two frames, as
+the game changes one tile a frame: the tile below becomes soil, then
+(`pending`) the tile itself empties; nothing else is rolled for meanwhile.
+A tile emptied so is sky if the tile above it is sky (or it is above its
+column's surface), otherwise cave: sinking ground shows the sky behind it,
+not the black of a cave in the shape of the hill that was (`emptied`). (For the lab, rules
 may also wedge soil between solid sides, an arch, or let a face slump;
 the game's have neither: GAME_RULES.)
 
@@ -24,8 +36,8 @@ back; one no longer at risk is dropped; one that can't fail now (the
 frame's changed tile taken: `can_fail`) goes to the back unrolled;
 otherwise a roll: the random generator stepped 8 times, its 16 bits against the
 threshold.
-One that survives goes to the back; one that fails is gone (dust: nothing
-gathered), and at most one fails a frame. Every changed tile, the player's
+One that survives goes to the back; one that fails drops, and at most one
+fails a frame. Every changed tile, the player's
 or subsidence's, is noted: the tiles it may have put at risk join the
 queue (`note`).
 
@@ -38,10 +50,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from stratagem.tiles import GRASS, PASSABLE, SHAPE_FULL, SOIL, TREE_PARTS, background
+from stratagem.tiles import AIR, BACKGROUND_SKY, GRASS, PASSABLE, SHAPE_FULL, SKY, SOIL, TREE_PARTS, background
 from stratagem.world import World, background_bits
 
 ALL_SOIL, PLACED_SOIL = "all soil", "placed soil"
+EMPTY = (AIR, SKY)                  # what soil drops into
 QUEUE = 64
 CHECKS = 2
 SLUMP_DROP = 4
@@ -112,6 +125,8 @@ class Subsidence:
     placed: set[tuple[int, int]] = field(default_factory=set)
     queue: list[tuple[int, int]] = field(default_factory=list)
     can_fail: object = None         # () -> bool; None: always
+    blocked: object = None          # (x, y) -> bool: the miner is in the tile; None: never
+    pending: tuple[int, int] | None = None     # a tile dropped, to be emptied next
     bounds: tuple[int, int, int, int] | None = None    # the tile cache: left, right, top, bottom; None: everywhere
     trees: bool = False             # bring trees down here (the game's support does)
     frame: int = 0
@@ -137,8 +152,11 @@ class Subsidence:
         return bool(self.rules.slump) and any(all(self.open(x + d, y + k) for k in range(SLUMP_DROP))
                                               for d in (-1, 1))
 
+    def empty(self, x: int, y: int) -> bool:
+        return self.cached(x, y) and self.world.tile_at(x, y)[0] in EMPTY
+
     def at_risk(self, x: int, y: int) -> bool:
-        return self.loose(x, y) and (self.open(x, y + 1) or self.face(x, y))
+        return self.loose(x, y) and (self.empty(x, y + 1) or self.face(x, y))
 
     def note(self, x: int, y: int) -> None:
         """Tile (x, y) changed."""
@@ -170,6 +188,13 @@ class Subsidence:
                 self.world.set_tile(tx, ty, opened(tx, ty))
                 stack += [(tx, ty - 1), (tx - 1, ty), (tx + 1, ty)]
 
+    def emptied(self, x: int, y: int) -> tuple[int, int]:
+        """What a dropped tile leaves: sky if the tile above is (or above
+        the surface), otherwise cave."""
+        if background_bits(x, y) or (self.cached(x, y - 1) and self.world.tile_at(x, y - 1)[0] == SKY):
+            return SKY, SHAPE_FULL | BACKGROUND_SKY
+        return AIR, SHAPE_FULL
+
     def threshold(self, x: int, y: int) -> int:
         thresholds = self.rules.thresholds()
         if self.open(x, y + 1):
@@ -177,8 +202,21 @@ class Subsidence:
         return thresholds[3]
 
     def step(self) -> tuple[int, int] | None:
-        """A frame; returns the tile that failed, if one did."""
+        """A frame; returns the tile changed, if one was: a tile dropped
+        into, or a tile emptied, completing a drop."""
         self.frame += 1
+        if self.pending is not None:
+            if self.can_fail is not None and not self.can_fail():
+                return None
+            x, y = self.pending
+            self.pending = None
+            if not self.loose(x, y):
+                return None             # (mined meanwhile)
+            self.placed.discard((x, y))
+            self.set_tile(x, y, self.emptied(x, y))
+            if self.trees:
+                self.fell_trees(x, y - 1)
+            return x, y
         for _ in range(min(CHECKS, len(self.queue))):
             x, y = self.queue.pop(0)
             if not self.cached(x, y):
@@ -189,10 +227,16 @@ class Subsidence:
             if self.can_fail is not None and not self.can_fail():
                 self.queue.append((x, y))
                 continue
+            if self.blocked is not None and self.blocked(x, y + 1):
+                self.queue.append((x, y))
+                continue
             if self.random.roll() < self.threshold(x, y):
                 self.gone += 1
-                self.dig(x, y)
-                return x, y
+                if (x, y) in self.placed:
+                    self.placed.add((x, y + 1))
+                self.set_tile(x, y + 1, (SOIL, SHAPE_FULL | background_bits(x, y + 1)))
+                self.pending = x, y
+                return x, y + 1
             self.queue.append((x, y))
         return None
 

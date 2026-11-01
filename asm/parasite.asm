@@ -373,5 +373,12 @@ GUARD &F800
 .subside_y          SKIP 1
 .subside_t          SKIP 1
 .subside_t3         SKIP 1
+.subside_pending    SKIP 1      \ Non-zero: a tile dropped, to empty next
+.subside_pending_x  SKIP 1
+.subside_pending_y  SKIP 1
+.subside_left       SKIP 1      \ The tiles the miner is in
+.subside_right      SKIP 1
+.subside_top        SKIP 1
+.subside_bottom     SKIP 1
 
 SAVE "PLIGHT", sl_radial, plight_end, sl_radial

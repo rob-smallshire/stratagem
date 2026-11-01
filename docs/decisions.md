@@ -516,3 +516,7 @@ A running log of design decisions. Add to it whenever one is made.
   at risk of subsiding; no arch, no slumping of faces. A cut into a
   hillside stands as dug, and a small excavation stays small (with
   slumping, small digs grew into craters cutting back into the hills).
+- **Soil that fails drops a tile:** into the empty tile below, rather than
+  vanishing; slowly and by chance, as sand in some games but slower. Soil
+  is kept until mined; tunnels in soil fill and the ground sinks. It never
+  drops onto the miner, and leaves sky where the tile above it is sky.

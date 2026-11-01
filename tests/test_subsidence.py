@@ -7,7 +7,9 @@ from test_daylight import ParasiteGame
 
 from stratagem import subsidence
 from stratagem.subsidence import QUEUE, Subsidence, opened
-from stratagem.tiles import PASSABLE, STONE, TREE_PARTS
+from stratagem.actions import overlaps_player
+from stratagem.player import Player
+from stratagem.tiles import PASSABLE, SKY, SOIL, STONE, TREE_PARTS
 from stratagem.world import HEIGHTS, World, background_bits
 
 FRAMES = 3000
@@ -15,7 +17,7 @@ FRAMES = 3000
 
 def settle(model: Subsidence, frames: int = 30_000) -> None:
     for _ in range(frames):
-        if not model.queue:
+        if not model.queue and model.pending is None:
             return
         model.step()
     raise AssertionError("it didn't settle")
@@ -28,13 +30,22 @@ def rock_row(world: World, x: int) -> int:
     return y
 
 
-def test_a_tunnel_through_the_soil_subsides_to_the_sky():
+def test_a_tunnel_through_the_soil_fills_and_the_ground_sinks_to_it():
+    """The soil over a tunnel two high drops into it, a tile at a time: the
+    tunnel fills, and each column's top two tiles are sky. (Soil left
+    undisturbed over a natural cave stands, until something near it
+    changes.)"""
     model = Subsidence(World())
     for x in range(64, 76):
         model.dig(x, HEIGHTS[x] + 3)
         model.dig(x, HEIGHTS[x] + 2)
     settle(model)
-    assert all(model.open(x, y) for x in range(64, 76) for y in range(HEIGHTS[x], HEIGHTS[x] + 4))
+    for x in range(64, 76):
+        rock = rock_row(World(), x)
+        if any(World().tile_at(x, y)[0] in PASSABLE for y in range(HEIGHTS[x], rock)):
+            continue                # (a natural cave in its soil, undisturbed: it stands)
+        assert [model.world.tile_at(x, y)[0] for y in (HEIGHTS[x], HEIGHTS[x] + 1)] == [SKY, SKY], x
+        assert all(model.world.tile_at(x, y)[0] == SOIL for y in range(HEIGHTS[x] + 2, rock)), x
 
 
 def test_a_tunnel_in_the_rock_stands_and_the_hills_stay():
@@ -62,15 +73,17 @@ def test_a_cut_into_a_hillside_stands():
                for c in (x - 2, x - 1, x + 2, x + 3) for y in range(HEIGHTS[c], rock_row(World(), c)))
 
 
-def test_soil_put_down_over_a_drop_falls():
+def test_soil_put_down_over_a_drop_falls_to_its_bottom():
     model = Subsidence(World())
     x = 71
+    bottom = rock_row(model.world, x + 1) + 2
     for column in (x + 1, x + 2):
-        for y in range(HEIGHTS[column], rock_row(model.world, column) + 2):
+        for y in range(HEIGHTS[column], bottom):
             model.dig(column, y)
     model.place(x + 1, HEIGHTS[x] - 1)
     settle(model)
     assert model.open(x + 1, HEIGHTS[x] - 1), "a bridge of soil stood"
+    assert model.world.tile_at(x + 1, bottom - 1)[0] == SOIL, "it didn't come to rest at the bottom"
 
 
 def test_the_queue_holds_each_tile_once_and_no_more_than_it_can():
@@ -119,18 +132,23 @@ def test_the_parasites_subsidence_is_the_models(game_build):
         free = game.byte("redraw_tile") == 0
         model.can_fail = lambda: free
         model.bounds = bounds()
-        gone = model.step()
+        player = Player(x=memory[labels["zp_player_x"]] | memory[labels["zp_player_x"] + 1] << 8,
+                        y=memory[labels["zp_player_y"]] | memory[labels["zp_player_y"] + 1] << 8)
+        model.blocked = lambda x, y: overlaps_player(player, x, y)
+        changed = model.step()
         game.frame(0)
         assert queue() == model.queue, f"frame {frame}: the queue"
         assert random_state() == model.random.state, f"frame {frame}: the random generator"
-        if gone is not None:
+        if changed is not None:
             failed += 1
-            assert game.tile_at(*gone)[0] in PASSABLE, f"frame {frame}: {gone} didn't fail"
-        if not model.queue:
+            assert game.tile_at(*changed) == model.world.tile_at(*changed), f"frame {frame}: {changed}"
+        if not model.queue and model.pending is None:
             break
     print(f"\n{failed} tiles failed over {frame + 1} frames")
-    assert failed >= 5, f"only {failed} tiles failed"
+    assert failed >= 5, f"only {failed} tiles changed"
     assert not model.queue, "it didn't settle"
+    assert all(game.tile_at(x, y) == model.world.tile_at(x, y) for x in range(left - 1, left + 4)
+               for y in range(HEIGHTS[x] - 2, HEIGHTS[x] + 6)), "the world isn't the model's"
 
 
 assert subsidence.GAME_RULES.loose == subsidence.ALL_SOIL and background_bits and NOON
