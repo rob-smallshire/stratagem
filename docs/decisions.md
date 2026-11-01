@@ -520,3 +520,9 @@ A running log of design decisions. Add to it whenever one is made.
   vanishing; slowly and by chance, as sand in some games but slower. Soil
   is kept until mined; tunnels in soil fill and the ground sinks. It never
   drops onto the miner, and leaves sky where the tile above it is sky.
+- **The director's moratoria, and the day's turns for certain:** Daylight
+  and Night start only early enough to end in their own period with the
+  least quiet still to run before Dusk and Dawn (about 14:04 and 1:07,
+  from the pieces' lengths); Dawn and Dusk play for certain when the
+  director considers within them. No cheerful daylight spills into dusk,
+  nor night into dawn, and the turns of the day are marked every day.

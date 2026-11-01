@@ -12,6 +12,7 @@ INCLUDE "asm/os.asm"
 INCLUDE "asm/layout.asm"
 INCLUDE "asm/tube_layout.asm"
 INCLUDE "build/generated/labels_host.asm"
+INCLUDE "build/generated/director.asm"
 
 zp_ptr = HOST_zp_ptr            \ Saved by music_event
 zp_score = HOST_zp_temp         \ While music_init runs, before the game
@@ -35,16 +36,21 @@ PIECE_DAYLIGHT = 2
 PIECE_DUSK = 3
 PIECE_NIGHT = 4
 PIECE_UNDERGROUND = 5
+NO_PIECE = &FF                  \ (occasion: silence)
 
 \ The director: silence, mostly. FIRST_QUIET ticks before the first piece,
 \ which plays for certain; after each, QUIET_MIN and up to 255 QUIET_UNITs
 \ more; then every CONSIDER_TICKS a chance of PLAY_CHANCE in 256 of the
 \ piece for the world as it is (the time, or underground: PACKET_WORLD),
 \ half that if it was the last played. A piece, once started, plays to
-\ its end.
+\ its end. Daylight and Night may start only so early that they end in
+\ their own period, QUIET_MIN still to run before the next (DAYLIGHT_UNTIL,
+\ NIGHT_UNTIL: day_music.latest_start), so that cheerful daylight doesn't
+\ spill into dusk, nor night into dawn; and Dawn and Dusk, the turns of the
+\ day, play for certain when the director considers within them.
 TICKS_PER_SECOND = 50
 FIRST_QUIET = 15 * TICKS_PER_SECOND
-QUIET_MIN = 120 * TICKS_PER_SECOND
+QUIET_MIN = DIRECTOR_QUIET_MIN_SECONDS * TICKS_PER_SECOND
 QUIET_UNIT = 32                 \ (up to 2:43 more)
 CONSIDER_TICKS = 30 * TICKS_PER_SECOND
 PLAY_CHANCE = 85                \ (a third)
@@ -154,8 +160,14 @@ PLAY_CHANCE = 85                \ (a third)
     RTS
 .consider
     JSR occasion
+    CPX #NO_PIECE               \ A moratorium: silence
+    BEQ later
     LDA director_chance
     BEQ play                    \ (The first)
+    CPX #PIECE_DAWN             \ The turns of the day: for certain
+    BEQ play
+    CPX #PIECE_DUSK
+    BEQ play
     JSR random
     CMP director_chance
     BCS later
@@ -191,7 +203,8 @@ PLAY_CHANCE = 85                \ (a third)
     RTS
 }
 
-\ X: the piece for the world as it is (HOST_host_world, HOST_host_time).
+\ X: the piece for the world as it is (HOST_host_world, HOST_host_time), or
+\ NO_PIECE in Daylight's and Night's moratoria, before Dusk and Dawn.
 .occasion
 {
     LDX #PIECE_UNDERGROUND
@@ -199,12 +212,18 @@ PLAY_CHANCE = 85                \ (a third)
     BMI done                    \ (WORLD_UNDERGROUND)
     LDX #PIECE_NIGHT
     LDA HOST_host_time
+    CMP #NIGHT_UNTIL
+    BCC done
+    LDX #NO_PIECE
     CMP #DAWN_TIME
     BCC done
     LDX #PIECE_DAWN
     CMP #DAY_TIME
     BCC done
     LDX #PIECE_DAYLIGHT
+    CMP #DAYLIGHT_UNTIL
+    BCC done
+    LDX #NO_PIECE
     CMP #DUSK_TIME
     BCC done
     LDX #PIECE_DUSK

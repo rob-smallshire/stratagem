@@ -52,7 +52,7 @@ def test_the_games_music_waits_for_the_frame_and_loses_no_tick(tube_music_bbc, g
 
 MUSIC_BANK_INDEX = 3                # asm/tube_layout.asm
 ROMSEL_COPY = 0xF4
-PIECE_DAWN = 1                      # asm/mbank.asm
+PIECE_DAWN, PIECE_DUSK = 1, 3       # asm/mbank.asm
 FIRST_QUIET_SECONDS, QUIET_MIN_TICKS = 15, 120 * 50
 MODEL_TICKS = 300
 
@@ -113,3 +113,32 @@ def test_the_director_starts_with_dawn_plays_it_as_the_model_does_then_waits(tub
     bbc.run_for_emulated_seconds(0.1)
     quiet = bank()[mbank["director_quiet"]] | bank()[mbank["director_quiet"] + 1] << 8
     assert quiet >= QUIET_MIN_TICKS - 10, f"{quiet} ticks quiet"
+
+
+def piece_started(bbc, host, mbank, seconds: float) -> bool:
+    """Run until a piece starts (music_play, in the music's bank: other ROMs
+    run at its address too), or for `seconds`; stopped at its start."""
+    bank_number = bbc.memory.address.peek[host["ram_banks"] + MUSIC_BANK_INDEX]
+    deadline = bbc.debugger.cycle_count + seconds * 2e6
+    bbc.debugger.add_breakpoint(mbank["music_play"])
+    try:
+        while bbc.debugger.cycle_count < deadline:
+            bbc.debugger.run_and_wait_for_stop(timeout=120)
+            if bbc.memory.address.peek[ROMSEL_COPY] & 0x0F == bank_number:
+                return True
+        return False
+    finally:
+        bbc.debugger.clear_breakpoints()
+
+
+def test_daylight_waits_for_dusk_and_dusk_plays_for_certain(tube_music_bbc, game_build):
+    """Started at 17:00, within Daylight's moratorium (it would spill into
+    dusk), the director stays silent; at dusk, its first consideration plays
+    Dusk, for certain."""
+    bbc = tube_music_bbc
+    host, mbank = game_build.labels["HOST"], game_build.labels["MBANK"]
+    boot_game(bbc, game_build, time=17 * 0x10000 // 24)
+    assert piece_started(bbc, host, mbank, 90), "nothing played"
+    time = bbc.memory.address.peek[host["host_time"]]
+    assert time >= day_music.period_time(day_music.DUSK_HOUR), f"a piece started at {time * 24 / 256:.2f}h"
+    assert music_bank(bbc, host)[mbank["director_last"]] == PIECE_DUSK

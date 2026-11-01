@@ -39,3 +39,15 @@ def test_a_score_is_saved_as_written(score, tmp_path):
     written = score()
     assert written.write(tmp_path).read_bytes() == (day_scores.MUSIC_DIRPATH / written.filename).read_bytes(), \
         "art/music is stale: uv run python -m stratagem.day_scores"
+
+
+@pytest.mark.parametrize("arrangement, next_hour", [(day_music.DAYLIGHT, day_music.DUSK_HOUR),
+                                                    (day_music.NIGHT, day_music.DAWN_HOUR)],
+                         ids=["daylight", "night"])
+def test_daylight_and_night_end_with_the_quiet_to_run_before_the_next(arrangement, next_hour):
+    """Started at its latest start, the piece ends, and its least silence
+    after, before the next period (Dusk's, Dawn's) begins."""
+    start = day_music.latest_start(arrangement, next_hour)
+    seconds = sequencer.SequencePlayer(day_music.piece(arrangement)).ticks() / day_music.TICKS_PER_SECOND
+    ends = start * day_music.TIME_SECONDS + seconds + day_music.QUIET_MIN_SECONDS
+    assert ends <= day_music.period_time(next_hour) * day_music.TIME_SECONDS

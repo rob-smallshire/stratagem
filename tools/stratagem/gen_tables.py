@@ -18,7 +18,8 @@ Writes into build/generated/:
   each kind places;
 - pack.asm: the pack screen's constants, and its icons, digits and marks;
 - loading_page.asm: the loading page, and the tables that animate it;
-- m5_day.asm: the musical day's pieces (stratagem.day_music), for MBANK;
+- m5_day.asm, director.asm: the musical day's pieces (stratagem.day_music),
+  for MBANK, and the director's latest starts;
 - daynight.asm, daynight_tables.asm: the world's day and night
   (stratagem.daynight): its constants, and the parasite's tables;
 - subsidence.asm: subsidence's rules (stratagem.subsidence).

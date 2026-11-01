@@ -484,24 +484,35 @@ down, which costs almost nothing.
   underground; otherwise by the time: Dawn from 5 o'clock, Daylight from
   7, Dusk from 18, Night from 20 (`tube_layout.asm`, as times: &35, &4A,
   &C0, &D5).
+- **Moratoria:** a piece plays to its end, so Daylight and Night may start
+  only early enough to end in their own period with the least silence
+  still to run before the next begins: Daylight by about 14:04, Night by
+  about 1:07 (`day_music.latest_start`, from each piece's length and the
+  quiet, into `build/generated/director.asm`). After those, the director
+  is silent until Dusk or Dawn: no cheerful daylight spills into dusk, no
+  night into dawn, and the turns of the day find the director free.
+- **The turns of the day:** Dawn and Dusk play for certain at the
+  director's first consideration within them (within 30 seconds of their
+  start, given the quiet).
 - **When:** 15 seconds of silence at the start, then the first piece for
   certain (at the game's start, about 7:18, Daylight); after
   each piece, two minutes and up to 2:43 more of silence; then every 30
   seconds a chance of a third of the piece for the moment, half that if
   it was the last played. A piece plays to its end, whatever happens.
 - **The silences, as they fall** (simulated exactly: the director's own
-  LFSR, all 128 seeds, three hours each on the surface): median 3.8
-  minutes, mean 4.8; half between 2.8 and 5.8, 5% to 95% from 2.2 to 9.7,
-  the longest 25. Music plays about a quarter of the time. Kept so:
-  continuous music tires. Two quirks, accepted for now: Dawn's and Dusk's
-  windows (109 seconds each) are shorter than the least quiet, so after
-  the first Dawn they come about a tenth of the time each, against
-  Daylight's and Night's two fifths; and the LFSR moves a bit a draw, so
-  successive chances are correlated, lengthening the tail.
+  LFSR, all 128 seeds, three hours each on the surface): median 4.5
+  minutes, mean 5.2; half between 3.4 and 6.7, 5% to 95% from 2.3 to
+  10.2, the longest 11. Dawn and Dusk play every day; Daylight on about
+  four days in five, Night on about one in two. Kept so: continuous music
+  tires. (Before the moratoria, Dawn and Dusk, their windows of 109
+  seconds shorter than the least quiet, came only a tenth of the time
+  each, and pieces ran over into the next period. The LFSR moves a bit a
+  draw, so successive chances are correlated.)
 - **The overture** is in the bank, for celebration; nothing asks for it
   yet.
 - `tests/test_game_music.py` checks that Dawn comes first, after the quiet
-  start; that the bank's player plays it as the model does; and that the
+  start (started at 5 o'clock); that started at 17:00, in Daylight's
+  moratorium, the director waits, and plays Dusk at dusk; that the bank's player plays it as the model does; and that the
   director is quiet for two minutes or more after it ends.
   `tests/test_world_clock.py` checks the clock and the underground flag.
 
