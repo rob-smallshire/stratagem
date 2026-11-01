@@ -288,20 +288,27 @@ OVERLAP_OFFSET = 64             \ Keeps positions relative to a tile positive
     JMP wanted
 .ahead
     \ The column of the pixel just ahead: (px + PLAYER_WIDTH) >> 3, or
-    \ (px - 1) >> 3.
+    \ (px - 1) >> 3; placing, the first wholly ahead, a tile less a pixel
+    \ further (the miner is narrower than a tile; a block may not overlap it).
+    LDY want
+    BEQ reach_set
+    LDY #TILE_WIDTH - 1
+.reach_set
+    STY zp_temp
     LDA zp_player_facing
     BMI behind
+    LDA #PLAYER_WIDTH
     CLC
-    LDA zp_box_x
-    ADC #PLAYER_WIDTH
+    ADC zp_temp
+    ADC zp_box_x                \ (Carry clear)
     STA zp_temp
     LDA zp_box_x + 1
     ADC #0
     JMP column_found
 .behind
-    SEC
+    CLC                         \ (Carry clear: less the reach, and 1)
     LDA zp_box_x
-    SBC #1
+    SBC zp_temp
     STA zp_temp
     LDA zp_box_x + 1
     SBC #0

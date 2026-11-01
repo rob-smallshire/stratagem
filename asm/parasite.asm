@@ -170,6 +170,32 @@ INCLUDE "build/generated/daynight_tables.asm"
 .piece_sky_backdrops            \ Each piece's backdrop over the sky
     PIECE_SKY_BACKDROPS
 
+\ Sky in a band of the glow, para_material at (zp_fill_x, zp_fill_y),
+\ as the host draws it (stratagem.daynight.drawn): para_shape the band's
+\ shape, drawing sky's cave page. For para_copy_tile. Preserves Y.
+.sky_drawn
+{
+    LDA para_material
+    CMP #TILE_SKY
+    BNE done
+    LDX zp_fill_x
+    LDA world_heights,X
+    SEC
+    SBC zp_fill_y               \ Rows above the surface
+    BCC done
+    CMP #DAYNIGHT_BANDS + 1
+    BCS done
+    SBC #0                      \ (Carry clear: less 1) Rows 0 and 1: band 0
+    BCS band_set
+    LDA #0
+.band_set
+    TAX
+    LDA daynight_band_shapes,X
+    STA para_shape
+.done
+    RTS
+}
+
 \ The backdrop a pair is composed over (tiles.backdrop_number), in A, from
 \ its sky bit, in carry: the cave, or over the sky, the piece's (the upper
 \ canopy's the plain sky, above the glow's bands). For para_copy_tile.

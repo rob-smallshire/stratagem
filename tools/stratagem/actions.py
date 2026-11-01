@@ -98,12 +98,16 @@ def quarters(hands: Hands) -> dict[int, int]:
     return TOOL_QUARTERS[tool_in_use(hands)]
 
 
-def _ahead(player: Player, wanted, most_left_of=None) -> tuple[int, int] | None:
+def _ahead(player: Player, wanted, most_left_of=None, placing: bool = False) -> tuple[int, int] | None:
     """In the column ahead, from the feet up to the head, the tile `wanted`
     accepts: with the most solid left, by tile_at most_left_of, if given (the
-    lowest, of equals), otherwise the lowest."""
+    lowest, of equals), otherwise the lowest. The column ahead is that of
+    the pixel just ahead, or placing, the first wholly ahead: the miner is
+    narrower than a tile, and a block may not overlap it."""
     px, py = player.px, player.py
-    column = (px + PLAYER_WIDTH) // TILE_WIDTH if player.facing > 0 else (px - 1) // TILE_WIDTH
+    reach = TILE_WIDTH - 1 if placing else 0
+    column = ((px + PLAYER_WIDTH + reach) // TILE_WIDTH if player.facing > 0
+              else (px - 1 - reach) // TILE_WIDTH)
     best, best_left = None, -1
     for row in range((py + PLAYER_HEIGHT - 1) // TILE_HEIGHT, py // TILE_HEIGHT - 1, -1):
         if wanted(column, row):
@@ -120,7 +124,7 @@ def _solid_left(tile: tuple[int, int]) -> int:
     return QUARTERS * QUARTERS if tile[0] in CHOPPABLE else solid_count(*tile)
 
 
-def aim(player: Player, inputs: int, wanted, most_left_of=None) -> tuple[int, int] | None:
+def aim(player: Player, inputs: int, wanted, most_left_of=None, placing: bool = False) -> tuple[int, int] | None:
     px, py = player.px, player.py
     middle = (px + PLAYER_WIDTH // 2) // TILE_WIDTH
     if inputs & INPUT_DOWN:
@@ -128,7 +132,7 @@ def aim(player: Player, inputs: int, wanted, most_left_of=None) -> tuple[int, in
     elif inputs & INPUT_UP:
         target = middle, (py - 1) // TILE_HEIGHT
     else:
-        return _ahead(player, wanted, most_left_of)
+        return _ahead(player, wanted, most_left_of, placing)
     return target if wanted(*target) else None
 
 
@@ -306,7 +310,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             return hands, NONE, None
         passable = inventory.PLACES[hand] in PASSABLE      # may overlap the player
         target = aim(player, inputs, lambda x, y: in_world(x, y) and world.tile_at(x, y)[0] in EMPTY
-                     and (passable or not overlaps_player(player, x, y)))
+                     and (passable or not overlaps_player(player, x, y)), placing=True)
         if target is None and torch:            # the miner's own tile, if empty
             own = ((player.px + PLAYER_WIDTH // 2) // TILE_WIDTH, (player.py + PLAYER_HEIGHT // 2) // TILE_HEIGHT)
             target = own if world.tile_at(*own)[0] in EMPTY else None
