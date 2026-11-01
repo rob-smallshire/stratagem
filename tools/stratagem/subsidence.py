@@ -1,34 +1,51 @@
 """Subsidence (docs/building.md): soil held from below only, failing slowly
-and by chance, from below upwards, a model to try before building.
+and by chance, from below upwards. The model the parasite's
+asm/subsidence.asm follows exactly, and the subsidence lab runs.
 
 Soil is loose: held by what is under it, never from the side, so it can't
-bridge or overhang. Which soil is loose is the choice under test: only
-soil put down by the player (natural soil anchored, as terrain is today),
-or all of it, grass included (grass is soil with grass on it).
+bridge or overhang. Which soil is loose is a rule: all of it, grass
+included (grass is soil with grass on it), as the game has it; or, for the
+lab, only soil put down.
 
-A loose tile is at risk while the tile under it is open (passable). Each
-frame, up to `checks` tiles at risk are rolled for, each failing with
-probability `chance`, less where it is wedged between solid neighbours
-(an arch: `chance` divided by 1 + `arch` for each solid side). A tile that
-fails is gone (dust: nothing falls, nothing is gathered), which puts the
-tile above it at risk, and the tiles beside it lose a side. So subsidence
-starts from below and climbs, slowly; soil can stand unsupported for a
-while; and the work is a fixed few rolls a frame, however much is at risk.
-At most `falls` tiles fail in a frame (each is a changed tile to send).
+A loose tile is at risk while the tile under it is open (passable), or
+while it is a face: open beside it for SLUMP_DROP tiles down, steeper than
+any step of the hills as generated (3 at most), so that a wall left by
+digging slumps to a slope and the hills never move.
 
-A tree standing on soil that fails comes down at once (the game's support
-does that, a piece at a time; here, whole, as pieces aren't the subject).
+It happens only where the parasite's tile cache is (`bounds`), so that
+every tile it reads is a quick look in the cache: a tile outside it is
+solid, and not loose; one outside it isn't noted; and one queued that has
+left it goes to the back unread, until the miner comes back.
+
+Tiles at risk wait in a queue (QUEUE tiles at most, each once). Each frame
+up to CHECKS are taken from its head: one outside the cache goes to the
+back; one no longer at risk is dropped; one that can't fail now (the
+frame's changed tile taken: `can_fail`) goes to the back unrolled;
+otherwise a roll: the random generator stepped 8 times, its 16 bits against the
+threshold for the tile (by how many solid sides wedge it, or a face's).
+One that survives goes to the back; one that fails is gone (dust: nothing
+gathered), and at most one fails a frame. Every changed tile, the player's
+or subsidence's, is noted: the tiles it may have put at risk join the
+queue (`note`).
+
+The random generator is the 16-bit Galois LFSR of MBANK's director
+(asm/mbank.asm): shift right, and on a carry out EOR the high byte with
+&B4.
 """
 
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass, field
 
 from stratagem.tiles import GRASS, PASSABLE, SHAPE_FULL, SOIL, TREE_PARTS, background
 from stratagem.world import World, background_bits
 
 ALL_SOIL, PLACED_SOIL = "all soil", "placed soil"
+QUEUE = 64
+CHECKS = 2
+SLUMP_DROP = 4
+ROLL_STEPS = 8
+SEED = 0xACE1
 
 
 @dataclass(frozen=True)
@@ -36,10 +53,34 @@ class Rules:
     loose: str = ALL_SOIL           # which soil is loose
     chance: float = 1 / 64          # of failing, at a roll, with no solid side
     arch: float = 2.0               # each solid side divides the chance by 1 + this
-    checks: int = 4                 # rolls a frame
-    falls: int = 2                  # failures a frame, at most
-    slump: float = 0.0              # of failing, at a roll, for an exposed face (below)
-    slump_drop: int = 4             # an exposed face: open beside it for so many tiles down
+    slump: float = 1 / 512          # of failing, at a roll, for a face (0: no slumping)
+
+    def thresholds(self) -> list[int]:
+        """The 16-bit thresholds a roll must be under to fail: by solid
+        sides (0, 1, 2), then a face's."""
+        return [round(0x10000 * self.chance / (1 + self.arch * sides)) for sides in range(3)] + \
+            [round(0x10000 * self.slump)]
+
+
+GAME_RULES = Rules()
+
+
+class Random:
+    """MBANK's LFSR."""
+
+    def __init__(self, state: int = SEED):
+        self.state = state
+
+    def step(self) -> None:
+        carry = self.state & 1
+        self.state >>= 1
+        if carry:
+            self.state ^= 0xB400
+
+    def roll(self) -> int:
+        for _ in range(ROLL_STEPS):
+            self.step()
+        return self.state
 
 
 def opened(x: int, y: int) -> tuple[int, int]:
@@ -48,65 +89,75 @@ def opened(x: int, y: int) -> tuple[int, int]:
     return background(bits), SHAPE_FULL | bits
 
 
+def noted(x: int, y: int) -> list[tuple[int, int]]:
+    """The tiles a change at (x, y) may put at risk, in the order noted:
+    itself, above it, beside it, and beside it up to a face's height above
+    (a drop beside them deepened)."""
+    tiles = [(x, y), (x, y - 1), (x - 1, y), (x + 1, y)]
+    for d in (-1, 1):
+        tiles += [(x + d, y + 1 - k) for k in range(SLUMP_DROP + 1) if k != 1]
+    return tiles
+
+
 @dataclass
 class Subsidence:
     world: World
-    rules: Rules
-    seed: int = 1
+    rules: Rules = GAME_RULES
+    random: Random = field(default_factory=Random)
     placed: set[tuple[int, int]] = field(default_factory=set)
-    at_risk: list[tuple[int, int]] = field(default_factory=list)
+    queue: list[tuple[int, int]] = field(default_factory=list)
+    can_fail: object = None         # () -> bool; None: always
+    bounds: tuple[int, int, int, int] | None = None    # the tile cache: left, right, top, bottom; None: everywhere
+    trees: bool = False             # bring trees down here (the game's support does)
     frame: int = 0
     gone: int = 0
 
-    def __post_init__(self):
-        self.rng = random.Random(self.seed)
+    def cached(self, x: int, y: int) -> bool:
+        if self.bounds is None:
+            return True
+        left, right, top, bottom = self.bounds
+        return left <= x <= right and top <= y <= bottom
 
     def loose(self, x: int, y: int) -> bool:
-        material = self.world.tile_at(x, y)[0]
+        if not self.cached(x, y):
+            return False
         if self.rules.loose == PLACED_SOIL:
             return (x, y) in self.placed
-        return material in (SOIL, GRASS)
+        return self.world.tile_at(x, y)[0] in (SOIL, GRASS)
 
     def open(self, x: int, y: int) -> bool:
-        return self.world.tile_at(x, y)[0] in PASSABLE
+        return self.cached(x, y) and self.world.tile_at(x, y)[0] in PASSABLE
 
-    def exposed(self, x: int, y: int) -> bool:
-        """A face: open beside it for slump_drop tiles down, steeper than
-        any step of the hills as generated (3 tiles at most), so it slumps
-        if slumping is on, until no drop beside it is so deep."""
-        return self.rules.slump > 0 and any(all(self.open(x + d, y + k) for k in range(self.rules.slump_drop))
-                                            for d in (-1, 1))
+    def face(self, x: int, y: int) -> bool:
+        return bool(self.rules.slump) and any(all(self.open(x + d, y + k) for k in range(SLUMP_DROP))
+                                              for d in (-1, 1))
 
-    def at_risk_here(self, x: int, y: int) -> bool:
-        return self.loose(x, y) and (self.open(x, y + 1) or self.exposed(x, y))
+    def at_risk(self, x: int, y: int) -> bool:
+        return self.loose(x, y) and (self.open(x, y + 1) or self.face(x, y))
 
-    def place(self, x: int, y: int) -> None:
-        self.world.set_tile(x, y, (SOIL, SHAPE_FULL | background_bits(x, y)))
-        self.placed.add((x, y))
+    def note(self, x: int, y: int) -> None:
+        """Tile (x, y) changed."""
+        for tile in noted(x, y):
+            if len(self.queue) < QUEUE and tile not in self.queue and self.at_risk(*tile):
+                self.queue.append(tile)
+
+    def set_tile(self, x: int, y: int, tile: tuple[int, int]) -> None:
+        self.world.set_tile(x, y, tile)
         self.note(x, y)
 
     def dig(self, x: int, y: int) -> None:
-        """Empty a tile (the player digging it), noting what's now at risk."""
-        self.world.set_tile(x, y, opened(x, y))
         self.placed.discard((x, y))
-        self.note(x, y - 1)
-        self.fell_trees(x, y - 1)
+        self.set_tile(x, y, opened(x, y))
+        if self.trees:
+            self.fell_trees(x, y - 1)
 
-    def note(self, x: int, y: int) -> None:
-        """Tile (x, y), opened (or its tile below), may have put those
-        around it at risk: above it, and beside it up to a face's height
-        above (a drop beside them deepened)."""
-        around = [(x, y), (x, y - 1), (x - 1, y), (x + 1, y)]
-        if self.rules.slump:
-            around += [(x + d, y + 1 - k) for d in (-1, 1) for k in range(self.rules.slump_drop + 1)]
-        for tx, ty in around:
-            if self.at_risk_here(tx, ty) and (tx, ty) not in self.at_risk:
-                self.at_risk.append((tx, ty))
+    def place(self, x: int, y: int) -> None:
+        self.placed.add((x, y))
+        self.set_tile(x, y, (SOIL, SHAPE_FULL | background_bits(x, y)))
 
     def fell_trees(self, x: int, y: int) -> None:
-        """A tree whose root has lost its ground comes down, whole."""
-        if self.world.tile_at(x, y)[0] not in TREE_PARTS:
-            return
+        """A tree whose root has lost its ground comes down, whole (the lab's
+        stand-in for the game's support)."""
         stack = [(x, y)]
         while stack:
             tx, ty = stack.pop()
@@ -114,33 +165,43 @@ class Subsidence:
                 self.world.set_tile(tx, ty, opened(tx, ty))
                 stack += [(tx, ty - 1), (tx - 1, ty), (tx + 1, ty)]
 
-    def sides(self, x: int, y: int) -> int:
-        return sum(not self.open(x + d, y) for d in (-1, 1))
+    def threshold(self, x: int, y: int) -> int:
+        thresholds = self.rules.thresholds()
+        if self.open(x, y + 1):
+            return thresholds[sum(not self.open(x + d, y) for d in (-1, 1))]
+        return thresholds[3]
 
-    def step(self) -> int:
-        """A frame: up to `checks` rolls; returns the tiles that failed."""
+    def step(self) -> tuple[int, int] | None:
+        """A frame; returns the tile that failed, if one did."""
         self.frame += 1
-        failed = 0
-        for _ in range(min(self.rules.checks, len(self.at_risk))):
-            if failed >= self.rules.falls:
-                break
-            x, y = self.at_risk.pop(0)
-            if not self.at_risk_here(x, y):
-                continue                        # held again, or gone
-            if self.open(x, y + 1):
-                chance = self.rules.chance / (1 + self.rules.arch * self.sides(x, y))
-            else:
-                chance = self.rules.slump
-            if self.rng.random() < chance:
-                self.world.set_tile(x, y, opened(x, y))
-                self.placed.discard((x, y))
+        for _ in range(min(CHECKS, len(self.queue))):
+            x, y = self.queue.pop(0)
+            if not self.cached(x, y):
+                self.queue.append((x, y))
+                continue
+            if not self.at_risk(x, y):
+                continue
+            if self.can_fail is not None and not self.can_fail():
+                self.queue.append((x, y))
+                continue
+            if self.random.roll() < self.threshold(x, y):
                 self.gone += 1
-                failed += 1
-                self.fell_trees(x, y - 1)
-                self.note(x, y - 1)
-                self.note(x - 1, y)
-                self.note(x + 1, y)
-            else:
-                self.at_risk.append((x, y))     # still at risk: rolled again later
-        return failed
+                self.dig(x, y)
+                return x, y
+            self.queue.append((x, y))
+        return None
 
+
+def generate(generated_dirpath) -> None:
+    """subsidence.asm: the game's rules, as the parasite's constants and the
+    thresholds by solid sides (0, 1, 2), then a face's."""
+    thresholds = GAME_RULES.thresholds()
+    assert all(0 < t < 0x10000 for t in thresholds) and GAME_RULES.loose == ALL_SOIL
+    lines = ["\\ Generated by stratagem.subsidence: do not edit.",
+             f"SUBSIDE_QUEUE = {QUEUE}", f"SUBSIDE_CHECKS = {CHECKS}", f"SUBSIDE_DROP = {SLUMP_DROP}",
+             f"SUBSIDE_ROLL_STEPS = {ROLL_STEPS}", f"SUBSIDE_SEED = &{SEED:04X}",
+             "MACRO SUBSIDE_THRESHOLDS_LOW", "    EQUB " + ", ".join(f"&{t & 0xFF:02X}" for t in thresholds),
+             "ENDMACRO",
+             "MACRO SUBSIDE_THRESHOLDS_HIGH", "    EQUB " + ", ".join(f"&{t >> 8:02X}" for t in thresholds),
+             "ENDMACRO"]
+    (generated_dirpath / "subsidence.asm").write_text("\n".join(lines) + "\n")

@@ -20,14 +20,15 @@ Writes into build/generated/:
 - loading_page.asm: the loading page, and the tables that animate it;
 - m5_day.asm: the musical day's pieces (stratagem.day_music), for MBANK;
 - daynight.asm, daynight_tables.asm: the world's day and night
-  (stratagem.daynight): its constants, and the parasite's tables.
+  (stratagem.daynight): its constants, and the parasite's tables;
+- subsidence.asm: subsidence's rules (stratagem.subsidence).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from stratagem import actions, day_music, daynight, loading_page, loading_screen, sequencer, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
+from stratagem import actions, day_music, daynight, subsidence, loading_page, loading_screen, sequencer, camera, crafting, inventory, items, pack, lighting, player, screen, sprites, support, tiles, world
 
 
 def _bytes_lines(data: bytes | list[int], per_line: int = 16) -> list[str]:
@@ -689,3 +690,4 @@ def generate_all(generated_dirpath: Path) -> None:
     sequencer.generate(generated_dirpath)
     day_music.generate(generated_dirpath)
     daynight.generate(generated_dirpath)
+    subsidence.generate(generated_dirpath)

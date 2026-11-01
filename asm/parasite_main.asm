@@ -29,6 +29,7 @@
     DEX
     BPL start_inventory
     JSR world_clock_start
+    JSR subsidence_init
     LDA #0
     STA cooldown
     JSR pack_init               \ (Returns A = 0)
@@ -92,6 +93,7 @@
     JSR world_clock
     JSR update_player
     JSR player_action
+    JSR subsidence_step         \ (After the player: the frame's changed tile)
     JSR items_step
 .*para_items_moved
     JSR pack_plan_camera

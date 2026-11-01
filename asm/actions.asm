@@ -1185,6 +1185,7 @@ SCAN_HIGHEST = 2                \ The highest in the way
     LDA #&FF
     STA redraw_tile
     STA light_dirty             \ Light may pass differently now
+    JSR subsidence_target       \ And soil may be at risk (once it's in the cache)
     CLC
 .done
     RTS

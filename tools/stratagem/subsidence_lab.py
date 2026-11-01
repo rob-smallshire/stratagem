@@ -111,9 +111,10 @@ SCENES = [("a tunnel through the soil", tunnel_in_soil),
           ("a tunnel in the rock, under the soil", tunnel_in_rock),
           ("a shaft through the soil", shaft),
           ("soil put down: a column, a bridge", put_down)]
-RULES = [("all soil loose, 1/64", Rules(ALL_SOIL)), ("all soil loose, 1/256", Rules(ALL_SOIL, chance=1 / 256)),
-         ("only soil put down, 1/64", Rules(PLACED_SOIL)),
-         ("all soil, 1/64, slumping 1/512", Rules(ALL_SOIL, slump=1 / 512))]
+RULES = [("all soil loose, 1/64", Rules(ALL_SOIL, slump=0)),
+         ("all soil loose, 1/256", Rules(ALL_SOIL, chance=1 / 256, slump=0)),
+         ("only soil put down, 1/64", Rules(PLACED_SOIL, slump=0)),
+         ("all soil, 1/64, slumping 1/512: the game's", Rules(ALL_SOIL))]
 WINDOW = (24, 18)
 
 
@@ -126,7 +127,7 @@ def picture(world: World, left: int, top: int) -> Image.Image:
 
 
 def run(scene, rules: Rules):
-    model = Subsidence(World(), rules)
+    model = Subsidence(World(), rules, trees=True)
     left, top = scene(model)
     shots, most, busiest = [], 0, 0
     snapshots = [s * FRAMES_PER_SECOND for s in SNAPSHOT_SECONDS]
@@ -134,12 +135,12 @@ def run(scene, rules: Rules):
     while model.frame <= TIMEOUT_SECONDS * FRAMES_PER_SECOND:
         if model.frame in snapshots:
             shots.append((model.frame, picture(model.world, left, top)))
-        if not model.at_risk and settled is None:
+        if not model.queue and settled is None:
             settled = model.frame
             if model.frame >= snapshots[-1]:
                 break
-        most = max(most, len(model.at_risk))
-        busiest = max(busiest, model.step())
+        most = max(most, len(model.queue))
+        busiest = max(busiest, int(model.step() is not None))
     return shots, settled, model.gone, most, busiest
 
 
