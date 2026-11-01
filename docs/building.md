@@ -199,9 +199,12 @@ of the hill that was.
 - **In the emulator:** a cutting dug into the hillside beside the start:
   over about 20 seconds the soil over it drops in and fills it, the
   hillside settling in steps, sky behind; the tile over the miner waits
-  above him (build/subsidence/subsidence-game.png). A shaft the miner
-  digs still takes its background from the surface as generated (cave,
-  black, below it): digging could follow subsidence's rule.
+  above him (build/subsidence/subsidence-game.png). A tile keeps its
+  background whatever is put down, dug or dropped there (since
+  2026-11-01), so soil put down in sky opened below the surface, and dug
+  again, leaves sky; but a shaft the miner digs from the surface is
+  cave, black, below it, as its tiles were generated: digging could
+  follow subsidence's rule (sky under sky).
 
 ## Open questions
 

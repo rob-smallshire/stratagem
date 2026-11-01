@@ -21,8 +21,9 @@
 \   &3800-&42FF  the light's grid of excess
 \   &4300-&7FFF  PGAME, then pieces' slots
 \   &8000-&A07A  PWORLD and its cache of the store of changed chunks
-\   &A07B-&BCFF  free
-\   &BD00-&C0FF  daylight's tables: sky depths and reaches (daylight.asm)
+\   &A07B-&BBFF  free
+\   &BC00-&C0FF  daylight's tables: sky floors, sky depths and reaches
+\                (daylight.asm)
 \   &C100-&F7FF  PLIGHT (with support and items), then tables the light
 \                sets up each pass
 
@@ -50,6 +51,10 @@ sun_reach_2 = &BF00
 sun_reach_3 = &C000
 
 TORCH_QUEUE = 128               \ Tiles awaiting redrawing (a power of 2)
+
+ORG &BC00
+.sky_floor          SKIP &100   \ Each column's sky floor (daylight.asm)
+ASSERT P% = sun_depth
 
 ORG &D1                         \ Daylight's zero page
 .sun_ptr            SKIP 2      \ A row of the tile cache's materials
@@ -156,7 +161,7 @@ ASSERT sl_plane = &2800 AND sl_grid = &3800
 INCLUDE "asm/world.asm"
 SAVE "PWORLD", world_start, world_end, world_start
 
-ASSERT world_tables_end <= sun_depth
+ASSERT world_tables_end <= sky_floor
 
 ASSERT sun_reach_3 + &100 <= sl_radial
 
@@ -179,9 +184,9 @@ INCLUDE "build/generated/daynight_tables.asm"
     CMP #TILE_SKY
     BNE done
     LDX zp_fill_x
-    LDA world_heights,X
+    LDA sky_floor,X
     SEC
-    SBC zp_fill_y               \ Rows above the surface
+    SBC zp_fill_y               \ Rows above the sky floor
     BCC done
     CMP #DAYNIGHT_BANDS + 1
     BCS done
@@ -262,6 +267,11 @@ GUARD &0800
 .sun_save_x         SKIP 1
 .sun_save_y         SKIP 1
 .sun_taper          SKIP 1
+.sun_surface        SKIP 1      \ ... its column's surface
+.sky_x              SKIP 1      \ A tile changed, for its sky floor
+.sky_y              SKIP 1
+.sky_old_floor      SKIP 1
+.sky_rows           SKIP 1
 .para_material      SKIP 1      \ The tile being sent
 .para_shape         SKIP 1
 .piece_shape        SKIP 1      \ Pieces (pieces.asm)

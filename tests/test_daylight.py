@@ -12,7 +12,7 @@ from mos6502 import Machine6502
 from stratagem import daynight, lighting
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.tiles import SKY
+from stratagem.tiles import BACKGROUND_SKY, GRASS, SHAPE_FULL, SKY, SOIL
 from stratagem.world import HEIGHTS
 
 TILE_CACHE_SIZE = 32
@@ -110,16 +110,23 @@ def check_daylight(game: ParasiteGame, time: int = NOON >> 8) -> tuple[int, int]
     for x in range(max(0, left - lighting.SHAFT_REACH), min(255, right + lighting.SHAFT_REACH) + 1):
         depth[x] = lighting.sky_depth(clear_at, x)
         assert game.memory[SUN_DEPTH + x] == depth[x], f"column {x}'s sky depth"
+    floor, surface = {}, list(HEIGHTS)
+    for x in range(left, right + 1):
+        floor[x] = lighting.sky_floor(game.tile_at, x)
+        surface[x] = lighting.surface_row(x, floor[x])
+        assert game.memory[game.labels["sky_floor"] + x] == floor[x], f"column {x}'s sky floor"
     beyond = tapered = 0
     for y in range(top, bottom + 1):
         for x in range(left, right + 1):
-            sun = lighting.shaft_sun(depth, clear_at(x, y), x, y, clear_above=y > 0 and clear_at(x, y - 1))
-            day = max(sun, lighting.glow(x, y))
-            band = daynight.band_of(x, y) if game.tile_at(x, y)[0] == SKY else None
+            sun = lighting.shaft_sun(depth, clear_at(x, y), x, y, clear_above=y > 0 and clear_at(x, y - 1),
+                                     surface=surface)
+            glow = lighting.glow(x, y, surface[x])
+            day = max(sun, glow)
+            band = daynight.band_of(y, floor[x]) if game.tile_at(x, y)[0] == SKY else None
             expected = daynight.level(day, time, band)
             assert game.cache_light(x, y) == expected * lighting.LIGHT_SCALE, f"tile ({x}, {y}) at {time}: light"
-            beyond += sun > lighting.glow(x, y)
-            tapered += sun > lighting.glow(x, y) and y - HEIGHTS[x] >= lighting.SHAFT_TAPER
+            beyond += sun > glow
+            tapered += sun > glow and y - surface[x] >= lighting.SHAFT_TAPER
     return beyond, tapered
 
 
@@ -160,3 +167,49 @@ def test_daylight_follows_the_time_of_day(game_build):
             raise AssertionError(f"the light didn't settle at {hours}h")
         check_daylight(game, game.memory[clock + 1])
         game.host.check_cache()
+
+
+def settle(game: ParasiteGame, frames: int = 400) -> None:
+    """Play until the light has settled: relit, swept and sent."""
+    for _ in range(frames):
+        game.frame(0)
+        if (not game.byte("sun_busy") and not game.byte("sweep_rows")
+                and game.byte("torch_queue_head") == game.byte("torch_queue_tail")):
+            return
+    raise AssertionError("the light didn't settle")
+
+
+def test_the_glow_follows_the_sky_down(game_build):
+    """At dusk, sky opened below the surface (as soil subsiding leaves it)
+    takes the glow's bands from its column's sky floor, the first tile
+    that doesn't show the sky, and is lit as the sky, untapered: the bands
+    over the old floor and the new are sent again, as their bands."""
+    game = ParasiteGame(game_build)
+    labels, memory = game.labels, game.memory
+    sent = {}
+
+    def tile_sent(mpu=None):
+        sent[game.byte("zp_fill_x"), game.byte("zp_fill_y")] = game.byte("para_material"), game.byte("para_shape")
+    game.machine.hooks[labels["para_tile_sent"]] = tile_sent
+    clock = labels["zp_time"]
+    time = round(18.0 * 0x10000 / 24)
+    memory[clock], memory[clock + 1] = time & 0xFF, time >> 8
+    settle(game)
+    px = (memory[labels["zp_player_x"]] | memory[labels["zp_player_x"] + 1] << 8) >> 7
+    x = next(c for c in range(px + 3, px + 12)
+             if all(game.tile_at(c, y)[0] in (SKY, GRASS, SOIL) for y in range(HEIGHTS[c] - 6, HEIGHTS[c] + 4)))
+    h = HEIGHTS[x]
+    for y in (h, h + 1, h + 2):
+        memory[labels["target_x"]], memory[labels["target_y"]] = x, y
+        memory[labels["zp_world_new_shape"]] = SHAPE_FULL | BACKGROUND_SKY
+        game.call("change_target", a=SKY)
+        settle(game)
+    assert memory[labels["sky_floor"] + x] == h + 3
+    check_daylight(game, time >> 8)
+    for y in range(h - 4, h + 3):
+        tile = game.tile_at(x, y)
+        assert tile[0] == SKY
+        assert sent[x, y] == daynight.drawn(y, h + 3, tile), f"tile ({x}, {y}) as sent"
+    for y in (h, h + 1, h + 2):             # lit as the sky, untapered
+        level = daynight.level(lighting.FULL, time >> 8, daynight.band_of(y, h + 3))
+        assert game.cache_light(x, y) == level * lighting.LIGHT_SCALE

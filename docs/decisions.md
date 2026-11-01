@@ -526,3 +526,11 @@ A running log of design decisions. Add to it whenever one is made.
   from the pieces' lengths); Dawn and Dusk play for certain when the
   director considers within them. No cheerful daylight spills into dusk,
   nor night into dawn, and the turns of the day are marked every day.
+- **The sky follows the ground, and goes dark at night:** the glow's bands
+  count from each column's sky floor (its first tile that doesn't show the
+  sky), so they follow ground that has sunk; a tile keeps its background
+  (sky or cave) whatever is put down, dug or dropped there. At night
+  (the sun below level 3) the host's palette makes the sky's blue and the
+  glow black, so sky behind a tile lit by a torch or the miner no longer
+  shows as day; the twilight's faint sky dither (levels 1 and 2) is lost
+  to it. Water shares the blue, but never shares the view with the sky.

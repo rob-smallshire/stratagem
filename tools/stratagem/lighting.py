@@ -39,7 +39,7 @@ import math
 
 import numpy as np
 
-from stratagem.tiles import PASSABLE, SHAPE_BITS, SHAPE_FULL, WATER
+from stratagem.tiles import BACKGROUND_SKY, PASSABLE, SHAPE_BITS, SHAPE_FULL, WATER
 from stratagem.world import HEIGHTS
 
 FULL = 15
@@ -226,6 +226,29 @@ def sky_depths(clear: np.ndarray) -> np.ndarray:
     return np.where(opaque.any(axis=0), opaque.argmax(axis=0), height)
 
 
+def shows_sky(tile: tuple[int, int]) -> bool:
+    """The sky shows through the whole tile: sky, or a piece before it."""
+    material, shape = tile
+    return material in PASSABLE and bool(shape & BACKGROUND_SKY)
+
+
+def sky_floor(tile_at, x: int) -> int:
+    """Column x's sky floor: its first tile from the top that doesn't
+    show the sky (the surface row, as generated; lower where the ground
+    has sunk, higher where something is put in the sky)."""
+    y = 0
+    while y < 255 and shows_sky(tile_at(x, y)):
+        y += 1
+    return y
+
+
+def surface_row(x: int, floor: int) -> int:
+    """Column x's surface, for daylight's taper and the glow: the surface
+    row as generated, or lower where the sky reaches further down (the
+    ground has sunk), so that sky is never tapered."""
+    return max(HEIGHTS[x], floor - 1)
+
+
 def sky_depth(clear_at, x: int, start: int = 0) -> int:
     """Column x's first opaque row, looking down from row `start`."""
     y = start
@@ -293,9 +316,9 @@ def sunlight(clear: np.ndarray, depth=None, **steps) -> np.ndarray:
     return plane
 
 
-def glow(x: int, y: int) -> int:
+def glow(x: int, y: int, surface: int | None = None) -> int:
     """The glow: fixed_light, GLOW_LOSS levels darker."""
-    return max(0, fixed_light(x, y) - GLOW_LOSS)
+    return max(0, fixed_light(x, y, surface) - GLOW_LOSS)
 
 
 def cell_masks(light_at):
@@ -306,10 +329,11 @@ def cell_masks(light_at):
     return mask_at
 
 
-def fixed_light(x: int, y: int) -> int:
-    """A stand-in for daylight: full down to the surface, then a level less
-    each tile deeper, down to FIXED_FLOOR: darkness."""
-    depth = y - HEIGHTS[x]
+def fixed_light(x: int, y: int, surface: int | None = None) -> int:
+    """A stand-in for daylight: full down to the surface (the surface row
+    as generated, unless given), then a level less each tile deeper, down
+    to FIXED_FLOOR: darkness."""
+    depth = y - (HEIGHTS[x] if surface is None else surface)
     return FULL if depth <= 0 else max(FIXED_FLOOR, FULL - depth)
 
 

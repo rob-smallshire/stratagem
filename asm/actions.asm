@@ -1081,17 +1081,15 @@ SCAN_HIGHEST = 2                \ The highest in the way
     RTS
 }
 
-\ Return in A the background bits for the tile at target_x/y:
-\ BACKGROUND_SKY if it is at or above its column's surface, otherwise 0.
+\ Return in A the background bits of the tile at target_x/y (BACKGROUND_SKY
+\ or 0), which it keeps whatever becomes of it.
 .target_background
 {
     LDX target_x
-    LDA surface_heights,X
-    CMP target_y
-    LDA #0
-    BCC done
-    LDA #BACKGROUND_SKY
-.done
+    LDY target_y
+    JSR tile_at
+    LDA zp_world_shape
+    AND #BACKGROUND_SKY
     RTS
 }
 

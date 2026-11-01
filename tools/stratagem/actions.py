@@ -50,10 +50,10 @@ from dataclasses import dataclass, replace
 from stratagem import inventory
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_PLACE, INPUT_RIGHT, INPUT_UP
 from stratagem.player import PLAYER_HEIGHT, PLAYER_WIDTH, TILE_HEIGHT, TILE_WIDTH, Player
-from stratagem.tiles import (AIR, BENCH, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
+from stratagem.tiles import (AIR, BACKGROUND_SKY, BENCH, DIGGABLE, FROM_BOTTOM, FROM_LEFT, FROM_RIGHT, FROM_TOP, GEM, GRASS, ORE,
                              QUARTER_LINES, QUARTER_PIXELS, QUARTERS, SHAPE_BITS, SHAPE_FULL, SKY, SOIL, STONE,
                              PASSABLE, TORCH, TREE_PARTS, background, cut_to, dig_shape, solid_count, solid_quarter_cells)
-from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World, background_bits
+from stratagem.world import RAMP_TOP_LEFT, RAMP_TOP_RIGHT, World
 
 # Quarters a dig removes, by the tool in the tool hand (pack.py's belt; NO_TOOL,
 # bare hands, also with none of that kind left) and the material; a material
@@ -282,7 +282,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             ramp, side = None, dig_direction(player, inputs)
         if target is not None:
             material, shape = world.tile_at(*target)
-            behind = background_bits(*target)
+            behind = shape & BACKGROUND_SKY        # the tile keeps its background
             if ramp is not None:
                 left = cut_to(shape & SHAPE_BITS, ramp)
                 tile = (background(behind), SHAPE_FULL | behind) if left is None else (material, left | behind)
@@ -315,7 +315,7 @@ def act(hands: Hands, player: Player, inputs: int, world: World) -> tuple[Hands,
             own = ((player.px + PLAYER_WIDTH // 2) // TILE_WIDTH, (player.py + PLAYER_HEIGHT // 2) // TILE_HEIGHT)
             target = own if world.tile_at(*own)[0] in EMPTY else None
         if target is not None and world.set_tile(*target, (inventory.PLACES[hand],
-                                                           SHAPE_FULL | background_bits(*target))):
+                                                           SHAPE_FULL | world.tile_at(*target)[1] & BACKGROUND_SKY)):
             return (replace(hands, counts=inventory.spend(hands.counts, hand), cooldown=PLACE_FRAMES, hand=hand,
                             torches=hands.torches + torch), PLACE, target)
     return hands, NONE, None

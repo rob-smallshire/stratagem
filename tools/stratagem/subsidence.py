@@ -19,8 +19,9 @@ It drops as soil (disturbed grass is soil), never onto the miner (it waits
 while the tile below overlaps him: `blocked`), and takes two frames, as
 the game changes one tile a frame: the tile below becomes soil, then
 (`pending`) the tile itself empties; nothing else is rolled for meanwhile.
-A tile emptied so is sky if the tile above it is sky (or it is above its
-column's surface), otherwise cave: sinking ground shows the sky behind it,
+A tile emptied so is sky if the tile above it is sky (or its own
+background is: every tile keeps its background, the sky's or the cave's,
+whatever becomes of it), otherwise cave: sinking ground shows the sky behind it,
 not the black of a cave in the shape of the hill that was (`emptied`). (For the lab, rules
 may also wedge soil between solid sides, an arch, or let a face slump;
 the game's have neither: GAME_RULES.)
@@ -51,7 +52,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from stratagem.tiles import AIR, BACKGROUND_SKY, GRASS, PASSABLE, SHAPE_FULL, SKY, SOIL, TREE_PARTS, background
-from stratagem.world import World, background_bits
+from stratagem.world import World
 
 ALL_SOIL, PLACED_SOIL = "all soil", "placed soil"
 EMPTY = (AIR, SKY)                  # what soil drops into
@@ -97,9 +98,15 @@ class Random:
         return self.state
 
 
-def opened(x: int, y: int) -> tuple[int, int]:
+def behind(world: World, x: int, y: int) -> int:
+    """A tile's background bits: what it shows behind it, which it keeps
+    whatever becomes of it."""
+    return world.tile_at(x, y)[1] & BACKGROUND_SKY
+
+
+def opened(world: World, x: int, y: int) -> tuple[int, int]:
     """What a tile is once emptied: sky or cave, by its background."""
-    bits = background_bits(x, y)
+    bits = behind(world, x, y)
     return background(bits), SHAPE_FULL | bits
 
 
@@ -170,13 +177,13 @@ class Subsidence:
 
     def dig(self, x: int, y: int) -> None:
         self.placed.discard((x, y))
-        self.set_tile(x, y, opened(x, y))
+        self.set_tile(x, y, opened(self.world, x, y))
         if self.trees:
             self.fell_trees(x, y - 1)
 
     def place(self, x: int, y: int) -> None:
         self.placed.add((x, y))
-        self.set_tile(x, y, (SOIL, SHAPE_FULL | background_bits(x, y)))
+        self.set_tile(x, y, (SOIL, SHAPE_FULL | behind(self.world, x, y)))
 
     def fell_trees(self, x: int, y: int) -> None:
         """A tree whose root has lost its ground comes down, whole (the lab's
@@ -185,13 +192,13 @@ class Subsidence:
         while stack:
             tx, ty = stack.pop()
             if self.world.tile_at(tx, ty)[0] in TREE_PARTS:
-                self.world.set_tile(tx, ty, opened(tx, ty))
+                self.world.set_tile(tx, ty, opened(self.world, tx, ty))
                 stack += [(tx, ty - 1), (tx - 1, ty), (tx + 1, ty)]
 
     def emptied(self, x: int, y: int) -> tuple[int, int]:
-        """What a dropped tile leaves: sky if the tile above is (or above
-        the surface), otherwise cave."""
-        if background_bits(x, y) or (self.cached(x, y - 1) and self.world.tile_at(x, y - 1)[0] == SKY):
+        """What a dropped tile leaves: sky if the tile above is (or its
+        background is), otherwise cave."""
+        if behind(self.world, x, y) or (self.cached(x, y - 1) and self.world.tile_at(x, y - 1)[0] == SKY):
             return SKY, SHAPE_FULL | BACKGROUND_SKY
         return AIR, SHAPE_FULL
 
@@ -234,7 +241,7 @@ class Subsidence:
                 self.gone += 1
                 if (x, y) in self.placed:
                     self.placed.add((x, y + 1))
-                self.set_tile(x, y + 1, (SOIL, SHAPE_FULL | background_bits(x, y + 1)))
+                self.set_tile(x, y + 1, (SOIL, SHAPE_FULL | behind(self.world, x, y + 1)))
                 self.pending = x, y
                 return x, y + 1
             self.queue.append((x, y))

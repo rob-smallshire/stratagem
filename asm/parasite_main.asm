@@ -678,6 +678,7 @@ ASSERT 1 + CHANGES_PER_FRAME * (2 + PARA_TILE_MOST) < &100 - PARA_TILE_MOST
     STX para_shape
 .plain
     JSR sky_drawn               \ (Sky in a band of the glow, as the band)
+.*para_tile_sent                \ (For the tests: the tile as sent)
     LDA para_material
     STA (para_write),Y
     INY

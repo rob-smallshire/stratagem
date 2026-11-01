@@ -34,6 +34,8 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
 .edge
     LDY #0
 .scan
+    TYA                         \ The sky floor: the surface, as generated
+    STA sky_floor,X
     JSR sun_scan
     INX
     BNE column
@@ -326,16 +328,26 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
 \ it is below its column's surface, and the glow (LIGHT_FULL - GLOW_LOSS
 \ down to the surface, then a level less a tile deeper); dimmed by the
 \ time of day, sun_dim levels less; and sky in the glow's bands, the
-\ DAYNIGHT_BANDS rows above its column's surface, brighter by the glow's
+\ DAYNIGHT_BANDS rows above its column's sky floor, brighter by the glow's
 \ boost (stratagem.daynight.level).
 .sun_daylight
 {
     JSR sun_tile
     STA sun_level
-    LDX zp_fill_x
+    LDX zp_fill_x               \ The surface: as generated, or lower where
+    LDA sky_floor,X             \ the sky reaches further down (the row
+    BEQ generated               \ above the sky floor; lighting.surface_row)
+    SEC
+    SBC #1
+    CMP world_heights,X
+    BCS surface_set
+.generated
+    LDA world_heights,X
+.surface_set
+    STA sun_surface
     LDA zp_fill_y
     SEC
-    SBC world_heights,X
+    SBC sun_surface
     BCC full
     STA sun_tmp
     LSR A                       \ The taper
@@ -369,9 +381,9 @@ ASSERT SHAFT_WALL_REACH = SHAFT_REACH AND SHAFT_REACH = 4
 .dimmed
     STA sun_level
     LDX zp_fill_x               \ Sky in a band?
-    LDA world_heights,X
+    LDA sky_floor,X
     SEC
-    SBC zp_fill_y               \ Rows above the surface
+    SBC zp_fill_y               \ Rows above the sky floor
     BCC lit
     CMP #DAYNIGHT_BANDS + 1
     BCS lit
@@ -565,12 +577,151 @@ ASSERT TORCH_QUEUE > SWEEP_TILES
     RTS
 }
 
+\ Tile (X, Y) has changed: its column's sky floor, the first tile from the
+\ top that doesn't show the sky (lighting.sky_floor). If that has moved,
+\ the sky in the glow's bands over it, old and new, is queued to be sent
+\ again, as its band may have changed, and its light; and the column is
+\ relit below them, as its surface (lighting.surface_row) may have moved.
+\ Preserves X and Y.
+.sky_floor_note
+{
+    STX sky_x
+    STY sky_y
+    LDA sky_floor,X
+    STA sky_old_floor
+    JSR tile_at
+    JSR sky_shows
+    BCC closed
+    CPY sky_old_floor           \ Opened at the sky floor: look further down
+    BNE done
+.scan
+    INY
+    CPY #&FF
+    BEQ found
+    JSR tile_at
+    JSR sky_shows
+    BCS scan
+.found
+    TYA
+    STA sky_floor,X
+    JMP moved
+.closed
+    TYA                         \ Closed above it: the new sky floor
+    CMP sky_floor,X
+    BCS done
+    STA sky_floor,X
+.moved
+    LDA sky_old_floor           \ The bands over the old sky floor
+    JSR sky_bands_queue
+    LDX sky_x
+    LDA sky_floor,X             \ And the new
+    JSR sky_bands_queue
+    LDX sky_x                   \ The column relit, from the higher bands
+    STX sun_req_l               \ down
+    STX sun_req_r
+    LDA sky_floor,X
+    CMP sky_old_floor
+    BCC higher
+    LDA sky_old_floor
+.higher
+    SEC
+    SBC #DAYNIGHT_BANDS
+    BCS top_set
+    LDA #0
+.top_set
+    STA sun_req_t
+    LDA #&FF
+    STA sun_req_b
+    JSR sun_request
+.done
+    LDX sky_x
+    LDY sky_y
+    RTS
+}
+
+\ Carry set if the tile A, of shape zp_world_shape, shows the sky through
+\ it: passable, with the sky behind it (lighting.shows_sky). X is the
+\ column, sky_x.
+.sky_shows
+{
+    TAX
+    CLC
+    LDA material_passable,X
+    BEQ done
+    LDA zp_world_shape
+    AND #BACKGROUND_SKY
+    BEQ done
+    SEC
+.done
+    LDX sky_x
+    RTS
+}
+
+\ Queue the sky in the glow's bands over a sky floor at row A, in column
+\ sky_x, to be sent again: those of its DAYNIGHT_BANDS rows that are in the
+\ tile cache, and sky, with their daylight; while the queue has room.
+.sky_bands_queue
+{
+    SEC
+    SBC #DAYNIGHT_BANDS
+    BCS top_set
+    LDA #0
+.top_set
+    STA zp_fill_y
+    LDA sky_x
+    STA zp_fill_x
+    LDA #DAYNIGHT_BANDS
+    STA sky_rows
+.row
+    LDA zp_fill_y               \ In the tile cache?
+    CMP cached_top
+    BCC next
+    CMP cached_bottom
+    BEQ in_rows
+    BCS next
+.in_rows
+    LDA zp_fill_x
+    CMP cached_left
+    BCC done
+    CMP cached_right
+    BEQ in_cache
+    BCS done
+.in_cache
+    JSR sun_cache_point         \ Sky?
+    LDA (sun_ptr),Y
+    CMP #TILE_SKY
+    BNE next
+    LDA torch_queue_head        \ Room?
+    CLC
+    SBC torch_queue_tail
+    AND #TORCH_QUEUE - 1
+    BEQ done
+    JSR sun_daylight
+    LDX torch_queue_tail        \ Queued
+    STA torch_queue_light,X
+    LDA zp_fill_x
+    STA torch_queue_x,X
+    LDA zp_fill_y
+    STA torch_queue_y,X
+    INX
+    TXA
+    AND #TORCH_QUEUE - 1
+    STA torch_queue_tail
+.next
+    INC zp_fill_y
+    DEC sky_rows
+    BNE row
+.done
+    RTS
+}
+
 \ Tile (X, Y) has changed: its column's sky depth, and the tiles to relight:
 \ if the sky depth is the same, the tile and the floor below it; otherwise
 \ SHAFT_REACH either side, from the highest of the tile and the old and new
 \ sky depths, to SUN_DARK below the lowest (and the floor below the tile).
 .sun_tile_changed
 {
+    JSR sky_floor_note
     STX sun_x
     STY sun_y
     LDA sun_depth,X
@@ -685,20 +836,16 @@ ASSERT TORCH_QUEUE > SWEEP_TILES
     STA sun_busy
     RTS
 .merge
-    LDA sun_req_l               \ Widened across: relight what was done too
-    CMP sun_l
+    LDA sun_req_l               \ Widened across (from the higher of the
+    CMP sun_l                   \ next row and the new top, below)
     BCS left_kept
     STA sun_l
-    LDA sun_req_t
-    STA sun_row
 .left_kept
     LDA sun_r
     CMP sun_req_r
     BCS right_kept
     LDA sun_req_r
     STA sun_r
-    LDA sun_req_t
-    STA sun_row
 .right_kept
     LDA sun_b
     CMP sun_req_b

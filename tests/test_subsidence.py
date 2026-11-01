@@ -111,7 +111,7 @@ def test_the_parasites_subsidence_is_the_models(game_build):
     model = Subsidence(World(), bounds=bounds())
     for x in range(left, left + 3):
         for y in (HEIGHTS[x] + 3, HEIGHTS[x] + 2):
-            material, shape = opened(x, y)
+            material, shape = opened(model.world, x, y)
             memory[labels["target_x"]], memory[labels["target_y"]] = x, y
             memory[labels["zp_world_new_shape"]] = shape
             game.call("change_target", a=material)

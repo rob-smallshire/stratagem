@@ -168,7 +168,7 @@
 .emptying
     STX target_x
     STY target_y
-    JSR target_background       \ Sky above the surface, or below sky
+    JSR target_background       \ Sky behind it, or sky above it
     BNE sky
     LDX target_x
     LDY target_y

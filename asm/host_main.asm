@@ -249,13 +249,28 @@ GUARD USER_END
 
 .host_time          EQUB 0      \ PACKET_TIME: the time of day, in 256ths
 .host_glow_colour   EQUB &FF    \ The glow's physical colour, once set
+.host_blue_colour   EQUB &FF    \ The sky's blue's, once set
 .host_world         EQUB 0      \ PACKET_WORLD: WORLD_UNDERGROUND, or 0
 
-\ The sky's glow (stratagem.daynight): GLOW_LOGICAL's physical colour,
-\ magenta at dawn and dusk, otherwise blue, set when it changes.
+\ The sky's colours (stratagem.daynight.sky_colours), set when they change:
+\ GLOW_LOGICAL's physical colour, magenta at dawn and dusk, otherwise
+\ blue; and at night, while the sun is low, it and the sky's blue (the tile
+\ group's) black, unless the view may reach water, which is blue too.
 .host_glow
 {
     LDA host_time
+    LDX zp_camera_y + 1         \ Far enough down for water: never dark
+    BNE light
+    CMP #SKY_DARK_UNTIL
+    BCC dark
+    CMP #SKY_DARK_FROM
+    BCC light
+.dark
+    LDA #SKY_BLACK
+    LDX #SKY_BLACK
+    BEQ set                     \ (Always)
+.light
+    LDX #SKY_BLUE
     CMP #GLOW_DAWN_FROM
     BCC blue
     CMP #GLOW_DAWN_UNTIL
@@ -271,14 +286,23 @@ GUARD USER_END
     LDA #GLOW_BLUE
 .set
     CMP host_glow_colour
-    BEQ done
+    BEQ glow_done
     STA host_glow_colour
     EOR #7                      \ As the ULA wants it
     ORA #GLOW_LOGICAL << 4
     STA ULA_PALETTE
+.glow_done
+    TXA
+    CMP host_blue_colour
+    BEQ done
+    STA host_blue_colour
+    EOR #7
+    ORA #SKY_BLUE_LOGICAL << 4
+    STA ULA_PALETTE
 .done
     RTS
 }
+ASSERT SKY_BLACK = 0 AND SKY_DARK_UNTIL < SKY_DARK_FROM
 .host_vsync_wait    EQUB 0      \ Non-zero: the music's ticks are owed...
 .host_ticks_owed    EQUB 0      \ ... so many
 

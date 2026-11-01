@@ -632,7 +632,7 @@ first day is a whole one, and its first dusk comes as a surprise.
   the time (`daynight_table`, 256 bytes in PLIGHT) holds the sun's level
   and the glow's boost.
 - **The sky's glow at dawn and dusk:** sky in the four rows above its
-  column's surface is drawn as one of four bands, warm pixels among the
+  column's sky floor is drawn as one of four bands, warm pixels among the
   blue (10, 7, 5 and 2 in 16, by the Bayer matrix, densest at the hills),
   and lit up to 3 levels brighter than the sun's, by the time and the
   band. The warm pixels are the tile group's cyan (`GLOW`), which no tile
@@ -647,9 +647,29 @@ first day is a whole one, and its first dusk comes as a surprise.
   backdrop in the host's library, whose number the parasite sends
   (`piece_backdrop`, `tiles.backdrop_number`). A tall tree's lower canopy,
   above the bands, still shows a strip of the band.
+- **The sky floor:** each column's first tile from the top that doesn't
+  show the sky (sky, or a piece before it: `lighting.sky_floor`), kept for
+  the whole world (`sky_floor`, 256 bytes at &BC00) and moved by each
+  changed tile (`sky_floor_note`). As generated it is the surface; where
+  the ground sinks it goes down with it, so the glow's bands follow the
+  ground, and sky below the surface is lit as sky, untapered (daylight's
+  surface is the row above the sky floor where that is lower:
+  `lighting.surface_row`). When it moves, the sky in the bands over the
+  old floor and the new is queued to be sent again (its band may change
+  with its light unchanged), and the column relit below.
 - **The sky is lit by the day alone:** no torch lights it
   (`torch_light`), nor the miner (`sl_block_change`), so the night sky
-  has no halo.
+  has no halo. But sky behind a lit tile (a piece's backdrop, a slope's)
+  is drawn at the tile's light; so at night, while the sun is below level
+  3 (from about 19:35 to 4:30), the host's palette makes the sky's blue
+  and the glow black (`host_glow`, `daynight.sky_colours`). The sky's
+  blue is water's too, but water lies only below row 200, never in view
+  with the sky: while the camera is below its row 256 (of 8 lines), the
+  blue stays blue.
+- **A tile keeps its background:** what is put down, dug or dropped
+  takes the background bit of the tile it replaces (`target_background`
+  reads it), not the surface's rule, so soil put down in sky opened below
+  the surface, and dug again, leaves sky.
 - **When the level changes,** about every 5 to 10 seconds through a ramp,
   `sun_sweep` relights the tile cache, 4 tiles a frame from the view's
   top, queueing those whose light changes as the torches' are: about 3
