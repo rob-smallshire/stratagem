@@ -55,18 +55,17 @@ PACKET_REDRAW = &80
 
 \ The world's day (world_clock.asm): a 16-bit count of game frames, a day
 \ of 21.8 minutes at 50 frames a second, midnight at 0 and noon at &8000;
-\ its high byte the time, in 256ths of a day. From START_HOUR. Its phases,
+\ its high byte the time, in 256ths of a day. From START_TIME (generated,
+\ stratagem.daynight: the first full daylight after dawn). Its phases,
 \ for the music's director, are times: dawn from DAWN_HOUR, day from
 \ DAY_HOUR, dusk from DUSK_HOUR, night from NIGHT_HOUR. The player is
 \ underground with its feet UNDERGROUND_DEPTH or more tiles below its
 \ column's surface.
 HOURS = 24
-START_HOUR = 5
 DAWN_HOUR = 5
 DAY_HOUR = 7
 DUSK_HOUR = 18
 NIGHT_HOUR = 20
-START_TIME = START_HOUR * &10000 DIV HOURS     \ (frames)
 DAWN_TIME = DAWN_HOUR * 256 DIV HOURS          \ (times: the high byte)
 DAY_TIME = DAY_HOUR * 256 DIV HOURS
 DUSK_TIME = DUSK_HOUR * 256 DIV HOURS

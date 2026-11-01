@@ -3,9 +3,8 @@ high byte the time, sent to the host in each packet with whether the
 player is underground, for the music's director."""
 
 from conftest import boot_game
+from stratagem.daynight import START_TIME
 
-HOURS, START_HOUR = 24, 5                       # asm/tube_layout.asm
-START_TIME = START_HOUR * 0x10000 // HOURS
 WORLD_UNDERGROUND = 0x80
 DIG_DOWN_FRAMES = 150
 
@@ -21,7 +20,7 @@ def test_the_day_starts_at_dawn_turns_and_knows_underground(tube_bbc, game_build
     boot_game(bbc, game_build, time=START_TIME)
     peek = bbc.memory.address.peek
     frames(bbc, host, 2)
-    assert peek[host["host_time"]] == START_TIME >> 8, "not dawn"
+    assert peek[host["host_time"]] == START_TIME >> 8, "not the first full daylight"
     assert peek[host["host_world"]] == 0, "not on the surface"
 
     parasite = bbc.connect_coprocessor().memory.address

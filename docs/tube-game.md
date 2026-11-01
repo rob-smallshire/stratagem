@@ -595,8 +595,9 @@ Chunks could be packed between the two, at no cost to `tile_at`.
 
 The parasite keeps the world's clock (`asm/world_clock.asm`): a 16-bit
 count of frames, `zp_time`, a day of 21.8 minutes at 50 frames a second,
-midnight at 0 and noon at &8000, wrapping at midnight for free; from 5
-o'clock, stopped while the pack is open. Each packet carries the time, the
+midnight at 0 and noon at &8000, wrapping at midnight for free; from the
+first full daylight after dawn (about 7:18), stopped while the pack is
+open. Each packet carries the time, the
 clock's high byte (256ths of a day, about 5 seconds each:
 `PACKET_TIME`), and whether the player is underground (`PACKET_WORLD`),
 which the host keeps in `host_time` and `host_world` for the music's
@@ -610,7 +611,9 @@ time, is full from about 7:20 to 16:45; a quick sigmoid ramp at dusk falls
 to level 3 by about 19:00; then a long, shallow twilight (2, then 1) on
 the night's side; black from about 21:40 to 2:25; and the dawn mirrors it.
 Light leaks over the horizon into the night, but the dark doesn't leak
-into the day. The game starts at 5 o'clock, at level 3, before dawn.
+into the day. The game starts at the first full daylight after dawn
+(`START_TIME`, about 7:18, worked out from the curve), so the world's
+first day is a whole one, and its first dusk comes as a surprise.
 
 - **Daylight dimmed by subtraction:** `sun_daylight` takes LIGHT_FULL less
   the sun's level (`sun_dim`) from every tile's daylight, the glow

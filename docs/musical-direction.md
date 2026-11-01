@@ -474,7 +474,8 @@ down, which costs almost nothing.
 
 - **The world's day:** the parasite keeps a clock (`asm/world_clock.asm`):
   a 16-bit count of frames, a day of 21.8 minutes (midnight at 0, noon at
-  &8000), from 5 o'clock, stopped while the pack is open. Each packet
+  &8000), from the first full daylight after dawn (about 7:18), stopped
+  while the pack is open. Each packet
   carries the time, the clock's high byte, in 256ths of a day
   (`PACKET_TIME`), and whether the player's feet are three tiles or more
   below the surface (`PACKET_WORLD`). The world's light follows it
@@ -484,7 +485,7 @@ down, which costs almost nothing.
   7, Dusk from 18, Night from 20 (`tube_layout.asm`, as times: &35, &4A,
   &C0, &D5).
 - **When:** 15 seconds of silence at the start, then the first piece for
-  certain (at 5 o'clock, Dawn: the world waking with the player); after
+  certain (at the game's start, about 7:18, Daylight); after
   each piece, two minutes and up to 2:43 more of silence; then every 30
   seconds a chance of a third of the piece for the moment, half that if
   it was the last played. A piece plays to its end, whatever happens.

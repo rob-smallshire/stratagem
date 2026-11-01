@@ -6,7 +6,7 @@ once the frame is drawn (host_music_owed, asm/host_main.asm)."""
 from conftest import boot_game
 from stratagem import day_music, sequencer
 
-START_TIME = 5 * 0x10000 // 24          # asm/tube_layout.asm: the game's own start, at dawn
+DAWN_TIME = 5 * 0x10000 // 24           # 5 o'clock: the director's first piece, Dawn
 
 FRAMES = 150
 SCRIPT_KEYS = [["M", "L"], ["X", "L"], ["Z"]]
@@ -18,7 +18,7 @@ def test_the_games_music_waits_for_the_frame_and_loses_no_tick(tube_music_bbc, g
     reaches the top of the display, as without the music."""
     bbc = tube_music_bbc
     host, mbank = game_build.labels["HOST"], game_build.labels["MBANK"]
-    boot_game(bbc, game_build, time=START_TIME)
+    boot_game(bbc, game_build, time=DAWN_TIME)
     crtc = bbc.crtc.state
     lines_per_row = crtc.max_scanline + 1
     display_top = ((crtc.vtotal + 1 - crtc.vsync_pos) * lines_per_row + crtc.vtotal_adj) * 128
@@ -69,7 +69,7 @@ def test_the_director_starts_with_dawn_plays_it_as_the_model_does_then_waits(tub
     director is quiet for at least QUIET_MIN."""
     bbc = tube_music_bbc
     host, mbank = game_build.labels["HOST"], game_build.labels["MBANK"]
-    boot_game(bbc, game_build, time=START_TIME)
+    boot_game(bbc, game_build, time=DAWN_TIME)
     start = bbc.debugger.cycle_count
     bank = lambda: music_bank(bbc, host)
     # The piece starts (music_play, in the music's bank: other ROMs run at
