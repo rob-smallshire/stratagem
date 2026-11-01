@@ -534,3 +534,10 @@ A running log of design decisions. Add to it whenever one is made.
   glow black, so sky behind a tile lit by a torch or the miner no longer
   shows as day; the twilight's faint sky dither (levels 1 and 2) is lost
   to it. Water shares the blue, but never shares the view with the sky.
+- **Subsidence dropped; the ladder of entropy kept:** soil no longer
+  fails when undermined. It made digging near the surface messy and
+  confusing, its whole-tile drops showed the tile grid the game otherwise
+  hides, and it served nothing in play. Soil put down stays where it's
+  put, as terrain; stone still puts down only soil, and soil dug is
+  nothing. Supersedes the subsidence entries above. The sky floor and the
+  night palette stay (soil put down in the sky moves the floor).

@@ -225,8 +225,6 @@ INCLUDE "asm/pack.asm"
 INCLUDE "asm/crafting.asm"
 INCLUDE "asm/place.asm"
 INCLUDE "asm/world_clock.asm"
-INCLUDE "build/generated/subsidence.asm"
-INCLUDE "asm/subsidence.asm"
 .plight_end
 
 \ Variables that need no starting value: after the game's
@@ -371,24 +369,5 @@ GUARD &F800
 .sl_tile_excess     SKIP GRID_SPAN * GRID_SPAN  \ Row-major, with the border
 .sl_corner          SKIP GRID_SPAN * GRID_SPAN  \ At each tile's top left
 .torch_near         SKIP TORCH_MAX      \ (torches.asm)
-.subside_queue_x    SKIP SUBSIDE_QUEUE  \ Subsidence (subsidence.asm): tiles at risk
-.subside_queue_y    SKIP SUBSIDE_QUEUE
-.subside_head       SKIP 1
-.subside_tail       SKIP 1
-.subside_count      SKIP 1
-.subside_random     SKIP 2      \ The random generator (MBANK's LFSR)
-.subside_checks     SKIP 1      \ Workspace
-.subside_i          SKIP 1
-.subside_x          SKIP 1
-.subside_y          SKIP 1
-.subside_t          SKIP 1
-.subside_t3         SKIP 1
-.subside_pending    SKIP 1      \ Non-zero: a tile dropped, to empty next
-.subside_pending_x  SKIP 1
-.subside_pending_y  SKIP 1
-.subside_left       SKIP 1      \ The tiles the miner is in
-.subside_right      SKIP 1
-.subside_top        SKIP 1
-.subside_bottom     SKIP 1
 
 SAVE "PLIGHT", sl_radial, plight_end, sl_radial

@@ -12,7 +12,7 @@ from mos6502 import Machine6502
 from stratagem import daynight, lighting
 from stratagem.build import read_disc_file
 from stratagem.camera import INPUT_ACTION, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT, INPUT_UP
-from stratagem.tiles import BACKGROUND_SKY, GRASS, SHAPE_FULL, SKY, SOIL
+from stratagem.tiles import BACKGROUND_SKY, SHAPE_FULL, SKY, SOIL
 from stratagem.world import HEIGHTS
 
 TILE_CACHE_SIZE = 32
@@ -179,11 +179,11 @@ def settle(game: ParasiteGame, frames: int = 400) -> None:
     raise AssertionError("the light didn't settle")
 
 
-def test_the_glow_follows_the_sky_down(game_build):
-    """At dusk, sky opened below the surface (as soil subsiding leaves it)
-    takes the glow's bands from its column's sky floor, the first tile
-    that doesn't show the sky, and is lit as the sky, untapered: the bands
-    over the old floor and the new are sent again, as their bands."""
+def test_the_glow_follows_the_sky_floor(game_build):
+    """At dusk, soil put down in the sky raises its column's sky floor (the
+    first tile that doesn't show the sky), and the glow's bands rise with
+    it; dug out again, they go back down. Each time the bands over the old
+    floor and the new are sent again, as their bands."""
     game = ParasiteGame(game_build)
     labels, memory = game.labels, game.memory
     sent = {}
@@ -197,19 +197,26 @@ def test_the_glow_follows_the_sky_down(game_build):
     settle(game)
     px = (memory[labels["zp_player_x"]] | memory[labels["zp_player_x"] + 1] << 8) >> 7
     x = next(c for c in range(px + 3, px + 12)
-             if all(game.tile_at(c, y)[0] in (SKY, GRASS, SOIL) for y in range(HEIGHTS[c] - 6, HEIGHTS[c] + 4)))
+             if all(game.tile_at(c, y)[0] == SKY for y in range(HEIGHTS[c] - 9, HEIGHTS[c])))
     h = HEIGHTS[x]
-    for y in (h, h + 1, h + 2):
-        memory[labels["target_x"]], memory[labels["target_y"]] = x, y
-        memory[labels["zp_world_new_shape"]] = SHAPE_FULL | BACKGROUND_SKY
-        game.call("change_target", a=SKY)
-        settle(game)
-    assert memory[labels["sky_floor"] + x] == h + 3
-    check_daylight(game, time >> 8)
-    for y in range(h - 4, h + 3):
-        tile = game.tile_at(x, y)
-        assert tile[0] == SKY
-        assert sent[x, y] == daynight.drawn(y, h + 3, tile), f"tile ({x}, {y}) as sent"
-    for y in (h, h + 1, h + 2):             # lit as the sky, untapered
-        level = daynight.level(lighting.FULL, time >> 8, daynight.band_of(y, h + 3))
-        assert game.cache_light(x, y) == level * lighting.LIGHT_SCALE
+
+    def change(material, rows):
+        for y in rows:
+            memory[labels["target_x"]], memory[labels["target_y"]] = x, y
+            memory[labels["zp_world_new_shape"]] = SHAPE_FULL | BACKGROUND_SKY
+            game.call("change_target", a=material)
+            settle(game)
+
+    def check(floor):
+        assert memory[labels["sky_floor"] + x] == floor
+        check_daylight(game, time >> 8)
+        for y in range(floor - 4, floor):
+            tile = game.tile_at(x, y)
+            assert tile[0] == SKY
+            assert sent[x, y] == daynight.drawn(y, floor, tile), f"tile ({x}, {y}) as sent"
+
+    change(SOIL, (h - 1, h - 2, h - 3))
+    check(h - 3)
+    sent.clear()
+    change(SKY, (h - 3, h - 2, h - 1))
+    check(h)
