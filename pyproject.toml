@@ -23,6 +23,7 @@ strat-loading-lab = "stratagem.loading_lab:main"
 strat-m5-record = "stratagem.m5_record:main"
 strat-m5-master = "stratagem.m5_master:main"
 strat-m5-synth = "stratagem.m5_synth:main"
+strat-screenshot = "stratagem.screenshot:main"
 
 [dependency-groups]
 test = [
