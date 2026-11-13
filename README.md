@@ -1,5 +1,7 @@
 # Stratagem
 
+[![CI](https://github.com/rob-smallshire/stratagem/actions/workflows/ci.yml/badge.svg)](https://github.com/rob-smallshire/stratagem/actions/workflows/ci.yml)
+
 > **Unfinished, and in development.** Stratagem is a game being made, not a
 > game to play yet: the world, digging, building, light, the day and its
 > music are there, but much of the game isn't, and anything here may change.
@@ -34,7 +36,9 @@ behaviour tested from Python.
   is silent.
 
 The OS and the filing system stay resident: the game loads with ordinary
-OS calls.
+OS calls. On these machines that means DFS: an ADFS or network filing
+system ROM raises PAGE above the &1900 the game needs. The ADFS image
+(`.adl`) is built for the Master, where PAGE stays low.
 
 It is developed and tested in the
 [Beebium](https://github.com/rob-smallshire/beebium) emulator, and is
@@ -49,7 +53,7 @@ Requires [uv](https://docs.astral.sh/uv/) and
 [beebasm](https://github.com/stardot/beebasm) on the `PATH`.
 
 ```sh
-uv run strat-build                    # build/stratagem.ssd
+uv run strat-build                    # build/stratagem.ssd (DFS) and .adl (ADFS)
 uv run pytest -m "not slow"           # the quick tests, in Beebium and py65
 uv run pytest                         # all of them, on both machines
 uv run --group test strat-screenshot  # the screenshot above, from the game

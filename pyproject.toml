@@ -8,7 +8,8 @@ license-files = ["LICENSE"]
 dependencies = [
     "mido>=1.3.3",
     "numpy>=2",
-    "oaknut-dfs>=12.18.2",
+    "oaknut-adfs>=13.6.1",
+    "oaknut-dfs>=13.6.1",
     "Pillow>=10",
 ]
 

@@ -11,6 +11,12 @@ beebasm writes a disc image only as far as its last file, so the image is
 finally expanded to its full 80-track size with oaknut-dfs, as some
 emulators and tools do not recognise a truncated image.
 
+The same files are then copied onto an ADFS L (640 KB) image,
+build/stratagem.adl, with oaknut-adfs, for machines whose filing system is
+ADFS. (On the B+ and the Integra-B, an ADFS or network filing system ROM
+raises PAGE above STRAT's &1900, so the game runs from it only where PAGE
+stays low enough: the Master, when it is supported.)
+
     uv run strat-build
 """
 
@@ -31,8 +37,10 @@ ASM_DIRPATH = PROJECT_DIRPATH / "asm"
 BUILD_DIRPATH = PROJECT_DIRPATH / "build"
 LABELS_DIRPATH = BUILD_DIRPATH / "labels"
 DISC_FILEPATH = BUILD_DIRPATH / "stratagem.ssd"
+ADFS_DISC_FILEPATH = BUILD_DIRPATH / "stratagem.adl"
 
 DISC_TITLE = "STRATAGEM"
+ADFS_TITLE = "Stratagem"
 
 GENERATED_DIRPATH = BUILD_DIRPATH / "generated"
 
@@ -127,6 +135,7 @@ def build() -> BuildResult:
     generate_all(GENERATED_DIRPATH)
     LABELS_DIRPATH.mkdir(parents=True, exist_ok=True)
     labels = _build_disc(DISC_FILEPATH, SOURCES, BOOT_FILE)
+    make_adfs_disc(DISC_FILEPATH, ADFS_DISC_FILEPATH)
     return BuildResult(DISC_FILEPATH, labels)
 
 
@@ -147,13 +156,30 @@ def expand_disc(disc_filepath: Path) -> None:
     expand(disc_filepath, ACORN_DFS_80T_SINGLE_SIDED)
 
 
+def make_adfs_disc(dfs_disc_filepath: Path, adfs_disc_filepath: Path) -> None:
+    """Copy every file of the DFS disc, with its load and execution
+    addresses, onto a new ADFS L disc (640 KB) with the same boot option."""
+    from oaknut.adfs import ADFS, ADFS_L
+    from oaknut.dfs.dfs import DFS
+
+    adfs_disc_filepath.unlink(missing_ok=True)
+    with DFS.from_file(dfs_disc_filepath, read_only=True) as dfs:
+        with ADFS.create_file(adfs_disc_filepath, ADFS_L, title=ADFS_TITLE,
+                              boot_option=dfs.boot_option) as adfs:
+            for source in (dfs.root / "$").iterdir():
+                stat = source.stat()
+                (adfs.root / source.path.split(".", 1)[1]).write_bytes(
+                    source.read_bytes(), load_address=stat.load_address, exec_address=stat.exec_address)
+
+
 def main() -> None:
     try:
         result = build()
     except (RuntimeError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
         sys.exit(1)
-    print(f"Built {result.disc_filepath.relative_to(PROJECT_DIRPATH)} with {', '.join(result.labels)}")
+    print(f"Built {result.disc_filepath.relative_to(PROJECT_DIRPATH)} and "
+          f"{ADFS_DISC_FILEPATH.relative_to(PROJECT_DIRPATH)} with {', '.join(result.labels)}")
 
 
 if __name__ == "__main__":

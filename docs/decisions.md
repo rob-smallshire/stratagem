@@ -550,3 +550,11 @@ A running log of design decisions. Add to it whenever one is made.
   the brightness curve unchanged; dawn keeps blue and magenta. The two
   sequences meet at blue by day and black by night, and tell evening from
   morning at a glance (the day/night lab's two-tone way).
+- **DFS only on the B+ and the Integra-B; an ADFS image for the Master:**
+  measured in Beebium on both machines, an ADFS 1.30 ROM raises the host's
+  PAGE to &1F00, ANFS 4.18 to &1C00 and NFS 3.65 to &1B00, even with DFS
+  selected, all above STRAT's &1900. ADFS and the network filing systems
+  aren't supported on these machines; the build makes an ADFS L copy of the
+  disc (`build/stratagem.adl`) all the same, for the Master, where PAGE
+  stays low. CI (`.github/workflows/ci.yml`) builds both and runs every
+  test.
