@@ -64,3 +64,7 @@ uv run --group test strat-screenshot  # the screenshot above, from the game
 - [The decision log](docs/decisions.md): why things are as they are.
 - [The musical direction](docs/musical-direction.md), and
   [the music's style](art/music/style.md).
+
+## Licence
+
+MIT: see [LICENSE](LICENSE).
