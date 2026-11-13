@@ -1,0 +1,83 @@
+name: Release
+
+# Triggered by a version tag (v0.1.1, ...), which `uvx bump-my-version bump
+# patch` makes (see .bumpversion.toml). Runs the whole test suite first; only
+# if it passes does it build the discs and publish a GitHub release with the
+# game's disc images. The build names them for the version:
+# stratagem-v<version>.ssd (DFS) and .adl (ADFS).
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish the release
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      BEEBASM_VERSION: v1.10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache beebasm
+        id: beebasm-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/beebasm/bin
+          key: beebasm-${{ env.BEEBASM_VERSION }}-${{ runner.os }}
+
+      - name: Build beebasm
+        if: steps.beebasm-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$BEEBASM_VERSION" https://github.com/stardot/beebasm.git ~/beebasm/src
+          make -C ~/beebasm/src/src code
+          mkdir -p ~/beebasm/bin
+          cp "$(find ~/beebasm/src -maxdepth 2 -type f -name beebasm -perm -u+x | head -1)" ~/beebasm/bin/
+
+      - name: Put beebasm on the PATH
+        run: echo "$HOME/beebasm/bin" >> "$GITHUB_PATH"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: uv sync --locked --no-default-groups
+
+      - name: Check the tag matches the version
+        run: |
+          version="$(uv run python -c 'from stratagem._version import __version__; print(__version__)')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match the version ${version}" >&2
+            exit 1
+          fi
+
+      - name: Build the discs
+        run: |
+          uv run strat-build
+          test -f "build/stratagem-${GITHUB_REF_NAME}.ssd"
+          test -f "build/stratagem-${GITHUB_REF_NAME}.adl"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "build/stratagem-${GITHUB_REF_NAME}.ssd" \
+            "build/stratagem-${GITHUB_REF_NAME}.adl" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --prerelease \
+            --title "Stratagem ${GITHUB_REF_NAME}" \
+            --notes "An unfinished game, in development. For a BBC Micro B+ 128K, or a Model B with an Integra-B, with DFS, at least three free banks of sideways RAM (a fourth for the music), a 6502 second processor and, for the music, a Music 5000 (or an emulator of one). The .ssd is a DFS disc: insert it and press Shift-Break, then SPACE. The .adl is an ADFS copy, for the Master, when it is supported: on the B+ and the Integra-B an ADFS ROM raises PAGE too high. Each disc has a README, the LICENSE, and a file named for the version."

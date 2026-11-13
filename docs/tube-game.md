@@ -1,7 +1,8 @@
 # Stratagem on the Tube
 
 The game running on a 6502 second processor, with the host drawing what it
-sends: `uv run strat-build` makes `build/stratagem.ssd`. This is the game;
+sends: `uv run strat-build` makes `build/stratagem-v<version>.ssd` (and an
+ADFS copy, `.adl`). This is the game;
 the host-only game it grew from was dropped on 2026-10-21 (`decisions.md`).
 The prototypes that led here are in `tube-prototypes.md`.
 
@@ -15,7 +16,7 @@ processor (a 3 MHz 65C02, or the 4 MHz 65C102).
   add `--tube-65c02` to the server's options: from Beebium 0.12.0 an
   Integra-B so launched boots across the Tube (one saved by an earlier
   version still needs `*CONFIGURE TUBE` and Ctrl-Break once).
-- Insert `build/stratagem.ssd` and Shift-Break.
+- Insert `build/stratagem-v<version>.ssd` and Shift-Break.
 
 The keys are those of `implementation-record.md`, and T:
 

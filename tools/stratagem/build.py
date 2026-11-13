@@ -11,8 +11,10 @@ beebasm writes a disc image only as far as its last file, so the image is
 finally expanded to its full 80-track size with oaknut-dfs, as some
 emulators and tools do not recognise a truncated image.
 
-The same files are then copied onto an ADFS L (640 KB) image,
-build/stratagem.adl, with oaknut-adfs, for machines whose filing system is
+The disc is given a file named for the version, a README and the LICENSE
+(disc_files.py), and the images are named for the version:
+build/stratagem-v<version>.ssd. The same files are then copied onto an ADFS
+L (640 KB) image, build/stratagem-v<version>.adl, with oaknut-adfs, for machines whose filing system is
 ADFS. (On the B+ and the Integra-B, an ADFS or network filing system ROM
 raises PAGE above STRAT's &1900, so the game runs from it only where PAGE
 stays low enough: the Master, when it is supported.)
@@ -30,17 +32,17 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from stratagem.disc_files import (DFS_TITLE, LICENSE_FILENAME, README_FILENAME, acorn_text, adfs_title, disc_filename,
+                                  license_text, readme_text, version_filename, version_text)
 from stratagem.gen_tables import generate_all
 
 PROJECT_DIRPATH = Path(__file__).resolve().parents[2]
 ASM_DIRPATH = PROJECT_DIRPATH / "asm"
 BUILD_DIRPATH = PROJECT_DIRPATH / "build"
 LABELS_DIRPATH = BUILD_DIRPATH / "labels"
-DISC_FILEPATH = BUILD_DIRPATH / "stratagem.ssd"
-ADFS_DISC_FILEPATH = BUILD_DIRPATH / "stratagem.adl"
+DISC_FILEPATH = BUILD_DIRPATH / disc_filename(".ssd")
+ADFS_DISC_FILEPATH = BUILD_DIRPATH / disc_filename(".adl")
 
-DISC_TITLE = "STRATAGEM"
-ADFS_TITLE = "Stratagem"
 
 GENERATED_DIRPATH = BUILD_DIRPATH / "generated"
 
@@ -112,7 +114,7 @@ def _build_disc(disc_filepath: Path, sources: dict[str, Path], boot_file: str) -
         if index == 0:
             # Create a fresh disc with a !BOOT that runs the boot file.
             _assemble(source_filepath, labels_filepath,
-                      ["-do", disc, "-boot", boot_file, "-title", DISC_TITLE])
+                      ["-do", disc, "-boot", boot_file, "-title", DFS_TITLE])
         else:
             # Add to the existing disc via a staging copy.
             _assemble(source_filepath, labels_filepath, ["-di", disc, "-do", staging])
@@ -135,6 +137,7 @@ def build() -> BuildResult:
     generate_all(GENERATED_DIRPATH)
     LABELS_DIRPATH.mkdir(parents=True, exist_ok=True)
     labels = _build_disc(DISC_FILEPATH, SOURCES, BOOT_FILE)
+    add_text_files(DISC_FILEPATH)
     make_adfs_disc(DISC_FILEPATH, ADFS_DISC_FILEPATH)
     return BuildResult(DISC_FILEPATH, labels)
 
@@ -156,6 +159,17 @@ def expand_disc(disc_filepath: Path) -> None:
     expand(disc_filepath, ACORN_DFS_80T_SINGLE_SIDED)
 
 
+def add_text_files(disc_filepath: Path) -> None:
+    """Add the version file, the README and the LICENSE (disc_files.py), as
+    Acorn text, to the DFS disc."""
+    from oaknut.dfs.dfs import DFS
+
+    with DFS.from_file(disc_filepath) as dfs:
+        for name, text in ((version_filename(), version_text()), (README_FILENAME, readme_text()),
+                           (LICENSE_FILENAME, license_text())):
+            (dfs.root / "$" / name).write_bytes(acorn_text(text))
+
+
 def make_adfs_disc(dfs_disc_filepath: Path, adfs_disc_filepath: Path) -> None:
     """Copy every file of the DFS disc, with its load and execution
     addresses, onto a new ADFS L disc (640 KB) with the same boot option."""
@@ -164,7 +178,7 @@ def make_adfs_disc(dfs_disc_filepath: Path, adfs_disc_filepath: Path) -> None:
 
     adfs_disc_filepath.unlink(missing_ok=True)
     with DFS.from_file(dfs_disc_filepath, read_only=True) as dfs:
-        with ADFS.create_file(adfs_disc_filepath, ADFS_L, title=ADFS_TITLE,
+        with ADFS.create_file(adfs_disc_filepath, ADFS_L, title=adfs_title(),
                               boot_option=dfs.boot_option) as adfs:
             for source in (dfs.root / "$").iterdir():
                 stat = source.stat()

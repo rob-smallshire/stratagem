@@ -33,7 +33,7 @@ filing system resident, and is tested in the Beebium emulator.
 ## Commands
 
 ```bash
-uv run strat-build        # assemble -> build/stratagem.ssd, labels in build/labels/
+uv run strat-build        # assemble -> build/stratagem-v<version>.ssd and .adl, labels in build/labels/
 uv run pytest             # builds first; emulator tests run on each machine
 uv run pytest -m "not slow"   # the quick run, about a minute: one short case of each kind
 uv run pytest tests/test_daylight.py   # or just the tests that cover the change

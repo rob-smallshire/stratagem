@@ -31,7 +31,7 @@ behaviour tested from Python.
   at least three free 16K banks of sideways RAM. A fourth holds the game's
   music. (The Master 128 is planned.)
 - **A 6502 second processor:** a 3 MHz 65C02, or a 4 MHz 65C102. The game
-  runs on the second processor; the BBC Micro draws what it sends.
+  runs on the second processor; the BBC Micro does the rendering and music.
 - **A Music 5000**, if you have one, for the music. Without one, the game
   is silent.
 
@@ -44,8 +44,15 @@ It is developed and tested in the
 [Beebium](https://github.com/rob-smallshire/beebium) emulator, and is
 untested elsewhere, including on real hardware. In Beebium, import
 `presets/stratagem-b-plus-128k-65c02.json` (File > Import Presets...), a
-B+ 128K with a 3 MHz 65C02, insert `build/stratagem.ssd` and press
-Shift-Break.
+B+ 128K with a 3 MHz 65C02, insert the `.ssd` disc image and press
+Shift-Break, then SPACE.
+
+Disc images come with each
+[release](https://github.com/rob-smallshire/stratagem/releases), or build
+them yourself (below): `stratagem-vX.Y.Z.ssd` for DFS, and
+`stratagem-vX.Y.Z.adl`, an ADFS copy. Each disc also holds a README, the
+LICENSE, and a file named for the version (e.g. `0_1_0`), so `*CAT` shows
+which version it is.
 
 ## Building
 
@@ -53,11 +60,27 @@ Requires [uv](https://docs.astral.sh/uv/) and
 [beebasm](https://github.com/stardot/beebasm) on the `PATH`.
 
 ```sh
-uv run strat-build                    # build/stratagem.ssd (DFS) and .adl (ADFS)
+uv run strat-build                    # build/stratagem-vX.Y.Z.ssd (DFS) and .adl (ADFS)
 uv run pytest -m "not slow"           # the quick tests, in Beebium and py65
 uv run pytest                         # all of them, on both machines
 uv run --group test strat-screenshot  # the screenshot above, from the game
 ```
+
+CI builds the discs, keeps them as a `disc-images` artifact, and runs the
+tests on every push to master and every pull request.
+
+## Releasing
+
+The version lives in `.bumpversion.toml`, with `pyproject.toml`,
+`tools/stratagem/_version.py` and `uv.lock` kept equal to it.
+
+```sh
+uvx bump-my-version bump patch     # e.g. 0.1.0 -> 0.1.1: edits, commits and tags v0.1.1
+git push --follow-tags             # push the commit and the tag
+```
+
+The tag triggers the release workflow: it runs the whole test suite, then
+publishes a GitHub release (marked a pre-release) with the disc images.
 
 ## Finding out more
 

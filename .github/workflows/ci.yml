@@ -58,7 +58,8 @@ jobs:
       - name: Build the discs
         run: uv run strat-build
 
-      # Both images: the DFS disc (.ssd) and its ADFS copy (.adl). The game
+      # Both images, named for the version: the DFS disc (.ssd) and its ADFS
+      # copy (.adl). The game
       # runs from ADFS only where PAGE stays at &1900 or below: not on the
       # B+ or the Integra-B with an ADFS ROM fitted.
       - name: Keep the disc images
@@ -66,8 +67,8 @@ jobs:
         with:
           name: disc-images
           path: |
-            build/stratagem.ssd
-            build/stratagem.adl
+            build/stratagem-v*.ssd
+            build/stratagem-v*.adl
           if-no-files-found: error
 
       - name: Run the tests

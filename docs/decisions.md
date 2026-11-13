@@ -558,3 +558,11 @@ A running log of design decisions. Add to it whenever one is made.
   disc (`build/stratagem.adl`) all the same, for the Master, where PAGE
   stays low. CI (`.github/workflows/ci.yml`) builds both and runs every
   test.
+- **Versions, as the other games have them:** bump-my-version keeps the
+  version (from 0.1.0) in `.bumpversion.toml`, `pyproject.toml`,
+  `tools/stratagem/_version.py` and `uv.lock`, and tags releases v<version>,
+  which the release workflow publishes, as pre-releases while the game is
+  unfinished. The disc images are named for it, the ADFS disc's title
+  carries it, and each disc holds a file named for it (`0_1_0`), a README
+  and the LICENSE (`disc_files.py`). The DFS title stays STRATAGEM: twelve
+  characters leave no room for the version.
