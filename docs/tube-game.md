@@ -19,7 +19,8 @@ renderer's calls page both in and out (`render_on`, `render_off`, by
 as the tick reads the host's variables in user RAM. Beebium doesn't
 emulate the Master, so it is tested in b2 (`uv run strat-b2`, with b2
 running): the game boots from the DFS disc on a Master Turbo, plays and
-draws.
+draws. On a real Master Turbo it loads from the ADFS disc and plays,
+without problems (2026-11-14).
 
 - In Beebium, import `presets/stratagem-b-plus-128k-65c02.json` (File >
   Import Presets...): a B+ 128K with a 3 MHz 65C02. From the command line,

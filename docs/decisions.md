@@ -574,4 +574,5 @@ A running log of design decisions. Add to it whenever one is made.
   thirteen inline render calls became calls to those two, which paid for
   the Master's code in STRAT's few spare bytes. Tested in b2 (Beebium has
   no Master), driven through its HTTP API: no keys, so the waits for SPACE
-  are patched out in memory.
+  are patched out in memory. Then run on a real Master Turbo from the
+  ADFS disc, without problems.

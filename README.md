@@ -44,8 +44,8 @@ image (`.adl`) is for the Master, where PAGE stays low.
 It is developed and tested in the
 [Beebium](https://github.com/rob-smallshire/beebium) emulator, and on the
 Master, which Beebium doesn't emulate yet, in
-[b2](https://github.com/tom-seddon/b2) (`uv run strat-b2`). It is
-untested on real hardware. In Beebium, import
+[b2](https://github.com/tom-seddon/b2) (`uv run strat-b2`). On real
+hardware it has run on a Master Turbo, from the ADFS disc. In Beebium, import
 `presets/stratagem-b-plus-128k-65c02.json` (File > Import Presets...), a
 B+ 128K with a 3 MHz 65C02, insert the `.ssd` disc image and press
 Shift-Break, then SPACE.

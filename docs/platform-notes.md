@@ -73,8 +73,9 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
   7, 6, 5 and 4. **V** (b2)
 - OSBYTE `&00` with X=1 returns X=3 for MOS 3.20 (4 for 3.50, 5 for the
   Compact's MOS 5). **V** (b2)
-- The filing systems' workspace is in HAZEL, so PAGE stays at `&0E00` with
-  DFS and ADFS. **U** (not yet measured)
+- The filing systems' workspace is in HAZEL, so PAGE stays low with DFS
+  and ADFS: the game loads and runs from the ADFS disc on a real Master
+  Turbo (2026-11-14). **V** (real hardware; PAGE itself not measured)
 - Beebium doesn't emulate the Master yet (#189); b2 does, and its HTTP
   API (peek and poke, with paging overrides; reset with a config; load a
   disc) drives it (`uv run strat-b2`). Its paste rejects control

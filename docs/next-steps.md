@@ -144,7 +144,7 @@ tunneller will fill them, and then digging is quietly refused.
 - **Art:** tiles and the miner are placeholder art drawn by code; grass on
   slopes loses its green top. Tiles and sprites should come from images.
 - **Master 128:** supported since 2026-11-14 (ACCCON X), tested in b2 from
-  the DFS disc; the ADFS disc, and a real Master, still to try. Beebium
+  the DFS disc, and run on a real Master Turbo from the ADFS disc. Beebium
   doesn't emulate it yet (#189).
 - **NFS/ANFS:** PAGE (OSHWM) under the Econet filing systems hasn't been
   measured; the loader assumes `&1900`.
