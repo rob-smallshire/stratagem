@@ -1,6 +1,6 @@
 [project]
 name = "stratagem"
-version = "0.1.0"
+version = "0.1.1"
 description = "Stratagem -- an open-world building game for the BBC Micro"
 requires-python = ">=3.12"
 license = "MIT"
