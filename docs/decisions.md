@@ -566,3 +566,12 @@ A running log of design decisions. Add to it whenever one is made.
   carries it, and each disc holds a file named for it (`0_1_0`), a README
   and the LICENSE (`disc_files.py`). The DFS title stays STRATAGEM: twelve
   characters leave no room for the version.
+- **The Master 128, by ACCCON X:** after it was tried on a real Master
+  Turbo (2026-11-14). As on the Integra-B, the render region is the lower
+  12K of the render bank; the screen is reached with ACCCON's X bit, set
+  and cleared around each call to the renderer (`render_on`,
+  `render_off`), since ROMSEL's bit 7 pages ANDY on the Master. The
+  thirteen inline render calls became calls to those two, which paid for
+  the Master's code in STRAT's few spare bytes. Tested in b2 (Beebium has
+  no Master), driven through its HTTP API: no keys, so the waits for SPACE
+  are patched out in memory.

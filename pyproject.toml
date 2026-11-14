@@ -27,6 +27,7 @@ strat-m5-record = "stratagem.m5_record:main"
 strat-m5-master = "stratagem.m5_master:main"
 strat-m5-synth = "stratagem.m5_synth:main"
 strat-screenshot = "stratagem.screenshot:main"
+strat-b2 = "stratagem.b2_check:main"
 
 [dependency-groups]
 test = [

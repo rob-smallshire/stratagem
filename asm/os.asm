@@ -16,6 +16,7 @@ EVENT_VSYNC = 4
 
 \ Hardware
 ROMSEL = &FE30                  \ Paged ROM select (write only)
+ACCCON_X = &04                  \ The Master's CPU sees the shadow at &3000-&7FFF
 JIM_PAGE = &FCFF                \ JIM's page register: write only, a read loads it
 JIM_COPY = &EE                  \ The OS's copy of it, written first
 ACCCON = &FE34                  \ B+ ACCCON / Integra-B RAMSEL / Master ACCCON

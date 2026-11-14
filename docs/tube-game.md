@@ -8,8 +8,18 @@ The prototypes that led here are in `tube-prototypes.md`.
 
 ## Playing it
 
-Needs a BBC B+ 128K or a Model B with Integra-B, with a 6502 second
-processor (a 3 MHz 65C02, or the 4 MHz 65C102).
+Needs a BBC B+ 128K, a Model B with Integra-B, or a Master 128, with a
+6502 second processor (a 3 MHz 65C02, or the 4 MHz 65C102: a Master Turbo).
+
+On the Master the render region is the lower 12K of the render bank, as
+on the Integra-B, and the screen is reached with ACCCON's X bit, not
+ROMSEL's bit 7 (which on the Master pages ANDY over `&8000`-`&8FFF`): the
+renderer's calls page both in and out (`render_on`, `render_off`, by
+`screen_bit`), and the vertical sync event clears X while the music ticks,
+as the tick reads the host's variables in user RAM. Beebium doesn't
+emulate the Master, so it is tested in b2 (`uv run strat-b2`, with b2
+running): the game boots from the DFS disc on a Master Turbo, plays and
+draws.
 
 - In Beebium, import `presets/stratagem-b-plus-128k-65c02.json` (File >
   Import Presets...): a B+ 128K with a 3 MHz 65C02. From the command line,

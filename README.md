@@ -27,22 +27,25 @@ behaviour tested from Python.
 
 ## What it runs on
 
-- **A BBC Micro B+ 128K, or a Model B with an Integra-B board**, each with
-  at least three free 16K banks of sideways RAM. A fourth holds the game's
-  music. (The Master 128 is planned.)
-- **A 6502 second processor:** a 3 MHz 65C02, or a 4 MHz 65C102. The game
+- **A BBC Micro B+ 128K, a Model B with an Integra-B board, or a Master
+  128**, each with at least three free 16K banks of sideways RAM. A fourth
+  holds the game's music.
+- **A 6502 second processor:** a 3 MHz 65C02, or a 4 MHz 65C102 (a
+  Master Turbo). The game
   runs on the second processor; the BBC Micro does the rendering and music.
 - **A Music 5000**, if you have one, for the music. Without one, the game
   is silent.
 
 The OS and the filing system stay resident: the game loads with ordinary
-OS calls. On these machines that means DFS: an ADFS or network filing
-system ROM raises PAGE above the &1900 the game needs. The ADFS image
-(`.adl`) is built for the Master, where PAGE stays low.
+OS calls. On the B+ and the Integra-B that means DFS: an ADFS or network
+filing system ROM raises PAGE above the &1900 the game needs. The ADFS
+image (`.adl`) is for the Master, where PAGE stays low.
 
 It is developed and tested in the
-[Beebium](https://github.com/rob-smallshire/beebium) emulator, and is
-untested elsewhere, including on real hardware. In Beebium, import
+[Beebium](https://github.com/rob-smallshire/beebium) emulator, and on the
+Master, which Beebium doesn't emulate yet, in
+[b2](https://github.com/tom-seddon/b2) (`uv run strat-b2`). It is
+untested on real hardware. In Beebium, import
 `presets/stratagem-b-plus-128k-65c02.json` (File > Import Presets...), a
 B+ 128K with a 3 MHz 65C02, insert the `.ssd` disc image and press
 Shift-Break, then SPACE.

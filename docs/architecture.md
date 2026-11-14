@@ -9,8 +9,8 @@ it relies on, and `docs/decisions.md` records decisions as they are made.
 ## Targets and constraints
 
 - Machines with 32K main RAM, 20K shadow RAM and at least 64K sideways RAM:
-  the BBC B+ 128K, the Model B with Integra-B, and the Master 128 (later:
-  Beebium does not emulate it yet).
+  the BBC B+ 128K, the Model B with Integra-B, and the Master 128 (since
+  2026-11-14, tested in b2, as Beebium does not emulate it yet).
 - We use 48K of sideways RAM (three banks), leaving one bank free for the
   user's own ROM images, such as MMFS. (Since the game moved to a second
   processor (`tube-game.md`), the host uses one bank, for the render

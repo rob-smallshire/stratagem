@@ -21,12 +21,9 @@ MACRO SELECT_ROMSEL
 ENDMACRO
 
 MACRO RENDER_CALL routine
-    LDA zp_romsel_render
-    SELECT_ROMSEL
+    JSR render_on
     JSR routine
-    LDA zp_romsel_game
-    SELECT_ROMSEL
-    RTS
+    JMP render_off
 ENDMACRO
 
 .call_render_row        RENDER_CALL render_row
@@ -40,6 +37,35 @@ ENDMACRO
 .call_render_pack       RENDER_CALL render_pack
 .call_render_pack_marks RENDER_CALL render_pack_marks
 .call_render_pack_changed RENDER_CALL render_pack_changed
+
+\ Page in the render bank, with the screen: on the B+ and the Integra-B by
+\ ROMSEL's bit 7 (ANDY, or MEMSEL), in zp_romsel_render; on the Master by
+\ ACCCON's X bit (screen_bit), as its ROMSEL bit 7 would page ANDY over the
+\ render bank. And page them out again. Each keeps X, Y and the carry.
+.render_on
+{
+    LDA zp_romsel_render
+    SELECT_ROMSEL
+    LDA screen_bit              \ The Master's ACCCON X, or 0
+    BEQ done
+    ORA ACCCON
+    STA ACCCON
+.done
+    RTS
+}
+
+.render_off
+{
+    LDA zp_romsel_game
+    SELECT_ROMSEL
+    LDA screen_bit
+    BEQ done
+    EOR #&FF
+    AND ACCCON
+    STA ACCCON
+.done
+    RTS
+}
 
 \ OSWRCH: a command from the parasite and its arguments (COMMAND_FRAME and
 \ its buffer, or COMMAND_FETCH, a slot and an address), or an ordinary
@@ -117,6 +143,7 @@ ENDMACRO
 \ The host's variables (zero page is in host_zeropage.asm)
 .zp_boot_status     EQUB 0      \ BOOT_READY once loaded
 .zp_machine         EQUB 0
+.screen_bit         EQUB 0      \ ACCCON_X on the Master, otherwise 0
 .zp_redraw          EQUB 0
 .zp_input           EQUB 0
 .zp_keys            EQUB 0      \ The second byte of input (KEY_CYCLE)
@@ -204,6 +231,8 @@ ENDMACRO
     BEQ machine_ok
     CMP #MACHINE_B_PLUS
     BEQ machine_ok
+    CMP #MACHINE_MASTER
+    BEQ machine_ok
     LDX #LO(message_machine)
     LDY #HI(message_machine)
     JMP fail
@@ -216,8 +245,16 @@ ENDMACRO
     LDY #HI(message_banks)
     JMP fail
 .banks_ok
-    LDA ram_banks               \ The render bank (the B+ uses ANDY)
+    LDA ram_banks               \ The render bank (the B+ uses ANDY), with
+    LDX zp_machine              \ the screen: by ROMSEL bit 7, or on the
+    CPX #MACHINE_MASTER         \ Master by ACCCON X
+    BEQ master_screen
     ORA #&80
+    BNE screen_set              \ (Always)
+.master_screen
+    LDX #ACCCON_X
+    STX screen_bit
+.screen_set
     STA zp_romsel_render
     LDA ram_banks + 1           \ The store of changed chunks (host_store)
     STA host_store_banks
@@ -227,7 +264,7 @@ ENDMACRO
     AND #&7F
     STA zp_romsel_game
     LDA zp_romsel_render        \ The render region is ANDY on the B+, the
-    LDX zp_machine              \ render bank on the Integra-B
+    LDX zp_machine              \ render bank on the Integra-B and Master
     CPX #MACHINE_B_PLUS
     BEQ compose
     AND #&0F
@@ -450,12 +487,10 @@ ASSERT BANK_START + BOUNCE_PAGES * 256 <= RENDER_CODE
     STA zp_temp + 1
     LDA page
     STA zp_ptr + 1
-    LDA zp_romsel_render        \ ... and from there to the screen
-    SELECT_ROMSEL
+    JSR render_on               \ ... and from there to the screen
     LDX #BOUNCE_PAGES
     JSR RENDER_CODE
-    LDA zp_romsel_game
-    SELECT_ROMSEL
+    JSR render_off
     LDA page
     CLC
     ADC #BOUNCE_PAGES
@@ -631,12 +666,26 @@ ASSERT vdu_setup_end - vdu_strings < 256
     PHA
     LDA ROMSEL_COPY
     PHA
+    LDA screen_bit              \ On the Master, the CPU's view of
+    BEQ seen                    \ &3000-&7FFF main RAM, if the renderer had
+    AND ACCCON                  \ the screen (ACCCON X): the tick reads the
+    BEQ seen                    \ host's variables there
+    EOR ACCCON
+    STA ACCCON
+    LDA screen_bit
+.seen
+    PHA
     LDA music_romsel
     SELECT_ROMSEL
 .*music_event_tick
     JSR music_tick
 .*music_event_animate
     JSR animate
+    PLA                         \ The screen again, if it was seen
+    BEQ unseen
+    ORA ACCCON
+    STA ACCCON
+.unseen
     PLA
     SELECT_ROMSEL
     PLA
@@ -679,7 +728,7 @@ ASSERT vdu_setup_end - vdu_strings < 256
 ASSERT LO(music_old_evntv) <> &FF     \ JMP (indirect) on the NMOS 6502
 
 .message_tube       EQUS "Stratagem needs a 6502 second processor", 13, 0
-.message_machine    EQUS "Stratagem needs a BBC B+ 128K or an Integra-B", 13, 0
+.message_machine    EQUS "Stratagem needs a BBC B+ 128K, an Integra-B or a Master 128", 13, 0
 .message_banks      EQUS "Stratagem needs 48K of free sideways RAM", 13, 0
 .message_shadow     EQUS "Stratagem needs shadow RAM", 13, 0
 

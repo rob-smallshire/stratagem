@@ -60,6 +60,26 @@ or **U** (unsure). Sources are the beebium-stratagem session's research
 - Shadow RAM and ANDY are ordinary 2 MHz accesses in Beebium (no clock
   stretching); probably the same on real hardware. **U**
 
+## Master 128 and Master Turbo (MOS 3.20)
+
+- ACCCON (`&FE34`, readable) bit 2, X, makes the CPU see the shadow (the
+  screen in a shadow mode) at `&3000`-`&7FFF`, whatever the PC; bits 1 (E)
+  and 0 (D) are the VDU drivers' and the display's, and the OS keeps them.
+  Change X only by read-modify-write. **V** (b2)
+- ROMSEL bit 7 pages ANDY, 4K, over `&8000`-`&8FFF`: setting it, as the
+  B+ and the Integra-B do for the screen, would cover the first 4K of a
+  sideways bank. **V** (b2)
+- Sideways RAM is banks 4 to 7, empty in ROM_TYPE_TABLE: the game finds
+  7, 6, 5 and 4. **V** (b2)
+- OSBYTE `&00` with X=1 returns X=3 for MOS 3.20 (4 for 3.50, 5 for the
+  Compact's MOS 5). **V** (b2)
+- The filing systems' workspace is in HAZEL, so PAGE stays at `&0E00` with
+  DFS and ADFS. **U** (not yet measured)
+- Beebium doesn't emulate the Master yet (#189); b2 does, and its HTTP
+  API (peek and poke, with paging overrides; reset with a config; load a
+  disc) drives it (`uv run strat-b2`). Its paste rejects control
+  characters, Return included, and it has no key presses. **V**
+
 ## Integra-B (Model B, MOS 1.20, IBOS 1.26)
 
 - The video always reads main RAM. The extra 20K is CPU RAM at
